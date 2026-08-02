@@ -1,0 +1,21 @@
+# Python tool cruft
+__pycache__/
+*.pyc
+
+# OS cruft
+.DS_Store
+
+# Harness scratch dirs (Claude Code writes these under any .claude/ it touches).
+**/.cc-writes/
+
+# Local Claude Code session config -- created by the harness when it operates in this directory,
+# not part of this repo's own content. Machine/session-specific, never committed.
+/.claude/
+/.mcp.json
+
+# Maintainer-only machinery
+maintainer/
+
+# Per-machine absolute paths to engine/compiler checkouts -- see sources.example.md.
+# Never commit real local paths; they're specific to whoever's machine they were set on.
+sources.local.md

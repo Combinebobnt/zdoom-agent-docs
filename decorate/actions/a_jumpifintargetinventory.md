@@ -1,0 +1,57 @@
+# `A_JumpIfInTargetInventory` (state action)
+
+**Tier:** A
+**Engine:** Zandronum 3.2.1
+**Provenance:** ZDoom Wiki `A_JumpIfInTargetInventory` (retrieved 2026-08-01, oldid=42399) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:973-976` and the shared `DoJumpIfInventory` logic at lines 913–966.
+**Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_JumpIfInTargetInventory)` in `src/thingdef/thingdef_codeptr.cpp` — callable from any actor's state table.
+
+Checks the calling actor's target for a specific inventory item and conditionally jumps to a state if a certain amount is present. This is equivalent to `A_JumpIfInventory` with the `AAPTR_TARGET` pointer parameter, but more concise.
+
+## Signatures
+
+```c
+state A_JumpIfInTargetInventory(string "inventorytype", int amount, int offset[, int pointer])
+state A_JumpIfInTargetInventory(string "inventorytype", int amount, state "label"[, int pointer])
+```
+
+The third parameter can be either an integer frame offset or a state label — DECORATE resolves both forms via the parser.
+
+## Parameters
+
+| Parameter | Type | Meaning |
+|-----------|------|---------|
+| `inventorytype` | `string` (resolves to class) | The name of the inventory item class to check — e.g. `"Clip"`, `"Shell"`, `"HealthPack"`. Must resolve to a valid `Inventory`-derived class; an unresolvable or misspelled name silently causes no jump without error. |
+| `amount` | `int` | The threshold to check: if positive, jump when the actor has *at least* that many. If zero or negative, jump when the actor is carrying the *maximum possible* amount of that item (determined by the item's own `MaxAmount` property). This zero-and-max logic is useful for checking whether a player has a full magazine or ammo reserve without the amount varying based on backpack pickups. |
+| `offset` / `label` | `int` or state label | The frame offset to jump (if integer) or the state label to jump to (if string). |
+| `pointer` | `int` (optional, defaults to `AAPTR_DEFAULT`) | An actor pointer constant (`AAPTR_DEFAULT`, `AAPTR_TARGET`, `AAPTR_MASTER`, `AAPTR_TRACER`) selecting which actor's pointer to forward from the target. If unspecified, defaults to `AAPTR_DEFAULT`, which refers to the target itself. If the resulting pointer resolves to `NULL`, no jump occurs. |
+
+## Behavior
+
+The function searches for the specified inventory item in the target's (or the target's pointed-to actor's) inventory:
+
+- If the actor has no target, no jump occurs.
+- If the item is **not found**, no jump occurs.
+- If the item **is found**:
+  - **When `amount > 0`:** Jump if `item->Amount >= amount`. Note that if you request more items than the item's `MaxAmount`, the target can never accumulate that many, and the jump will never fire even if the target is carrying the maximum.
+  - **When `amount <= 0`:** Jump if `item->Amount >= item->MaxAmount`. This is the "at max capacity" check. Both zero and negative amounts trigger this branch.
+
+## Network and client-side behavior
+
+In network multiplayer (Zandronum):
+
+- **Weapon and flash states** (player's weapon (`ps_weapon`) and flash (`ps_flash`) psprites) execute the check on both server and client, and always jump synchronously.
+- **All other states** on server-authoritative actors return early in client mode without checking or jumping, unless one of these conditions holds:
+  - The target actor is flagged `+CLIENTSIDEONLY` (visuals-only; doesn't require server sync), **or**
+  - The target actor is the console player's own body.
+- **Inventory state chains in `CustomInventory` `Pickup` states** should not rely on the return value — `A_JumpIfInTargetInventory` explicitly sets the action result to `false` to avoid breaking inventory state flow.
+
+## Shared implementation
+
+`A_JumpIfInTargetInventory` delegates to the same internal `DoJumpIfInventory` helper used by `A_JumpIfInventory`, with the calling actor's `target` field passed in place of the actor pointer parameter. The two functions are otherwise identical in behavior and restrictions.
+
+## Failure modes and edge cases
+
+- **No target:** Returns without jumping — the `COPY_AAPTR_NOT_NULL` guard in the source ensures this.
+- **Unresolvable class name:** Silently returns without jumping. No error is logged.
+- **NULL actor pointer:** Returns without jumping (when a `pointer` parameter forwards to a `NULL`).
+- **Missing inventory item:** Returns without jumping — having zero of an item is not the same as having the item at zero amount; the item object must exist in the inventory.

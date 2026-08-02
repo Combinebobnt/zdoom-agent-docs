@@ -1,0 +1,155 @@
+zdoom-agent-docs — mixed-license notice
+========================================
+
+This repository mixes originally-authored material with material derived from third-party wikis
+and with short verbatim excerpts of third-party engine/compiler source code, each carrying its own
+license. Read this file before assuming a single license covers everything here — it does not.
+
+Every doc file that contains one of the two kinds of third-party material below says so in a
+`**Source excerpt:**` header field, pointing back to the relevant section here. If a file has no
+such field, it falls under section 1.
+
+1. Original material
+---------------------
+
+Everything not called out by section 2, 3, or 4 below — including every `CLAUDE.md`, `README.md`,
+`INDEX.md`, `shared/`, `tools/`, `sources.example.md`, and every doc file whose
+`Provenance:` line does **not** cite a wiki page and whose body contains no `**Source excerpt:**`
+field (i.e. tier-B/C entries written directly from engine/compiler source without quoting it
+verbatim, and any tier-A entry the maintainer has since rewritten from scratch) — is original work
+by the repo's contributors.
+
+    MIT License
+
+    Copyright (c) 2026 Combinebobnt and contributors
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
+A file can be "original work" under this section for its prose while still containing a verbatim
+excerpt covered by section 3 or 4 below — the MIT grant in this section covers the prose and
+analysis, not any quoted third-party source sitting inside the same file. Check for a
+`**Source excerpt:**` field before assuming a whole file is unencumbered.
+
+2. Wiki-derived material (tier-A entries)
+------------------------------------------
+
+Tier-A doc files (`**Tier:** A`) are enriched from a saved page on one of two wikis, recorded in
+each file's `**Provenance:**` line. Those source wikis publish their own content under terms this
+repo does not have the authority to override, regardless of how much the doc file's prose has been
+rewritten and re-verified against engine source:
+
+- Files citing a `... - ZDoom Wiki.html` provenance are derived from content published on the
+  ZDoom Wiki (`zdoom.org/wiki`) under the **GNU Free Documentation License, version 1.2** (per that
+  wiki's own footer notice). Redistribution/modification of that material must comply with GFDL
+  1.2's terms. A verbatim copy of the license text is included in this repo at
+  [licenses/GFDL-1.2.txt](licenses/GFDL-1.2.txt) per GFDL 1.2's own requirement that copies of
+  licensed material be accompanied by the license text.
+- Files citing a `... - Zandronum Wiki.html` provenance are derived from content published on the
+  Zandronum Wiki (`wiki.zandronum.com`) under **Creative Commons
+  Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)** (per that wiki's own
+  footer notice). **Note the NonCommercial clause** — this restricts commercial reuse of that
+  subset of files beyond what the MIT grant in section 1 would otherwise allow, independent of how
+  this repo itself is licensed. Full legal text: https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+
+Every tier-A file's `**Provenance:**` line is the authoritative record of which of the two source
+licenses applies to that specific file; check it before reusing a tier-A file outside this repo.
+
+3. Verbatim Zandronum engine source excerpts
+-----------------------------------------------
+
+A number of doc files, to precisely document observed behavior, quote short excerpts (a function
+body, a `case` block, a handful of related lines) directly from the Zandronum engine's own C++
+source — not from a wiki, and not paraphrased. Any such file carries a
+`**Source excerpt:** Zandronum engine source ...` field.
+
+The specific Zandronum source files these excerpts are drawn from (`src/p_acs.cpp`,
+`src/p_lnspec.cpp`, `src/team.cpp`, and similar) are themselves released under a permissive
+BSD-3-Clause-style license (verified directly against the file headers in the Zandronum source,
+not just its top-level `LICENSE.txt`, since Zandronum's own license notes that "some source files
+contain additional notices of original copyright by their contributors"):
+
+    Copyright 1998-2012 Randy Heit; Copyright (C) 2002 Brad Carney; Copyright (C) 2007-2012
+    Skulltag Development Team; Copyright (c) 2012, Zandronum Development Team. All rights reserved.
+
+    Redistribution and use in source and binary forms, with or without modification, are permitted
+    provided that the following conditions are met:
+
+    1. Redistributions of source code must retain the above copyright notice, this list of
+       conditions and the following disclaimer.
+    2. Redistributions in binary form must reproduce the above copyright notice, this list of
+       conditions and the following disclaimer in the documentation and/or other materials
+       provided with the distribution.
+    3. The name(s) of the author(s)/team may not be used to endorse or promote products derived
+       from this software without specific prior written permission.
+    4. Redistributions in any form must be accompanied by information on how to obtain complete
+       source code for the software and any accompanying software that uses the software. The
+       source code must either be included in the distribution or be available for no more than
+       the cost of distribution plus a nominal fee, and must be freely redistributable under
+       reasonable conditions.
+
+    THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES ARE DISCLAIMED. IN NO
+    EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DAMAGES ARISING IN ANY WAY
+    OUT OF THE USE OF THIS SOFTWARE.
+
+This notice, plus each excerpt's own file:line citation in its doc's `**Provenance:**` field,
+satisfies condition 1 (notice retained) for the whole repo at once. Condition 4 (information on
+how to obtain the complete source) is satisfied by this pointer: the complete Zandronum source is
+freely available at https://github.com/TorrSamaho/zandronum. Downstream reusers who copy a single
+excerpt-bearing `.md` file out of this tree should carry this section (or an equivalent pointer to
+it) along with it to stay compliant.
+
+This is a different, and more permissive, license than either wiki's — it is not copyleft and does
+not restrict commercial use, so it doesn't conflict with this repo's own MIT terms in section 1
+beyond the attribution/source-pointer obligation described above.
+
+4. Verbatim zt-bcc/bcc compiler source excerpts
+---------------------------------------------------
+
+`zt-bcc` (and the upstream `bcc` project it forks, `positively-charged/bcc`) is MIT-licensed,
+Copyright (c) 2013 Daniel Baimiachkine — the same permissive terms as this repo's own original
+material in section 1. Reusing such an excerpt would only require keeping this notice; there is no
+copyleft or commercial-use restriction to track separately.
+
+A note on engine source this repo does NOT quote
+-------------------------------------------------
+
+UZDoom/GZDoom engine source and the ZScript standard library (`wadsrc/static/zscript/`) are
+GPL-3.0. Unlike `acc` — also excluded from verbatim quoting, but only for lack of a permissive
+fallback — GPL-3.0 material would be perfectly quotable *if* this repo were prepared to carry
+GPL-3.0 obligations for the files that did it. It deliberately isn't: `shared/AUTHORING.md`'s
+"Quoting engine/compiler source verbatim" makes paraphrase-only a hard rule with no excerpt
+exception, precisely so no file in this tree ever needs a section 5. If you ever find a fenced
+code block that looks like real UZDoom/GZDoom C++ or ZScript stdlib source, treat it as a bug in
+the doc file, not as material this section failed to license — `tools/lint_docs.py` treats it as
+a hard lint error for the same reason.
+
+5. Practical guidance for reusing this repo
+----------------------------------------------
+
+- If you only need signature/parameter lookups, or a file with no `**Source excerpt:**` field and
+  a non-wiki `Provenance:`, section 1's MIT terms cover you outright.
+- If a file's `Provenance:` cites a wiki page, check section 2 and comply with the corresponding
+  wiki's license — in particular, verify NonCommercial compliance before using a
+  Zandronum-Wiki-derived (CC BY-NC-SA 4.0) file in a commercial context.
+- If a file carries a `**Source excerpt:**` field, comply with section 3 or 4 as indicated — in
+  practice this just means keeping this LICENSE file (or the relevant section of it) alongside any
+  copy you make, since neither excerpt source imposes copyleft or commercial restrictions.
+- A single file can be subject to more than one of the above at once (e.g. a tier-A,
+  Zandronum-Wiki-derived file that also quotes engine source) — check every applicable field before
+  assuming only one section applies.
