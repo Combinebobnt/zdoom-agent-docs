@@ -1,5 +1,15 @@
 # `str GetCurrentGamemode(void)`
 
+**Tier:** A.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `GetCurrentGameMode - Zandronum Wiki.html` (`_intake/`, retrieved
+2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetCurrentGameMode&oldid=2308`) + source-verified (`p_acs.cpp:7582-7586`, `gamemode_enums.h:82-104`,
+`zt-bcc/lib/zcommon.bcs:1766`) and version-gated against `28f736fb3` per this repo's 3.2.1 check.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
+**Bucket:** extension function (negative index, `ACSF_GetCurrentGamemode`).
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+
 Returns the current game mode as a string constant name, with the `GAMEMODE_` prefix stripped.
 Extension function, index `-133` in `zt-bcc/lib/zcommon.bcs:1766` (declared there as
 `GetCurrentGamemode` — lowercase `m`; ACS/BCS name lookups are case-insensitive, so the wiki's
@@ -13,8 +23,6 @@ case ACSF_GetCurrentGamemode:
     return GlobalACSStrings.AddString( GetStringGAMEMODE_e( GAMEMODE_GetCurrentMode()) + 9 );
 }
 ```
-
-**Bucket:** extension function (negative index, `ACSF_GetCurrentGamemode`).
 
 - Takes no arguments and cannot fail — it just stringifies whatever `GAMEMODE_GetCurrentMode()`
   (the server's live `GAMEMODE_e` state) currently is, via a fixed name table
@@ -38,7 +46,7 @@ case ACSF_GetCurrentGamemode:
 
 **Example:**
 
-```
+```text
 str mode = GetCurrentGamemode();
 if (mode == "Invasion")
 {
@@ -49,9 +57,26 @@ if (mode == "Invasion")
 **Returns:** `str` — one of the 16 `GAMEMODE_e` names above (prefix stripped), always a valid
 value; never fails or returns an empty/error string.
 
-**Provenance:** wiki page `GetCurrentGameMode - Zandronum Wiki.html` (`_intake/`, retrieved
-2026-07-29, `oldid=2308`) + source-verified (`p_acs.cpp:7582-7586`, `gamemode_enums.h:82-104`,
-`zt-bcc/lib/zcommon.bcs:1766`) and version-gated against `28f736fb3` per this repo's 3.2.1 check.
-**Engine:** Zandronum 3.2.1. **Tier:** A.
+## Engine-family divergence
 
-**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+`GetCurrentGamemode` is bound as ACSF (CALLFUNC) index 133 — inside the 100–199 range UZDoom's own
+ACSF enum reserves for Zandronum's extensions and implements none of (confirmed via
+`tools/engine_matrix.py GetCurrentGamemode`, bin `zandronum-only-silent`). UZDoom's `CallFunction`
+dispatcher is a plain `switch` over the ACSF index with `default: break;` falling through to
+`return 0` — no error, no log line, execution just continues. A Zandronum-compiled object calling
+`GetCurrentGamemode()` under UZDoom silently gets `0` back in place of the real gamemode name. See
+[Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md) for the general mechanism
+— this function is one of the confirmed instances it names directly.
+
+That `0` doesn't land the way it does for the compat doc's plain int/bool-returning examples,
+where the substituted `0` is directly the coincidentally-correct payload. This function's declared
+return type is `str`, which ACS implements as an index into a string pool, not a raw value — a
+genuine call encodes its result through `GlobalACSStrings.AddString`, which tags the index with
+the pool's reserved library-id bits so the VM resolves it against the dynamic string table. The
+substituted `0` carries none of those bits: it decodes as library ID 0, string index 0 — whatever
+compiled string constant happens to sit at that slot in the calling object's own string table, if
+any, unrelated to any `GAMEMODE_e` name. So although `GAMEMODE_COOPERATIVE` is numerically 0 in
+the enum this file documents above, the UZDoom-side failure does not stringify to `"Cooperative"`
+and isn't the "looks fine in a quick SP test" case the compat doc warns about for int-returning
+extensions — a script comparing the result against a gamemode name is far more likely to see
+garbage or an unrelated string than a plausible-looking default.

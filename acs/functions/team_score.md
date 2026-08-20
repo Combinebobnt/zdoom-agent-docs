@@ -1,5 +1,24 @@
 # `int Team_Score(int howmuch, int nogrin)`
 
+**Tier:** A.
+**Applies to:** N/A — zt-bcc-declared, neither engine implements it
+**Verified against:** none
+**Provenance:** wiki page `Team_Score - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29,
+`https://wiki.zandronum.com/w/index.php?title=Team_Score&oldid=1341`) + source-verified against the Zandronum source (`p_lnspec.cpp:2102-2121`,
+`team.cpp:858-905`, `p_interaction.cpp:2813-2830`) and `zt-bcc/lib/zcommon.bcs:1499`. The wiki's
+one-parameter usage and basic "gives the activator's team points" description hold; the
+undocumented second parameter (dead), the always-`false` return, the dual team+player counter
+update, the strict-AND gamemode-flag gate, the on-team-player-activator requirement, the
+conditional announcer sound, the `pointlimit` win-condition side effect, and the netcode
+replication are this doc's source-verified additions. `LS_Team_Score` is present verbatim in
+`bc562a817` ("original Skulltag 0.97c2 source from Carnevil...", 2007-02-16) — the oldest commit
+in this checkout's history for this function — so it necessarily predates the 3.2.1
+version-string commit (`28f736fb3`) by many years; confirmed via `git merge-base
+--is-ancestor bc562a817 28f736fb3`.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
+**Bucket:** action special (positive index).
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+
 Gives the calling player's team (and the player personally) point-score, gated on the
 current gamemode's team/point flags. Action special (`LS_Team_Score`, index 152 in
 `zcommon.bcs`), implementation at the Zandronum source's `src/p_lnspec.cpp:2102-2121`, dispatching
@@ -7,8 +26,6 @@ to `TEAM_SetPointCount`/`PLAYER_SetPoints` in the Zandronum source's `src/team.c
 the Zandronum source's `src/p_interaction.cpp`. See also `functions/changeteamscore.md` (the
 `ACSF_ChangeTeamScore` extension function, a different, newer API into the same `SCORE_*`
 subsystem) — this doc doesn't restate that one's enum/announce material.
-
-**Bucket:** action special (positive index).
 
 ```cpp
 FUNC( LS_Team_Score )
@@ -86,25 +103,9 @@ FUNC( LS_Team_Score )
 return value to detect success or failure; check gamemode flags and activator state yourself if
 that matters.
 
-**Provenance:** wiki page `Team_Score - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29,
-`oldid=1341`) + source-verified against the Zandronum source (`p_lnspec.cpp:2102-2121`,
-`team.cpp:858-905`, `p_interaction.cpp:2813-2830`) and `zt-bcc/lib/zcommon.bcs:1499`. The wiki's
-one-parameter usage and basic "gives the activator's team points" description hold; the
-undocumented second parameter (dead), the always-`false` return, the dual team+player counter
-update, the strict-AND gamemode-flag gate, the on-team-player-activator requirement, the
-conditional announcer sound, the `pointlimit` win-condition side effect, and the netcode
-replication are this doc's source-verified additions. `LS_Team_Score` is present verbatim in
-`bc562a817` ("original Skulltag 0.97c2 source from Carnevil...", 2007-02-16) — the oldest commit
-in this checkout's history for this function — so it necessarily predates the 3.2.1
-version-string commit (`28f736fb3`) by many years; confirmed via `git merge-base
---is-ancestor bc562a817 28f736fb3`. **Engine:** Zandronum 3.2.1 (verified against
-the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.
-
 **Possible family:** This function, `ChangeTeamScore` (`functions/changeteamscore.md`), and
 `Team_GivePoints` (index 153, processed concurrently by a sibling agent in this batch) are all
 different entry points into the same team-scoring subsystem and may be worth consolidating into
 a `families/team-scoring.md` at some point. Per this batch's instructions, this file was kept
 standalone rather than folding into a family file — flagging the overlap here for the
 coordinating session to consider.
-
-**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.

@@ -1,8 +1,10 @@
 # `A_TransferPointer(pointer source, pointer recipient, pointer sourcefield, pointer recipientfield[, int flags])`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_TransferPointer` (retrieved 2026-07-31, oldid=38227) + verified against Zandronum source's `src/thingdef/thingdef_codeptr.cpp:282-307` and `src/actorptrselect.cpp`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_TransferPointer` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_TransferPointer&oldid=38227) + verified against Zandronum source's `src/thingdef/thingdef_codeptr.cpp:282-307` and `src/actorptrselect.cpp`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_TransferPointer)` — callable from any actor's state table.
 
 Transfers a pointer (target, master, or tracer relationship) from one actor to another, with optional safeguards against creating circular reference chains.
@@ -47,7 +49,7 @@ None — state flow does not branch.
 
 ## Examples
 
-```
+```decorate
 ACTOR WimpyImp : DoomImp
 {
   States
@@ -60,6 +62,15 @@ ACTOR WimpyImp : DoomImp
 ```
 
 This imp's master acquires the same target as the imp itself. The state then continues to the parent class's Missile state.
+
+## Engine-family divergence: pointer selector set
+
+The core `A_TransferPointer` algorithm (self-reference check, target/master loop safeguards, `AAPTR_DEFAULT`-as-recipientfield behavior, and the `PTROP_UNSAFETARGET`/`PTROP_UNSAFEMASTER`/`PTROP_NOSAFEGUARDS` flag values of 1/2/3) is identical in UZDoom — same logic, same constants. Only the set of valid `AAPTR_*` selector values differs between the two engines:
+
+- UZDoom defines `AAPTR_GET_LINETARGET`, a general selector (grouped alongside `AAPTR_TARGET`/`AAPTR_MASTER`/`AAPTR_TRACER`/`AAPTR_FRIENDPLAYER`) that Zandronum does not define at all.
+- Zandronum defines several netcode/event-script-oriented selectors UZDoom does not have: `AAPTR_PLAYER_GETFLOATYICON`, `AAPTR_PLAYER_GETCAMERA`, and the `AAPTR_DAMAGE_SOURCE`/`AAPTR_DAMAGE_INFLICTOR`/`AAPTR_DAMAGE_TARGET` trio (the latter only meaningful in Zandronum's damage event scripts).
+
+Passing a selector value on the "wrong" engine (e.g. `AAPTR_DAMAGE_SOURCE` on UZDoom) doesn't crash — it simply fails to match any case in the selector-resolution switch and falls through to returning the origin actor itself, the same fallback used for an unrecognized/zero selector.
 
 ## Related
 

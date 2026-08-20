@@ -1,11 +1,13 @@
 # Thing_Hate
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (verified against `master` HEAD via the Zandronum source's `src/p_lnspec.cpp`).
-**Provenance:** ZDoom Wiki (Thing_Hate); verified against Zandronum source 2026-07-29.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-06)
+**Provenance:** ZDoom Wiki (Thing_Hate) (retrieved 2026-08-06, https://zdoom.org/w/index.php?title=Thing_Hate&oldid=32902) + verified against Zandronum source `src/p_lnspec.cpp:1394-1562`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Action special, index 177.
 
-```c
+```acs
 int Thing_Hate(int hater, int hatee, int type)
 ```
 
@@ -43,6 +45,25 @@ Forces a monster to hate and attack another actor. Both the hater and hatee must
 - **Wiki divergence:** The wiki's initial example uses `Thing_Hate(100, 0, 0)` to make monsters attack the player "at map start," but type 0 does not set the dynamic TID-tracking mode; type 2 is likely intended. Additionally, the wiki prose recommends `Thing_Hate(tid, 0, 4)` for the activator no-sight-check idiom, but the source comment explicitly documents `Thing_Hate(tid, 0, 2)` instead; both set `NOSIGHTCHECK`, but type 4 additionally sets `HUNTPLAYERS`, making them not equivalent. Prefer type 2 for the "attack without seeing" effect alone.
 - **Server/network:** Setting a hater to its see state is server-authoritative; clients receive a `SERVERCOMMANDS_SetThingState` packet.
 - **All matching TIDs:** The function iterates and applies the hate to **all** actors with the matching hater TID, not just the first one.
+
+## Engine-family divergence: server-authoritative state sync is Zandronum-only
+
+The core hate-assignment logic is byte-for-byte identical between the two engines: UZDoom's
+`FUNC(LS_Thing_Hate)` (`src/playsim/p_lnspec.cpp:1565-1726`) sets `TIDtoHate`/`LastLookActor`,
+clears/updates `target` and `lastenemy`, applies the same `MF3_NOSIGHTCHECK` /
+`MF3_HUNTPLAYERS` / `MF4_NOHATEPLAYERS` flag rules per type, and assigns `hater->target` before
+calling `hater->SetState(hater->SeeState)`, matching the Zandronum engine fork's
+`src/p_lnspec.cpp:1394-1562` line for line.
+
+The one difference is the "Server/network" behavioral note above: immediately before
+`hater->SetState(hater->SeeState)`, the Zandronum engine fork inserts `if (NETWORK_GetState() ==
+NETSTATE_SERVER) SERVERCOMMANDS_SetThingState(hater, STATE_SEE);` — a server-authoritative
+broadcast telling clients to also put the actor into its see state, part of Zandronum's own
+client-server netcode. UZDoom has no `SERVERCOMMANDS_*` system at all (confirmed absent from its
+source tree); it calls `hater->SetState(hater->SeeState)` directly with no separate network-sync
+step. This has no single-player-visible effect either way — it only matters for how the state
+change propagates to remote clients in a networked game — so the "Server/network" bullet above
+should be read as Zandronum-specific, not a claim about UZDoom.
 
 ## Examples
 

@@ -1,17 +1,19 @@
 # `void A_CustomComboAttack(class<Actor> missiletype, float spawnheight, int damage, sound meleesound = "", name damagetype = "none", bool bleed = true)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_CustomComboAttack` (retrieved 2026-08-01, oldid=40208) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1416–1465`, `wadsrc/static/actors/actor.txt:264`, and `src/p_enemy.cpp:245–280`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_CustomComboAttack` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_CustomComboAttack&oldid=40208) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1416–1465`, `wadsrc/static/actors/actor.txt:264`, and `src/p_enemy.cpp:245–280`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Action function, defined on `AActor` (callable from any actor's state table).
 
 A customizable combo attack for monsters that adapts based on range. The calling actor faces its target, then performs either a melee attack (if the target is within melee range) or fires a projectile (if out of range and a missile type is specified). Does nothing if there is no current target.
 
-## Fork divergence — wiki type mismatch
+## Wiki/engine divergence: wiki type mismatch
 
 The ZDoom Wiki page describing this function (oldid=40208) uses `string` types for `missiletype`, `meleesound`, and `damagetype`, but Zandronum's actual declaration uses `class<Actor>`, `sound`, and `name` respectively. The wiki signature predates any known divergence in this function across ZDoom-family engines; a current wiki revision was not checked and may differ further.
 
-## Server-side behavior (Zandronum fork divergence)
+## Zandronum-specific: server-side behavior
 
 **Facing happens before the network gate:** The action immediately calls `A_FaceTarget`, which runs on both server and client. The rest of the attack (range check, damage, missile spawn) is server-side only — the function returns immediately on a client unless it called `A_FaceTarget` first. This differs from the typical pattern of gating the entire action before any side effects.
 
@@ -36,6 +38,10 @@ The melee branch activates if `self->CheckMeleeRange()` returns `true`. This fun
 - **Sight:** The actor must have line-of-sight to the target (`P_CheckSight`); targets behind walls/obstacles fail this check.
 
 If all checks pass, melee is used; otherwise the missile branch is attempted.
+
+## Engine-family divergence: SECF_NOATTACK sector flag in melee range check
+
+On UZDoom, the underlying melee-range check (`P_CheckMeleeRange`, exposed to ZScript as `AActor.CheckMeleeRange`) adds one condition not present in Zandronum: the check fails (falls through to the missile branch) if the calling actor's current sector has the `SECF_NOATTACK` flag set — a UDMF sector flag that suppresses monster attack initiation in that sector, and that does not exist in Zandronum at all. This check runs after the distance test and before the vertical-clearance test. On a map using this flag, a monster that would melee-attack on Zandronum instead falls through to the missile branch (or no-ops, if `missiletype` is null) on UZDoom.
 
 ## Missile spawn and behavior
 

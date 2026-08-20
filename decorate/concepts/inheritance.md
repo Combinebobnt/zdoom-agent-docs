@@ -1,8 +1,12 @@
 # Inheritance
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki "Using inheritance" (retrieved 2026-07-31, oldid=53923), cross-checked against the Zandronum source's class-creation and actor-parsing machinery (`src/dobjtype.cpp:273-315`, `src/thingdef/thingdef.cpp:80-174`, `src/thingdef/thingdef_properties.cpp:448-467`, `src/p_mobj.cpp:7633-7652`). Per `../../shared/AUTHORING.md`'s engine-scope caveats, the local checkout is a `master` HEAD reporting `3.3-alpha` in `version.h`, not a pristine 3.2.1 checkout — the files cited here (`dobjtype.cpp`, `thingdef.cpp`, `p_mobj.cpp`) are not touched by the applied ZandronumMCP patch.
+**Applies to:** UZDoom=yes, Zandronum=yes — `SKIP_SUPER`'s restriction rule differs between the two,
+see "Engine-family divergence" below; the rest of this file's inheritance/replaces/doomednum
+mechanics apply to both
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki "Using inheritance" (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=Using_inheritance&oldid=53923), cross-checked against the Zandronum source's class-creation and actor-parsing machinery (`src/dobjtype.cpp:273-315`, `src/thingdef/thingdef.cpp:80-174`, `src/thingdef/thingdef_properties.cpp:448-467`, `src/p_mobj.cpp:7633-7652`). Per `../../shared/AUTHORING.md`'s engine-scope caveats, the local checkout is a `master` HEAD reporting `3.3-alpha` in `version.h`, not a pristine 3.2.1 checkout — the files cited here (`dobjtype.cpp`, `thingdef.cpp`, `p_mobj.cpp`) are not touched by the applied ZandronumMCP patch.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
 This page covers how a derived actor class inherits properties, flags, and fields from its parent, how `replaces` and `doomednum` work, and how multiple-level inheritance chains resolve. For state-label inheritance specifically (how a subclass's `Goto` can reach a parent's labels), see `state-machine.md`'s "Label scoping and inheritance" section — this file covers property/flag inheritance, not state inheritance.
@@ -11,7 +15,7 @@ This page covers how a derived actor class inherits properties, flags, and field
 
 When a derived class is created at DECORATE compile time, its default property values are **copied from the parent's defaults** into its own new defaults instance — not looked up dynamically at runtime. The creation process (`PClass::CreateDerivedClass`, `src/dobjtype.cpp:273-315`) allocates a fresh `Defaults` buffer for the subclass and fills it with a `memcpy` from the parent's Defaults (`dobjtype.cpp:310-311`):
 
-```
+```text
 type->Defaults = (BYTE *)M_Malloc(size);
 memcpy (type->Defaults, Defaults, Size);
 if (size > Size)
@@ -32,7 +36,7 @@ The key point: properties and flags are **not** looked up by walking ancestors a
 
 The `SKIP_SUPER` property resets a derived actor's inherited properties to the base `AActor` defaults, wiping out whatever properties the parent class had set (`thingdef_properties.cpp:448-467`):
 
-```
+```text
 DEFINE_PROPERTY(skip_super, 0, Actor)
 {
 	...
@@ -52,7 +56,7 @@ DEFINE_PROPERTY(skip_super, 0, Actor)
 
 When a species is not explicitly set via the `Species` property, an actor's species is automatically determined by walking up the class hierarchy. The `GetSpecies()` function (`p_mobj.cpp:7633-7652`) climbs the parent classes as long as they have the `MF3_ISMONSTER` flag set; when it reaches a non-monster ancestor, it uses that ancestor's class name as the species:
 
-```
+```text
 if (GetDefaultByType(thistype)->flags3 & MF3_ISMONSTER)
 {
 	while (thistype->ParentClass)
@@ -74,7 +78,7 @@ The `replaces` keyword and the trailing doomednum in an actor header are **two i
 
 **`replaces` — actor substitution:** The `replaces` keyword (`thingdef_parse.cpp:1065-1076`) names another actor to replace. When that named actor is spawned (map-spawned only — not created via inventory, script, or other means), the replacement is used instead. The replacement is bidirectional: the replaced class's `Replacee` field points to the replacement, and the replacement's `Replacement` field points back (the relationship is set up in `SetReplacement`, `thingdef.cpp:203-204`):
 
-```
+```text
 replacee->ActorInfo->Replacement = info;
 info->Replacee = replacee->ActorInfo;
 ```
@@ -103,6 +107,23 @@ The wiki page shows examples in **both ZScript and DECORATE** (marked "deprecate
 
 - Whether the `Offset(0, 0)` special case (mentioned in `state-machine.md` as "keep previous offset" for Hexen compatibility) affects property inheritance in any way.
 - Whether `SKIP_SUPER` applies the same reset to multi-word flag fields (flags2, flags3, etc.) as the source code snippet above suggests for the core `AActor` size, or whether a more complex interaction is needed.
+
+## Engine-family divergence
+
+Confirmed directly in UZDoom source: the core defaults-copy inheritance mechanism this file
+documents (`PClass::CreateDerivedClass` `memcpy`-ing the parent's `Defaults` buffer,
+`src/common/objects/dobjtype.cpp`), the `replaces` keyword, and the doomednum `[-1, 32767]` range
+enforcement (`src/scripting/decorate/thingdef_parse.cpp`) are all present in UZDoom essentially
+unchanged from what's documented above for Zandronum.
+
+`SKIP_SUPER`'s restriction differs, though. Zandronum (per this file's "Three caveats" above)
+ignores `SKIP_SUPER` specifically for classes descended from `AInventory`. UZDoom's `skip_super`
+property (`src/scripting/thingdef_properties.cpp`) instead rejects it — with an `MSG_OPTERROR`,
+not a hard abort — on **any** class whose instance size no longer matches base `AActor`'s
+(`info->Size != actorclass->Size`), which in practice means any class that has added its own user
+variables or other size-extending state, not just `AInventory` descendants specifically. The two
+engines gate the same property on structurally different conditions (ancestry vs. instance-size
+match), not the same rule reworded.
 
 ## Cross-references
 

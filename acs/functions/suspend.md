@@ -1,5 +1,15 @@
 # `suspend;`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** `Suspend - ZDoom Wiki.html`
+(`https://zdoom.org/w/index.php?title=Suspend&oldid=55228`), verified against
+the Zandronum source's `src/p_acs.cpp` and the zt-bcc source's `src` on 2026-07-29. The wiki's core claim
+("picks up where it left off... only works properly with `ACS_Execute`... `ACS_ExecuteWithResult`
+and `ACS_ExecuteAlways` restart from the beginning instead") checks out exactly against the C++,
+traced below.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** none of the three — this is a **compiler statement/keyword**, not a callable function
 at all. `suspend` never appears in `zt-bcc/src/builtin.c`'s `g_funcs[]` (compiler-builtin bucket)
 or `zcommon.bcs`'s `special` table (action-special/extension-function buckets); it's tokenized as
@@ -8,16 +18,6 @@ or `zcommon.bcs`'s `special` table (action-special/extension-function buckets); 
 `SCRIPT_JUMP_TOTAL` triple). No parentheses, no arguments, bare `suspend;`. Compiles straight to
 the zero-operand opcode `PCD_SUSPEND` (`zt-bcc/src/codegen/pcode.h:7`, emitted at
 `zt-bcc/src/codegen/stmt.c:1146-1148`).
-
-**Tier:** A. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD —
-see "Engine scope" in `../../shared/AUTHORING.md`).
-
-**Provenance:** `Suspend - ZDoom Wiki.html`
-(`https://zdoom.org/w/index.php?title=Suspend&oldid=55228`), verified against
-the Zandronum source's `src/p_acs.cpp` and the zt-bcc source's `src` on 2026-07-29. The wiki's core claim
-("picks up where it left off... only works properly with `ACS_Execute`... `ACS_ExecuteWithResult`
-and `ACS_ExecuteAlways` restart from the beginning instead") checks out exactly against the C++,
-traced below.
 
 Unlike `restart;` (a `goto` back to the top of the same script instance) or `terminate;`
 (destroys the script instance), `suspend;` just parks the *same* running `DLevelScript` C++

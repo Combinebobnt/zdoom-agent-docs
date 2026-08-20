@@ -1,8 +1,10 @@
 # ACS_Execute
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (feature predates the fork; verified against the `3.3-alpha` local checkout).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `ACS_Execute - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=ACS_Execute&oldid=38920`), verified 2026-07-29 against the Zandronum source's `src/p_lnspec.cpp` and `p_acs.cpp`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Action special, index 80 in `zcommon.bcs`'s `special` table.
 
 `int ACS_Execute(int script, int map [, int s_arg1, int s_arg2, int s_arg3])`

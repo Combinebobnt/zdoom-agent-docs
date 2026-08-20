@@ -1,11 +1,13 @@
 # GetEventResult
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 — both `GetEventResult()` itself and the armor-damage-event rename were confirmed ancestors of the 3.2.1 version-bump commit, so this is not just "present in the 3.3-alpha checkout."
-**Provenance:** wiki page `GetEventResult - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `oldid=2283`) + verified against the Zandronum source (`p_acs.cpp`, `gamemode.h`, `gamemode.cpp`, `chat.cpp`, `sv_main.cpp`, `team.cpp`, `domination.cpp`) and the zt-bcc source's `lib/zcommon.bcs`, including a git-ancestry check of the `GetEventResult` and `GAMEEVENT_ACTOR_ARMORDAMAGED`→`GAMEEVENT_ACTOR_DAMAGED_PREMOD`-rename commits against the 3.2.1 version-bump commit `28f736fb3` (2026-07-29).
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `GetEventResult - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetEventResult&oldid=2283`) + verified against the Zandronum source (`p_acs.cpp`, `gamemode.h`, `gamemode.cpp`, `chat.cpp`, `sv_main.cpp`, `team.cpp`, `domination.cpp`) and the zt-bcc source's `lib/zcommon.bcs`, including a git-ancestry check of the `GetEventResult` and `GAMEEVENT_ACTOR_ARMORDAMAGED`→`GAMEEVENT_ACTOR_DAMAGED_PREMOD`-rename commits against the 3.2.1 version-bump commit `28f736fb3` (2026-07-29).
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
-```
+```text
 int GetEventResult(void);
 ```
 
@@ -46,7 +48,7 @@ the Zandronum source's `src`: `GAMEEVENT_ACTOR_DAMAGED`/`GAMEEVENT_ACTOR_DAMAGED
 `_JOINQUEUECHANGED`, `_PLAYERJOINS`) omits the argument and gets the `= 1` default
 (`gamemode.h:245`).
 
-## Divergence from the wiki
+## Wiki/engine divergence: event-type compatibility claim
 
 The wiki's "Usage" section frames this as a hard compatibility restriction: *"This is only
 compatible with the following event types: `GAMEEVENT_CHAT`, `GAMEEVENT_ACTOR_DAMAGED`, and
@@ -70,7 +72,7 @@ That's an oversimplification, verified against the source above:
   wiki conflates "the engine doesn't consume this event's outcome" with "the function returns a
   hardcoded 1," which isn't what the code does.
 - **Naming divergence, not just a wiki inaccuracy:** the wiki's third "compatible" type,
-  `GAMEEVENT_ACTOR_ARMORDAMAGED`, does not exist under that name anywhere in this fork's
+  `GAMEEVENT_ACTOR_ARMORDAMAGED`, does not exist under that name anywhere in Zandronum's
   toolchain. It was renamed to `GAMEEVENT_ACTOR_DAMAGED_PREMOD` in
   the Zandronum source commit `b9b31b7c1` ("Rename GAMEEVENT_ACTOR_ARMORDAMAGED to
   GAMEEVENT_ACTOR_DAMAGED_PREMOD to more descriptively match its behaviour", 2024-04-05) — see
@@ -112,3 +114,22 @@ used, not dates):
   short-circuit (`GAMEMODE_HandleEvent` no-ops immediately when called client-side, so
   `GetEventResult()` in a `CLIENTSIDE`-flagged `EVENT` script never sees a server-originated
   override round-trip).
+
+## Engine-family divergence
+
+`GetEventResult` is bound as ACSF (CALLFUNC) index **152**, inside the 100–199 range UZDoom
+reserves for Zandronum's own extensions and implements none of (see
+[Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md)). A Zandronum-compiled
+object calling it under UZDoom hits the dispatcher's `default: break;` case and gets back `0` —
+no error, no log line, script execution continues normally.
+
+That `0` is not a harmless placeholder here. On Zandronum, `g_lEventResult` starts each dispatch
+seeded at `1` for every event type except the two damage events (seeded at the incoming damage
+amount instead), so a script that never called `SetResultValue()` reads back `1`, not `0` — and
+`0` is itself a meaningful in-band value the consuming engine code acts on (blocks the chat
+message for `GAMEEVENT_CHAT`, zeroes the applied damage for the damage events). Under UZDoom,
+`GetEventResult()` always returns `0` regardless of whether any `SetResultValue()` call happened,
+which is indistinguishable from a script having deliberately blocked the chat message or zeroed
+the damage — there is no way for a caller to tell "no result was ever set" apart from "the result
+was explicitly set to the block/zero value." See [EVENT scripts](../concepts/event-scripts.md) for
+the full `SetResultValue`/result-chaining mechanism this reads back from on Zandronum.

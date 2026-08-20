@@ -1,12 +1,8 @@
 # `SetLineTexture`
 
-**Bucket:** compiler builtin — `zt-bcc/src/builtin.c:247`: `{ "setlinetexture", "iiis", NULL }`
-(four required int/string args), compiling to `PCD_SETLINETEXTURE`
-(`zt-bcc/src/builtin.c:395`). Not a `zcommon.bcs` `special`-table entry.
-
-**Tier:** A. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see
-"Engine scope" in `../../shared/AUTHORING.md`).
-
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `SetLineTexture - ZDoom Wiki.html`
 (`https://zdoom.org/w/index.php?title=SetLineTexture&oldid=35840`), verified against
 the Zandronum source's `src/p_acs.cpp` (`PCD_SETLINETEXTURE` at lines 11431-11433,
@@ -14,10 +10,15 @@ the Zandronum source's `src/p_acs.cpp` (`PCD_SETLINETEXTURE` at lines 11431-1143
 the Zandronum source's `src/sv_commands.cpp` (`SERVERCOMMANDS_SetLineTextureByID` at lines 5041-5070),
 and the zt-bcc source's `lib/zcommon.bcs` (constant definitions at lines 67-69 for `SIDE_*`, lines 74-76
 for `TEXTURE_*`) on 2026-07-29.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** compiler builtin — `zt-bcc/src/builtin.c:247`: `{ "setlinetexture", "iiis", NULL }`
+(four required int/string args), compiling to `PCD_SETLINETEXTURE`
+(`zt-bcc/src/builtin.c:395`). Not a `zcommon.bcs` `special`-table entry.
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
 ## Syntax
 
-```
+```text
 void SetLineTexture(int lineid, int line_side, int sidedef_texture, str texturename);
 ```
 
@@ -37,7 +38,7 @@ every linedef in the map and updates the texture on those whose ID matches `line
 
 ## Side constants
 
-```
+```text
 SIDE_FRONT = 0   // front sidedef of the linedef
 SIDE_BACK  = 1   // back sidedef of the linedef
 ```
@@ -49,7 +50,7 @@ SIDE_BACK, TEXTURE_TOP, "WALL01")`, not an error.
 
 ## Texture position constants
 
-```
+```text
 TEXTURE_TOP    = 0   // upper texture of sidedef
 TEXTURE_MIDDLE = 1   // middle (wall) texture of sidedef
 TEXTURE_BOTTOM = 2   // lower texture of sidedef
@@ -96,7 +97,7 @@ failures on this function (NULL pointer case) and from `ReplaceTextures`' behavi
 `texturename` is *visible* as a console message and a visible broken-texture appearance, not
 silent.
 
-## Zandronum-only netcode replication — not on the ZDoom wiki
+## Zandronum-specific: netcode replication (not on the ZDoom wiki)
 
 The implementation checks `NETWORK_GetState()` before textures are changed:
 
@@ -112,7 +113,12 @@ ID, but means any lookup failures (NULL string resolution, unrecognized texture 
 identically on server and clients. In single-player or as a client-side script, the network call
 is skipped.
 
-## Map-reset bookkeeping — Zandronum addition, not on the ZDoom wiki
+UZDoom's version of this function has no equivalent check or broadcast step — it always runs the
+lookup-and-set logic directly, with no server/client branch. This is consistent with that engine's
+different networking model, where connected clients execute identical ACS from a shared command
+stream rather than relying on server-authoritative broadcast of individual state changes.
+
+## Zandronum-specific: map-reset bookkeeping (not on the ZDoom wiki)
 
 Each affected linedef has a `TexChangeFlags` bitmask updated to track which of its six texture
 segments (three per side) were modified:
@@ -127,9 +133,11 @@ lines[linenum].TexChangeFlags |= 1 << ulShift;
 This bookkeeping is internal to the engine and used for map reset/reload restoration. Not
 user-facing — just explains why this field is touched if seen elsewhere in engine or ACS source.
 
+UZDoom's version of this function has no equivalent bitmask or bookkeeping step — its texture
+assignment ends at the sidedef texture-set call, with nothing tracking which segments were
+touched.
+
 ## See also
 
 - [`ReplaceTextures`](replacetextures.md) — replaces *every* occurrence of a texture name across
   the entire map, instead of targeting linedefs by ID.
-
-**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.

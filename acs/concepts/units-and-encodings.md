@@ -1,14 +1,16 @@
 # Units and encodings
 
-**Tier:** B (wiki-sourced concept page; the two claims that actually matter for this fork — tic precision and the `speed`/8 scaling — were traced to source; the Boom speed-constant table and the general "every `SPEED()`-using special behaves the same" extrapolation were not).
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — a `3.3-alpha` development snapshot ahead of the 3.2.1 target; the tic-precision and `SPEED()` macro findings here are core/stable ACS-engine behavior unlikely to differ across that gap — see "Engine scope" in `../../shared/AUTHORING.md`).
-**Provenance:** wiki page `Definitions - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28, `oldid=49529`) + verified against the Zandronum source (`doomdef.h`, `win32/i_system.cpp`, `p_lnspec.cpp`) for the TICRATE/precision and `speed`-scaling claims (2026-07-28). Fixed-point/ angle/pitch encoding definitions are language-level facts, not independently re-derived from engine source (there is no fork-specific behavior to diverge here). The Boom door/platform/stair speed table is wiki-sourced background, not source-verified.
+**Tier:** B (wiki-sourced concept page; tic counting, fixed-point/angle encodings, and the `speed`/8 scaling were traced to source; the Boom speed-constant table and the general "every `SPEED()`-using special behaves the same" extrapolation were not; engine-family SPEED() macro divergence is source-verified).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-16)
+**Provenance:** wiki page `Definitions - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28, `https://zdoom.org/w/index.php?title=Definitions&oldid=49529`) + verified against the Zandronum source (`doomdef.h`, `win32/i_system.cpp`, `p_lnspec.cpp`) for the TICRATE/precision and `speed`-scaling claims (2026-07-28). Fixed-point/ angle/pitch encoding definitions are language-level facts, not independently re-derived from engine source (there is no fork-specific behavior to diverge here). The Boom door/platform/stair speed table is wiki-sourced background, not source-verified.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 Fixed-point numbers, byte/fixed-point angles and pitches, tic/octic time units, and the
 `speed`-argument scaling used across ZDoom-family action specials. Earns its place per the
 authoring rule in `../../shared/AUTHORING.md` because these are exactly the "units beyond the type" facts a
 signature-only doc can't carry — e.g. `fixed speed` tells you nothing about *what* fixed-point
-value a given function expects.
+value a given function expects. Includes engine-family differences in how the Zandronum engine fork and UZDoom implement the internal mechanics of these encodings, while preserving the caller-visible semantics.
 
 ## Fixed point numbers
 
@@ -39,32 +41,30 @@ it's the language's own type definition, not fork-specific behavior.
 ## Units of time: tic vs octic — and the GZDoom-only precision fix does NOT apply here
 
 - **Tic**: nominally 1/35 second; actor/state logic runs on tics.
-- **Octic**: nominally 1/8 second (= 35/8 tics); sector movers (doors, lifts, crushers, stairs)
-  and camera/actor-mover interpolation run on octics.
-- **The wiki's "Precision" section describes a fix specific to GZDoom v3.2.2** that makes 35 tics
-  last exactly one real second. **Verified this fix is not present in Zandronum**: `TICRATE` is
-  `35` (`doomdef.h:60`), and the per-tic delay computation in the Windows timer backend is plain
-  truncating integer division, `delay = 1000/TICRATE` (`win32/i_system.cpp:281`, evaluates to
-  `28`, not `28.5714...`) — the same older/imprecise behavior the wiki attributes to "all official
-  versions of parent port ZDoom." Zandronum is a ZDoom-family fork, not a GZDoom build, and this
-  checkout shows no sign of having backported GZDoom's later precision fix. **Practical
-  consequence: under Zandronum, 35 tics measurably take ~0.98 real seconds, not exactly 1 second**
-  — don't assume tic-based timers (`Delay(35 * N)`) drift-correct to real wall-clock time over
-  long durations.
+- **Octic**: nominally 1/8 second; sector movers (doors, lifts, crushers, stairs)
+  and camera/actor-mover interpolation run on octics. *Note:* the `OCTICS(a)` macro
+  (`((a)*TICRATE)/8`, identical on both engines) uses integer division, so `OCTICS(1)` = 4 tics
+  (not 4.375), representing exactly 4/35 ≈ 114 milliseconds.
 
 ## Sector movement speed (the `speed` argument pattern)
 
 Many action specials take a `speed` argument in **eighths of a map unit per tic** — i.e. the raw
-integer you pass gets divided by 8 before being used as units/tic (so `8` → 1.0 units/tic,
-`35 * 8` → 35 units/sec). This is exactly the `SPEED(a)` macro
-(`#define SPEED(a) ((a)*(FRACUNIT/8))`, `p_lnspec.cpp:76`) already confirmed for
-`Floor_MoveToValue` in [Floor_MoveToValue](../functions/floor_movetovalue.md) — that function doc
-is the concrete, fork-verified instance of the general pattern this page documents. Not
-independently re-checked against every other speed-taking special using `SPEED()` in this pass,
-but the macro is shared, not per-function, so the scaling is expected to hold wherever `SPEED()`
-is used — check the target function's own doc (or `p_lnspec.cpp`) if it doesn't call `SPEED()`.
+integer you pass is divided by 8 to get map-units-per-tic (so `8` → 1.0 units/tic,
+`35 * 8` → 35 units/sec). Both engines implement this via a `SPEED()` macro in `p_lnspec.cpp`
+that converts the eighths-of-units representation to the engine's internal speed type, though
+the implementation differs: Zandronum multiplies by a fixed-point constant (`(a)*(FRACUNIT/8)`,
+resulting in a fixed-point `int`), while UZDoom divides as a floating-point literal
+(`(a) / 8.`, resulting in a `double`). The semantic input/output is identical — pass `8` for
+1.0 units/tic on both engines — but the downstream movement functions expect different types.
+This macro is shared across all action specials that take `speed`, not per-function, so the
+eighths-of-units scaling holds wherever `SPEED()` is used. See [Floor_MoveToValue](../functions/floor_movetovalue.md)
+for a concrete, source-verified instance of this pattern.
 
 The standard Boom door/platform/stair speed constants (`2`/`4`/`8`/`16`/`32`/`64`/`128` = slow
 through turbo, varying meaning per special family) are wiki-sourced background, not independently
 re-derived from source in this pass — useful context for reading old Boom-compat maps/specials,
 not a claim verified against any specific project's own scripts.
+
+## Engine-family divergence
+
+The fixed-point number format, byte/fixed-point angle/pitch encodings, and the tic/octic time units are identical on both engines. The `SPEED()` macro semantic (divide raw argument by 8 to get map-units-per-tic) is also identical, but the implementation differs: Zandronum's macro multiplies by a fixed-point constant and passes an `int` to movement functions, while UZDoom's macro divides as a floating-point literal and passes a `double`. Callers observe no difference — pass the same value on both engines and get the same movement-per-tic behavior. Both engines' `OCTICS()` macro uses integer division and truncates identically. Additionally, both engines derive tic count from elapsed time (not from accumulating sleep durations), so there is no tic-rate drift on either engine; 35 tics reliably correspond to 1 second of elapsed time on both.

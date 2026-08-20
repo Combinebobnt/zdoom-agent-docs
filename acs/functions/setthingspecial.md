@@ -1,8 +1,10 @@
 # `void SetThingSpecial(int tid, int special [, int arg0 [, int arg1 [, int arg2 [, int arg3 [, int arg4]]]]])`
 
 **Tier:** A.
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`).
-**Provenance:** wiki page `SetThingSpecial - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `oldid=35980`) + source-verified against the Zandronum source (`p_acs.cpp:11525-11581`) and `zt-bcc/src/builtin.c` (signature `setthingspecial = ;ii;rrrrr`). The wiki's basic description (sets the special and arguments for things with the same TID, uses activator if tid is 0) is confirmed in Zandronum. The named-ACS-special handling and network replication are Zandronum-specific additions not on the ZDoom wiki page.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `SetThingSpecial - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=SetThingSpecial&oldid=35980`) + source-verified against the Zandronum source (`p_acs.cpp:11525-11581`) and `zt-bcc/src/builtin.c` (signature `setthingspecial = ;ii;rrrrr`). The wiki's basic description (sets the special and arguments for things with the same TID, uses activator if tid is 0) is confirmed in Zandronum. The named-ACS-special handling and network replication are Zandronum-specific additions not on the ZDoom wiki page.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin (`PCD_*` opcode in `p_acs.cpp`).
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 

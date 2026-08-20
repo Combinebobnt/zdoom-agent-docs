@@ -1,8 +1,10 @@
 # Sqrt
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (checked against the Zandronum source's master/3.3-alpha checkout; both `ACSF_Sqrt`/`ACSF_FixedSqrt` are plain math wrappers with no netcode surface, so the 3.2.1-vs-3.3-alpha gap is not a concern here).
-**Provenance:** `_intake/Sqrt - ZDoom Wiki.html` (zdoom.org, oldid 50468), verified against engine source 2026-07-29.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** `_intake/Sqrt - ZDoom Wiki.html` (zdoom.org, https://zdoom.org/w/index.php?title=_intake%2FSqrt&oldid=50468), verified against engine source 2026-07-29.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Extension function (`zcommon.bcs` `special` table, index -48 for `Sqrt`, index -49 for `FixedSqrt` — both negative).
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
@@ -12,7 +14,7 @@
 ## Usage
 
 Both are real, implemented `ACSF_*` cases in `p_acs.cpp` (not a never-backported stub like
-`SpawnParticle`/`GetMaxInventory`/`StrArg` elsewhere in this fork) — `Sqrt` takes/returns a plain
+`SpawnParticle`/`GetMaxInventory`/`StrArg` elsewhere in the Zandronum engine fork) — `Sqrt` takes/returns a plain
 `int`, `FixedSqrt` takes/returns a `fixed`:
 
 ```c
@@ -24,13 +26,13 @@ case ACSF_FixedSqrt:
 ```
 
 `FixedSqrt` is a straightforward 16.16 fixed round-trip (`FIXED2DBL`/`FLOAT2FIXED` are the
-ordinary `/65536.0` and `xs_Fix<16>::ToFix` conversions used everywhere else in this fork — see
+ordinary `/65536.0` and `xs_Fix<16>::ToFix` conversions used everywhere else in the Zandronum engine fork — see
 `FixedDiv`'s doc) and behaves exactly like the wiki describes for non-negative input.
 
-## `Sqrt`'s return value is truncated (floored), not rounded, despite the wiki's wording
+## Wiki/engine divergence: `Sqrt`'s return value is truncated (floored), not rounded
 
 The wiki's "Return value" section says `Sqrt` gives "the rounded integer... square root of the
-number," implying round-to-nearest. That is not what this fork (or, going by the same
+number," implying round-to-nearest. That is not what Zandronum (or, going by the same
 `xs_FloorToInt` call, upstream ZDoom) actually does. `xs_FloorToInt` is documented in its own
 header (`xs_Float.h`) as `// Round down`, and its magic-number implementation is the standard
 "subtract ~0.5, then round" floor trick — it truncates towards negative infinity, it does not
@@ -69,5 +71,5 @@ of assuming a safe fallback.
 - `FixedDiv` (`functions/fixeddiv.md`) — same `FIXED2DBL`/`FLOAT2FIXED` conversion macros used
   here.
 - The wiki page's "Manual calculation" section (pure-ACS Newton's-method/bisection `sqrt()`
-  helper functions for engines predating this extension function) is moot for this fork —
+  helper functions for engines predating this extension function) is moot for the Zandronum engine fork —
   `ACSF_Sqrt`/`ACSF_FixedSqrt` are real and implemented, so there's no need to hand-roll one.

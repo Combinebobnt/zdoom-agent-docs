@@ -1,8 +1,10 @@
 # VectorAngle
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (checked against the Zandronum source's master/3.3-alpha checkout)
-**Provenance:** `VectorAngle - ZDoom Wiki.html` (intake, `oldid=53344`), verified against fork source 2026-07-29.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** `VectorAngle - ZDoom Wiki.html` (intake, `https://zdoom.org/w/index.php?title=VectorAngle&oldid=53344`), verified against fork source 2026-07-29.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
 `fixed VectorAngle(fixed x, fixed y)` — **compiler builtin**, not an extension function. Listed in
@@ -61,11 +63,39 @@ guards against the wiki's `int` framing being taken literally in bcc code.
   the `SlopeDiv`/`tantoangle` table math in this pass — flagging it as an engine-author-acknowledged
   caveat worth knowing if you call `VectorAngle` on very small displacement or velocity vectors.
 
+## Engine-family divergence: fixed-point slope table vs. native `atan2`
+
+UZDoom's `PCD_VECTORANGLE` handling (`src/playsim/p_acs.cpp`, `case PCD_VECTORANGLE:`) does not
+reuse anything like Zandronum's octant/slope-table `R_PointToAngle2`. The two stack arguments are
+passed through in the same order (`x` then `y`, matching the encoding above), but the angle itself
+is computed as a **native double-precision `atan2` call** — `g_atan2`, a thin wrapper around libm's
+`atan2` (`src/common/utility/vectors.h:56`, used by `VecToAngle` at `vectors.h:1531-1534`) — instead
+of fixed-point octant math. The `double` result is only converted to the ACS 16.16 fraction-of-turn
+encoding at the very end, via `TAngle<double>::Q16()` (`Degrees * (16384 / 90.0)`; a full turn is
+still `65536`, so the wire encoding is unchanged) after wrapping to `[0, 360)` degrees.
+
+This removes both approximation artifacts documented above under "Edge cases", which are specific
+to Zandronum's slope-table implementation and do not apply to UZDoom:
+
+- The **overflow guard** (Zandronum's octant math is only exact for `x`/`y` below roughly
+  `INT_MAX/4` raw units) has no UZDoom equivalent — a native `atan2` over `double` has no comparable
+  input-magnitude ceiling.
+- The **small-magnitude precision note** (Zandronum's slope-table lookup becomes unreliable for
+  `|x|`/`|y|` at or below `512` raw fixed units) likewise has no UZDoom equivalent — a native
+  `atan2` call does not lose precision at small input magnitudes the way a coarse lookup table does.
+
+The `(0, 0)` special case still returns exactly `0` on UZDoom, but for a different reason: IEEE 754
+defines `atan2(+0, +0)` as `+0`, so no explicit zero-check is needed (Zandronum's `R_PointToAngle2`
+has one, `if ((x | y) == 0) { return 0; }`), but the observable ACS-level result is identical.
+Ordinary in-range calls also agree to well within ACS's own 16.16 fixed-point resolution — the
+divergence here is in implementation strategy and in the two documented edge-case caveats, not in
+everyday return values.
+
 ## Example (from the wiki)
 
 Draws a `^` at the bottom of the screen pointing toward the actor with TID `1`:
 
-```c
+```acs
 script 1 ENTER
 {
     int vang, angle;

@@ -1,19 +1,35 @@
 # `A_CustomPunch(int damage, bool norandom = false, int flags = CPF_USEAMMO, class<Actor> pufftype = "BulletPuff", float range = 0, float lifesteal = 0)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_CustomPunch` (retrieved 2026-07-31, oldid=54654) + verified against Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1834-1918` and `wadsrc/static/actors/shared/inventory.txt:11`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_CustomPunch` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_CustomPunch&oldid=54654) + verified against Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1834-1918` and `wadsrc/static/actors/shared/inventory.txt:11`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `AActor` (inheritable by any actor class; callable from any state table).
 
 A melee attack for weapons with customizable damage, ammo consumption, puff, range, and health-steal.
 
-## Fork divergence
+## Wiki/engine divergence
 
 **The wiki page describes GZDoom/ZDoom, which has a significantly extended version.** Zandronum's version is simpler:
 
 - **Missing parameters:** `lifestealmax`, `armorbonustype`, `MeleeSound`, `MissSound`. Zandronum has no per-call sound override and no armor-steal or lifesteal limits.
 - **Missing flags:** `CPF_NOTURN` and `CPF_STEALARMOR` do not exist in Zandronum and will not compile. The wiki's `CPF_NOTURN` semantic does not apply — facing turn on a successful hit is **unconditional** (see "Behavior" below).
 - **P_DaggerAlert behavior:** The wiki states that `CPF_DAGGER` causes struck enemies to be "unconditionally placed into their pain state," but in Zandronum this only occurs if the target has a `Pain.Dagger` state defined (see "Flags" below).
+
+## Engine-family divergence: full wiki parameter and flag set present
+
+UZDoom's `A_CustomPunch` (`wadsrc/static/zscript/actors/inventory/stateprovider.zs`) is **not** simplified the way Zandronum's is — it carries the complete signature the wiki describes: `int lifestealmax = 0`, `class<BasicArmorBonus> armorbonustype = "ArmorBonus"`, `sound MeleeSound = 0`, and `sound MissSound = ""` all exist as real parameters, and `CPF_NOTURN` (16) and `CPF_STEALARMOR` (32) both exist as real flags (`wadsrc/static/zscript/constants.zs`). Concretely, on UZDoom:
+
+- **Facing turn is conditional.** The angle snap to the struck target only happens `if (!(flags & CPF_NOTURN))` — passing `CPF_NOTURN` suppresses it, unlike Zandronum's unconditional turn.
+- **Sound is overridable.** If `MeleeSound` is non-zero it plays instead of the weapon's `AttackSound` on a hit; if `MissSound` is set, it plays on a miss (`!t.linetarget`). Zandronum has neither.
+- **Lifesteal has a cap and an armor option.** `lifestealmax` is passed straight through to `GiveBody(amount, lifestealmax)`, capping how much a single hit can raise the attacker's health beyond their nominal max. If `CPF_STEALARMOR` is set, the healing is instead granted as an `armorbonustype` armor-bonus pickup (`ArmorBonus` by default) scaled by `actualdamage * lifesteal`, with `lifestealmax` becoming that item's `MaxSaveAmount` — Zandronum always heals health directly with no cap and has no armor-steal path at all.
+
+The `P_DaggerAlert`/`DaggerAlert` conditional-pain-state behavior described above is the same on both engines — this divergence is only about the wiki's "unconditional" claim, not an engine-vs-engine difference.
+
+## Engine-family divergence: no client/server authority split
+
+UZDoom's source tree has no `NETWORK_InClientMode`/`SERVERCOMMANDS_*`-style client-authority mechanism anywhere at all (unlike Zandronum's split-mode netcode). `A_CustomPunch` runs to completion as ordinary player-pawn logic with no client-mode early return and no server-broadcast calls — none of the "Server-authoritatively executed," `SERVERCOMMANDS_SetThingAngleExact()`/`SERVERCOMMANDS_SetPlayerHealth()`, or `SERVERCOMMANDS_TakeInventory` behavior described below applies to UZDoom. One related but separate difference: UZDoom's ammo-depletion check additionally requires `stateinfo != null && stateinfo.mStateType == STATE_Psprite` (the call must originate from a weapon pspr state) alongside `CPF_USEAMMO` and a successful hit — Zandronum has no such state-type guard, only the flag and a landed hit.
 
 ## Parameters
 

@@ -1,17 +1,28 @@
 # `A_Warp` (warping actor to another actor's position)
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_Warp` (retrieved 2026-07-31, oldid=54969) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:5539-5703`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_Warp` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_Warp&oldid=54969) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:5539-5703`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_Warp)` in `src/thingdef/thingdef_codeptr.cpp`.
 
 Warps the calling actor to the position of another actor (typically specified via an actor pointer constant like `AAPTR_TARGET`). Originally designed as a more versatile analog to `A_Fire` (used by the Arch-Vile's flame attack).
 
 **IMPORTANT: Engine-family divergence.** The ZDoom Wiki describes a more recent version of `A_Warp` with additional parameters and flags not present in Zandronum 3.2.1. See "Zandronum-specific notes" below for what is actually available in Zandronum.
 
+(Verified directly against UZDoom's own `A_Warp` implementation, not just the wiki: every flag and parameter listed below as wiki-only/GZDoom-UZDoom-only does in fact exist in UZDoom's `DEFINE_ACTION_FUNCTION(AActor, A_Warp)` and the shared `P_Thing_Warp()` helper it calls — see the further divergence below for a behavioral specific the wiki page doesn't otherwise surface.)
+
+## Engine-family divergence: network authority and teleport hooks (UZDoom)
+
+Two further Zandronum-vs-UZDoom differences, found verifying `A_Warp`'s own UZDoom implementation directly (`DEFINE_ACTION_FUNCTION(AActor, A_Warp)` in `src/playsim/p_actionfunctions.cpp`, which delegates to the shared `P_Thing_Warp()` helper in `src/playsim/p_things.cpp`) rather than inferred from the flag-existence list below:
+
+- **No client/server authority split on UZDoom.** Zandronum's implementation gates the whole function behind `NETWORK_InClientModeAndActorNotClientHandled()` so only the server (or a client-handled actor) actually performs the warp, then explicitly broadcasts the result via `SERVERCOMMANDS_MoveThingIfChanged` (see "Network behavior" below). UZDoom's implementation has no equivalent check and runs unconditionally wherever it's called, consistent with UZDoom having no client/server authority split anywhere in its source tree.
+- **`A_Warp` never reaches `PreTeleport`/`PostTeleport`, on either engine, but for different reasons.** UZDoom's `Actor` base class declares `PreTeleport`/`PostTeleport` virtuals (`wadsrc/static/zscript/actors/actor.zs`) that can cancel or react to a teleport, but they are invoked only by `FLevelLocals::EV_Teleport` (`src/playsim/p_teleport.cpp`) — the line/sector-teleporter and ACS `Teleport()`-special code path (the only two call sites of either hook in the whole UZDoom tree). `A_Warp` doesn't go through `EV_Teleport`, and unlike `A_Teleport` (which moves the actor via the lower-level `P_TeleportMove()` primitive directly), it doesn't go through `P_TeleportMove()` either — it repositions the actor via the separate `P_Thing_Warp()` helper, using `SetOrigin()`/`SetZ()` directly and validating the result with `P_TestMobjLocation()` and `P_TryMove()`. None of those calls PreTeleport/PostTeleport. Zandronum has no `PreTeleport`/`PostTeleport` concept at all (its DECORATE-only codebase predates ZScript), so the absence there isn't a divergence from UZDoom so much as a hook UZDoom's engine family added that `A_Warp` was simply never wired into.
+
 ## Signature
 
-```
+```text
 bool A_Warp(int ptr_destination, fixed xofs = 0, fixed yofs = 0, fixed zofs = 0,
             angle angle = 0, int flags = 0, state success_state = null)
 ```
@@ -124,7 +135,7 @@ A_Warp is handled server-side only. In network play, the client's local call to 
 
 Replicating the Arch-Vile's flame effect (orbiting projectile):
 
-```
+```text
 actor ArchVileFlame : Actor
 {
     Default
@@ -153,7 +164,7 @@ actor ArchVileFlame : Actor
 
 Simple example: warp to target's location, zero velocity:
 
-```
+```text
 actor TeleportEffect : Actor
 {
     States

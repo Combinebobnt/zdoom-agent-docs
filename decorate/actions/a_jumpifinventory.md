@@ -1,15 +1,17 @@
 # `A_JumpIfInventory` (state action)
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_JumpIfInventory` (retrieved 2026-07-31, oldid=55324) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:913-971`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_JumpIfInventory` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_JumpIfInventory&oldid=55324) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:913-971`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_JumpIfInventory)` in `src/thingdef/thingdef_codeptr.cpp` — callable from any actor's state table.
 
 Checks an actor's inventory and conditionally jumps to a state if a certain amount of an item is present. The same logic applies to checking the inventory of a different actor via an actor pointer.
 
 ## Signatures
 
-```c
+```decorate
 state A_JumpIfInventory(string "inventorytype", int amount, int offset[, int owner])
 state A_JumpIfInventory(string "inventorytype", int amount, state "label"[, int owner])
 ```
@@ -44,6 +46,35 @@ In network multiplayer (Zandronum):
   - The actor is the console player's own body (`self->player && consoleplayer`).
 - **Inventory state chains in `CustomInventory` `Pickup` states** should not rely on the return value — `A_JumpIfInventory` explicitly sets the action result to `false` to avoid breaking inventory state flow.
 
+## Engine-family divergence: network synchronization
+
+The "Network and client-side behavior" section above is Zandronum-specific and does not apply to
+UZDoom. `A_JumpIfInventory` on UZDoom is a two-line ZScript wrapper
+(`action state A_JumpIfInventory(...)` in `wadsrc/static/zscript/actors/checks.zs`) around
+`Actor.CheckInventory()` (`wadsrc/static/zscript/actors/inventory_util.zs`) — neither contains a
+`NETWORK_InClientMode()`-style gate, a `+CLIENTSIDEONLY`-equivalent check, or a `consoleplayer`
+check. UZDoom has no client/server authority split anywhere in its source tree for this function:
+it simply evaluates the inventory-amount condition and jumps (or doesn't), identically whether
+called from a weapon/flash psprite or any other actor's state table — there is no networking
+consideration at all.
+
+## Engine-family divergence: unresolvable class name is not silent
+
+The "Parameters" and "Failure modes and edge cases" sections above state that an unresolvable or
+misspelled `inventorytype` name causes a silent no-jump with no error logged — true for Zandronum,
+which resolves the class name at runtime via `EvalExpressionClass` (the `ACTION_PARAM_CLASS` macro
+in `src/thingdef/thingdef.h`). **UZDoom resolves the class name at DECORATE parse time instead**,
+via `FxClassTypeCast::Resolve()` (`src/common/scripting/backend/codegen.cpp`): an unknown class
+name triggers a script message ("Unknown class name '...' of type '...'") printed as a load-time
+warning by default (`MSG_OPTERROR`, which `FScriptPosition::Message` downgrades to `MSG_WARNING`
+unless the `strictdecorate` cvar — `CVAR_GLOBALCONFIG | CVAR_ARCHIVE`, default `false` — is
+enabled, in which case it becomes a hard, load-aborting `MSG_ERROR` instead). This is not silent:
+the message appears in the console/log once, at map or WAD load, for each misspelled call site in
+DECORATE source — not deferred to when the state actually executes. At runtime the resolved class
+reference is still `null`, and `CheckInventory()`'s own `if (itemtype == null) return false;` guard
+still means no jump occurs, matching Zandronum's runtime outcome — but a modder relying on the typo
+going unnoticed will not get the same silence on UZDoom.
+
 ## Shared implementation
 
 `A_JumpIfInventory` delegates to the internal `DoJumpIfInventory` helper, which is also used by `A_JumpIfInTargetInventory` (identical logic but checks the actor's `target` field instead of accepting an actor pointer).
@@ -53,3 +84,11 @@ In network multiplayer (Zandronum):
 - **Unresolvable class name:** Silently returns without jumping. No error is logged.
 - **NULL actor pointer:** Returns without jumping (the `COPY_AAPTR_NOT_NULL` guard in the source ensures this).
 - **Missing inventory item:** Returns without jumping — having zero of an item is not the same as having the item at zero amount; the item object must exist in the inventory.
+
+## See also
+
+- `A_JumpIfInTargetInventory` — same logic applied to the actor's `target` field instead of an
+  explicit actor pointer.
+- [Jump functions and network synchronization](../concepts/network-jump-synchronization.md) —
+  detailed coverage of how state jumps interact with client/server in multiplayer
+  (Zandronum-specific; see the divergence note above for UZDoom).

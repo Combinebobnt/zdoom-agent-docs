@@ -1,8 +1,10 @@
 # `void A_Wander([int flags])`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1; GZDoom-family (UZDoom 4.15pre) with `flags` parameter
-**Provenance:** ZDoom Wiki `A_Wander` (retrieved 2026-08-01, oldid=49317) + verified against Zandronum source's `src/p_enemy.cpp:2297`, `wadsrc/static/actors/constants.txt`, and `src/thingdef/thingdef_data.cpp`; UZDoom source's `src/playsim/p_enemy.cpp:2251`, `src/scripting/thingdef_data.cpp:328`, and `wadsrc/static/zscript/constants.zs:160+`
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_Wander` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_Wander&oldid=49317) + verified against Zandronum source's `src/p_enemy.cpp:2297`, `wadsrc/static/actors/constants.txt`, and `src/thingdef/thingdef_data.cpp`; UZDoom source's `src/playsim/p_enemy.cpp:2251`, `src/scripting/thingdef_data.cpp:328`, and `wadsrc/static/zscript/constants.zs:160+`
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** action function defined on `AActor` (Zandronum: `src/p_enemy.cpp:2297`; UZDoom: `src/playsim/p_enemy.cpp:2251`)
 
 Makes an actor wander around aimlessly. Unlike `A_Chase`, calling this function will not cause the actor to play active sounds, attack players, or pursue any target.
@@ -26,6 +28,10 @@ These parameters only apply to **GZDoom-family engines (UZDoom/GZDoom)**, not Za
   - `CHF_NODIRECTIONTURN` — The actor will not rotate to face its movement direction.
   - `CHF_STOPIFBLOCKED` — When an obstacle blocks the actor's path, it will stop moving but may still rotate to face the blocking obstacle.
   - `CHF_DONTTURN` — Convenience flag equivalent to `CHF_NORANDOMTURN | CHF_STOPIFBLOCKED`, combining the two turn-suppression flags.
+
+## Wiki/engine divergence: CHF_DONTTURN composition
+
+UZDoom's `constants.zs` (`wadsrc/static/zscript/constants.zs`) defines `CHF_DONTTURN` as `CHF_NORANDOMTURN | CHF_NOPOSTATTACKTURN | CHF_STOPIFBLOCKED` (three flags, value `416`), not the two-flag `CHF_NORANDOMTURN | CHF_STOPIFBLOCKED` (value `288`) the Parameters section above states. The extra bit, `CHF_NOPOSTATTACKTURN`, does not change `A_Wander`'s own behavior — `A_Wander` (`src/playsim/p_enemy.cpp:2251`) only ever tests `CHF_NODIRECTIONTURN`, `CHF_NORANDOMTURN`, and `CHF_STOPIFBLOCKED`; `CHF_NOPOSTATTACKTURN` is meaningful only to `A_Chase`. So passing `CHF_DONTTURN` to `A_Wander` produces the same practical effect the Parameters section describes, even though the constant's actual composition is one flag wider than stated there.
 
 ## Special cases
 

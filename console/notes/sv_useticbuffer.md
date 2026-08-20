@@ -1,8 +1,10 @@
 # `sv_useticbuffer`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-02)
 **Provenance:** Zandronum Wiki "Server variables" (https://wiki.zandronum.com/w/index.php?title=Server_variables&oldid=2534, saved 2026-08-02) for the debug-only-availability note; Zandronum source `src/sv_main.cpp` (CVAR declaration with `CVAR_DEBUGONLY` flag), verified against server command-processing logic in `src/sv_commands.cpp`.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 
 Enables command buffering: when true, the server buffers incoming client movement and fire commands before processing them, spreading execution across multiple server ticks to smooth laggy-client behavior.
 
@@ -37,3 +39,9 @@ Marked `CVAR_ARCHIVE | CVAR_NOSETBYACS | CVAR_DEBUGONLY`. The `CVAR_NOSETBYACS` 
 
 - **`sv_limitcommands`** — another debug-only cvar controlling command-flood protection (separate from buffering).
 - **`sv_maxpacketspertick`** — limits outbound packet transmission rate, another latency-mitigation mechanism (available in release builds).
+
+## Engine-family divergence
+
+`sv_useticbuffer` does not exist in UZDoom at all — confirmed absent from source, not merely undocumented. Attempting to set it under UZDoom (via the console, a config file, or ACS's `ConsoleCommand()`) prints `Unknown command "sv_useticbuffer"` to console/log and the write silently fails to apply — a visible failure if someone is watching the console at the time, but easy to miss in an unattended context such as a server startup script or an `autoexec.cfg` line.
+
+UZDoom's netcode has no equivalent debug-build command-buffering knob for spreading a laggy client's queued movement/fire commands across multiple ticks, so the jitter-smoothing tradeoff this cvar exists to measure and tune simply cannot be toggled or tested on that engine.

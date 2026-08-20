@@ -1,5 +1,27 @@
 # `int SendNetworkString(int script, str string [, int client])`
 
+**Tier:** A.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Provenance:** wiki page `SendNetworkString - Zandronum Wiki.html` (`_intake/`, retrieved
+2026-07-28, `https://wiki.zandronum.com/w/index.php?title=SendNetworkString&oldid=1684`) + source-verified (`p_acs.cpp:1818-1886,7835-7847`, `p_acs.h:358-359`,
+`cl_commands.cpp:787-799`, `cl_main.cpp:1032,3472-3495,7195-7203`, `sv_main.cpp:975-979,5107-5109,7504-7527`,
+`servercommands.cpp:11874-11886`, `netcommand.cpp:108-121,280-287`; introducing commit
+`645cce9`). The wiki's three named failure reasons, the offline-local-execution behavior, and the
+"only matters server-side" note on `client` all hold; the asymmetric reliability (reliable
+server→client vs. unreliable client→server, contradicting the wiki's blanket claim), the
+empty-string failure case, the demo-playback no-op, and the two different (and non-analogous to
+`RequestScriptPuke`) activator-resolution rules per direction are this doc's source-verified
+additions. The negative-`client`-broadcasts-to-everyone behavior (`p_acs.cpp:1875-1880`) was added
+2026-07-29 — same source range as the initial pass, but the broadcast/unicast distinction itself
+had been left unstated until a follow-up question about implementing a broadcast-to-all-clients
+`Log()` variant surfaced it. The offline-branch/`Log`-relay blank-line cross-reference was added
+2026-08-12 while root-causing an unrelated project's "blank lines on first `Log` relay call"
+report — no new source range, just an explicit tie between two already-verified behaviors that
+hadn't been connected before.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
+**Bucket:** extension function.
+
 Sends a string across the network (server→client or client→server) and runs a script on the
 receiving end with that string as its argument. `NamedSendNetworkString(str script, str string [,
 int client])` is the same by script name. Extension functions (`ACSF_SendNetworkString`/
@@ -9,8 +31,6 @@ int client])` is the same by script name. Extension functions (`ACSF_SendNetwork
 present unmodified in the 3.2.1 release specifically (no version tags past 2.x exist in this
 checkout to pin it), but core ACS engine functions of this vintage are stable across minor
 versions — flag for re-check only if a claim here doesn't hold on an actual 3.2.1 client.
-
-**Bucket:** extension function.
 
 - `client` is optional, default `-1` (`p_acs.cpp:7836,7842-7843`), and is **only ever read in the
   `NETSTATE_SERVER` branch** (`p_acs.cpp:1862-1883`) — the client-side send path
@@ -47,7 +67,14 @@ versions — flag for re-check only if a claim here doesn't hold on an actual 3.
   `ACS_ExistsScript`/empty-string checks at all in this branch (those only execute further down,
   in the multiplayer-only code paths). During demo playback the call is a no-op that also returns
   `1` (`p_acs.cpp:1824-1825`) — same undocumented-by-wiki pattern as `ExecuteClientScript`/
-  `RequestScriptPuke`.
+  `RequestScriptPuke`. **Practical consequence for testing:** because the offline branch skips the
+  empty-string check that real multiplayer applies, a call that would silently no-op (return `0`,
+  target script never runs) on a real server instead runs the target script locally with an empty
+  argument when tested offline/singleplayer — and if that target is a `Log(s:string)` relay (see
+  [`Log`](log.md#a-bad-string-argument-prints-a-blank-line-never-an-error)), the visible symptom is
+  a mysterious blank printed line that won't reproduce in real multiplayer. Don't assume
+  offline-tested `NamedSendNetworkString`/`Log`-relay behavior matches a real dedicated/listen
+  server for this reason.
 - **Multiplayer failure checks, in order** (`p_acs.cpp:1836-1883`): target script must exist
   (`ACS_ExistsScript`) → `0`; string must be non-empty → `0`; if called client-side, target script
   must be `NET`-flagged (`SCRIPTF_Net`) → `0`; if called server-side, `client` must be a valid
@@ -77,7 +104,7 @@ versions — flag for re-check only if a claim here doesn't hold on an actual 3.
 
 **Example** (from the wiki, client→server):
 
-```
+```text
 Script "SendStringToServer" (void) CLIENTSIDE
 {
     NamedSendNetworkString("ReceiveStringOnServer", "Hello Server");
@@ -95,19 +122,21 @@ missing on the target, or (server-side only) an invalid `client`. A `1` from a c
 does not guarantee server receipt (unreliable in that direction only); server→client calls ride
 an acknowledged, resend-backed channel.
 
-**Provenance:** wiki page `SendNetworkString - Zandronum Wiki.html` (`_intake/`, retrieved
-2026-07-28, `oldid=1684`) + source-verified (`p_acs.cpp:1818-1886,7835-7847`, `p_acs.h:358-359`,
-`cl_commands.cpp:787-799`, `cl_main.cpp:1032,3472-3495,7195-7203`, `sv_main.cpp:975-979,5107-5109,7504-7527`,
-`servercommands.cpp:11874-11886`, `netcommand.cpp:108-121,280-287`; introducing commit
-`645cce9`). The wiki's three named failure reasons, the offline-local-execution behavior, and the
-"only matters server-side" note on `client` all hold; the asymmetric reliability (reliable
-server→client vs. unreliable client→server, contradicting the wiki's blanket claim), the
-empty-string failure case, the demo-playback no-op, and the two different (and non-analogous to
-`RequestScriptPuke`) activator-resolution rules per direction are this doc's source-verified
-additions. The negative-`client`-broadcasts-to-everyone behavior (`p_acs.cpp:1875-1880`) was added
-2026-07-29 — same source range as the initial pass, but the broadcast/unicast distinction itself
-had been left unstated until a follow-up question about implementing a broadcast-to-all-clients
-`Log()` variant surfaced it. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master`/3.3-alpha
-HEAD — see "Engine scope" in `../../shared/AUTHORING.md`; this feature's exact behavior in a literal 3.2.1 build
-was not independently re-confirmed due to the absence of a version tag in this checkout, but is
-not expected to differ). **Tier:** A.
+## Engine-family divergence
+
+`SendNetworkString`/`NamedSendNetworkString` are ACSF (CALLFUNC) indices **146**/147 — squarely
+inside the 100–199 range UZDoom reserves for Zandronum's extensions and implements none of (see
+[Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md)). UZDoom's `CallFunction`
+dispatch switch has no case for either index and falls through to its default no-op branch — no
+error, no log line — while the interpreter still rebalances the stack around the call as if it had
+run, so the calling script just continues with `0` in place of this function's real return value.
+
+Concretely: no network message is ever built or sent under UZDoom — neither the server→client
+resend-backed path nor the client→server single-shot path documented above ever executes — and the
+target script named in the call never fires on the receiving end either, since firing it *is* the
+side effect that never happens. The `0` return is indistinguishable from this function's own
+legitimate multiplayer failures (missing target script, empty string, wrong `NET`/`CLIENTSIDE`
+flag), so a script can't tell "silently running on the wrong engine" apart from a real failure. Any
+protocol built on "call this, then the other side's script runs with the delivered string" — the
+client-side relay pattern this doc links to above — breaks end-to-end on UZDoom with nothing in
+either side's log to explain why.

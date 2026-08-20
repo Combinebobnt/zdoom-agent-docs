@@ -1,15 +1,8 @@
 # `void PolyWait(int polyid)`
 
-**Bucket:** compiler builtin (`zt-bcc/src/builtin.c:40`, `{ "polywait", ";i" }` — one required int
-arg, no optional args, matches the wiki's signature exactly; table-flagged `PCD_POLYWAIT |
-F_LATENT` at `builtin.c:188`, marking it a *latent* — i.e. potentially script-suspending — call,
-in the same `g_deds[]` family as `Delay`/`TagWait`/`ScriptWait`). Implemented as `PCD_POLYWAIT` in
-`p_acs.cpp`.
-
-**Tier:** A. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD —
-see "Engine scope" in `../../shared/AUTHORING.md`; `PolyWait`/polyobjects are inherited from Hexen-era ACS, long
-predating the fork, so there's no 3.2.1-vs-3.3-alpha ancestry concern here).
-
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `PolyWait - ZDoom Wiki.html`
 (`https://zdoom.org/w/index.php?title=PolyWait&oldid=35807`), verified against
 the Zandronum source's `src/p_acs.cpp` and the Zandronum source's `src/po_man.cpp` on 2026-07-29. The wiki
@@ -17,6 +10,12 @@ page is thin — signature, one paragraph of usage, one example — and states o
 ("delays the script ... until it has finished its movement"); everything below the "Mechanism"
 bullet comes from reading the engine directly, because the wiki doesn't mention either of the two
 edge cases below.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** compiler builtin (`zt-bcc/src/builtin.c:40`, `{ "polywait", ";i" }` — one required int
+arg, no optional args, matches the wiki's signature exactly; table-flagged `PCD_POLYWAIT |
+F_LATENT` at `builtin.c:188`, marking it a *latent* — i.e. potentially script-suspending — call,
+in the same `g_deds[]` family as `Delay`/`TagWait`/`ScriptWait`). Implemented as `PCD_POLYWAIT` in
+`p_acs.cpp`.
 
 Suspends the calling script until the polyobject identified by `polyid` stops moving.
 

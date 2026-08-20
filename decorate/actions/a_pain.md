@@ -1,8 +1,10 @@
 # `void A_Pain()`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1; UZDoom 4.15pre (see Engine-family divergence)
-**Provenance:** ZDoom Wiki `A_Pain` (retrieved 2026-08-01, oldid=47251) + verified against Zandronum source's `src/p_enemy.cpp:3567` and UZDoom source's `src/playsim/p_enemy.cpp:3178`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_Pain` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_Pain&oldid=47251) + verified against Zandronum source's `src/p_enemy.cpp:3567` and UZDoom source's `src/playsim/p_enemy.cpp:3178`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** action function defined on `AActor` (callable from any actor's state table).
 
 Plays a pain sound in response to damage. Behavior depends on whether the calling actor is a player or monster.

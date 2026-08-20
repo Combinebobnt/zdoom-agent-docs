@@ -1,8 +1,10 @@
 # `void A_DamageSelf(int amount, name damagetype = "none", int flags = 0, class<Actor> filter = null, name species = "None", int src = AAPTR_DEFAULT, int inflict = AAPTR_DEFAULT)`
 
 **Tier:** A
-**Engine:** UZDoom 4.15pre / GZDoom-family — no Zandronum implementation
-**Provenance:** ZDoom Wiki `A_DamageSelf` (retrieved 2026-08-01, oldid=54180) + verified against the UZDoom source's `src/playsim/p_actionfunctions.cpp:3962-3978`.
+**Applies to:** UZDoom=yes, Zandronum=no
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15)
+**Provenance:** ZDoom Wiki `A_DamageSelf` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_DamageSelf&oldid=54180) + verified against the UZDoom source's `src/playsim/p_actionfunctions.cpp:3962-3978`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/playsim/p_actionfunctions.cpp:3962` (`DEFINE_ACTION_FUNCTION(AActor, A_DamageSelf)`).
 
 **GZDoom/UZDoom only: does not exist in Zandronum.** Damages the calling actor by a specified amount; negative amounts heal instead. Supports flags, actor/species filtering, and configurable damage source/inflictor pointers.

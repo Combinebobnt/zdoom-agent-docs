@@ -1,8 +1,10 @@
 # Skill block definition
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 / UZDoom 4.15pre
-**Provenance:** ZDoom Wiki `MAPINFO/Skill_definition` (retrieved 2026-08-01, oldid=54710) + verified against Zandronum source (`src/g_skill.cpp:56-314`) and UZDoom source (`src/gamedata/g_skill.cpp:55-357`).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `MAPINFO/Skill_definition` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=MAPINFO%2FSkill_definition&oldid=54710) + verified against Zandronum source (`src/g_skill.cpp:56-314`) and UZDoom source (`src/gamedata/g_skill.cpp:55-357`).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 A `skill` block in MAPINFO defines a single difficulty level, setting monster health/damage scaling, ammo/pickup multipliers, respawn behavior, and actor replacement rules specific to that skill. Skill definitions are used to populate the difficulty selection menu and affect gameplay behavior when the skill is selected.
 
@@ -88,7 +90,7 @@ None identified.
 ## Examples
 
 Nightmare difficulty:
-```
+```text
 skill nightmare
 {
    AmmoFactor = 2
@@ -103,7 +105,7 @@ skill nightmare
 ```
 
 "I'm Too Young To Die" difficulty:
-```
+```text
 skill baby
 {
    AutoUseHealth
@@ -117,7 +119,7 @@ skill baby
 ```
 
 Hard difficulty with actor replacement:
-```
+```text
 skill hellish
 {
   FastMonsters

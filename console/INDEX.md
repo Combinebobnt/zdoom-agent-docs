@@ -1,6 +1,6 @@
 # Console cvar/ccmd doc index
 
-Router only. See `CLAUDE.md` for where cvars/ccmds are declared in engine source,
+Router only. See `AGENTS.md` for where cvars/ccmds are declared in engine source,
 `../shared/AUTHORING.md` for tiers/engine-scope/licensing.
 
 ## Concepts
@@ -48,7 +48,7 @@ Router only. See `CLAUDE.md` for where cvars/ccmds are declared in engine source
 - [cl_maxdecals](notes/cl_maxdecals.md) — negative values clamp to 0; zero disables decals entirely.
 - [con_scaletext](notes/con_scaletext.md) — Bool in Zandronum vs. Int (0–3) in UZDoom/GZDoom; the wiki's scaling-level behavior doesn't apply.
 - [debuganimated](notes/debuganimated.md) — ANIMATED-lump debug output; only settable from the command line/`autoexec.cfg`, since the lump loads before the console exists.
-- [developer](notes/developer.md) — Zandronum boolean flag; the wiki's integer severity levels (1–4) don't exist in this fork.
+- [developer](notes/developer.md) — Zandronum boolean flag; the wiki's integer severity levels (1–4) don't exist in Zandronum.
 - [msg](notes/msg.md) — message-level filter system, interacting with `msg0color`–`msg5color`.
 - [msg5color](notes/msg5color.md) — Zandronum-specific private-chat color (message level 5); no ZDoom/GZDoom counterpart.
 - [opl_numchips](notes/opl_numchips.md) — chip-count clamping (1–8) and a real-time reset callback.
@@ -74,3 +74,7 @@ Router only. See `CLAUDE.md` for where cvars/ccmds are declared in engine source
 - [sv_timestampformat](notes/sv_timestampformat.md) — six timestamp formats for the server console/logfile, gated on `sv_timestamp`.
 - [sv_useticbuffer](notes/sv_useticbuffer.md) — debug-build-only command buffering to smooth laggy-client jitter for other players.
 - [sv_votecooldown](notes/sv_votecooldown.md) — minimum minutes between votes; corrects a stale wiki alias (`SV_LimitNumVotes`).
+- [quicksave](notes/quicksave.md) — F6 default bind; branches on quicksave-slot-rotation and confirmation cvars, opens the Save menu if no slot is picked yet.
+- [quickload](notes/quickload.md) — F9 default bind; loads the remembered quicksave slot, refuses outright in netgames.
+- [menu_save](notes/menu_save.md) — F2 default bind; thin wrapper opening the `SavegameMenu` screen.
+- [menu_load](notes/menu_load.md) — F3 default bind; thin wrapper opening the `LoadgameMenu` screen.

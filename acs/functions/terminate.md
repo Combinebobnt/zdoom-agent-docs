@@ -1,5 +1,12 @@
 # `terminate;`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** `Terminate - ZDoom Wiki.html`
+(`https://zdoom.org/w/index.php?title=Terminate&oldid=35855`), verified against
+the Zandronum source's `src/p_acs.cpp` and the zt-bcc source's `src` on 2026-07-29.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** none of the three — a **compiler statement/keyword**, not a callable function, same
 grammar production as `restart`/`suspend` (see [restart](restart.md) for the shared background).
 `terminate` never appears in `zt-bcc/src/builtin.c`'s `g_funcs[]` or `zcommon.bcs`'s `special`
@@ -10,13 +17,6 @@ overridden only if the token was `TK_RESTART`/`TK_SUSPEND` — `stmt.c:569-577`)
 arguments, bare `terminate;`. Compiles to the zero-operand opcode `PCD_TERMINATE`
 (`zt-bcc/src/codegen/pcode.h:6`, emitted at `zt-bcc/src/codegen/stmt.c:1078` for the
 explicit-statement case).
-
-**Tier:** A. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD —
-see "Engine scope" in `../../shared/AUTHORING.md`).
-
-**Provenance:** `Terminate - ZDoom Wiki.html`
-(`https://zdoom.org/w/index.php?title=Terminate&oldid=35855`), verified against
-the Zandronum source's `src/p_acs.cpp` and the zt-bcc source's `src` on 2026-07-29.
 
 Ends the currently-running script immediately. Unlike `restart`, there's no re-lookup or jump —
 it just flips the interpreter's `state` field, which is enough to end everything.

@@ -1,8 +1,10 @@
 # `fixed GetActorPitch(int tid)`
 
 **Tier:** A.
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master`/`3.3-alpha` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`).
-**Provenance:** wiki page `GetActorPitch - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `oldid=42689`) + source-verified against `p_acs.cpp:12039-12044, 4445-4453`, `r_swrenderer.cpp:182-185` for pitch-limit derivation, and `zt-bcc/src/builtin.c:149`. The fixed-point pitch encoding, `fixed` return type, and nonzero-TID read-only-first-match asymmetry with `SetActorPitch` all verified. **Wiki/fork divergence noted:** the wiki describes pitch bounds as renderer-dependent (software vs GL), but this fork's source shows renderer-specific `GetMaxViewPitch()` implementation only in the software renderer path; GL implementation was not traced to completion, so the actual GL bounds in this fork remain unverified. Documented as a known gap. The `GetActorPitch`/`SetActorPitch` asymmetry is unmentioned on the wiki but is real in the fork and documented in `SetActorPitch`'s own entry.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `GetActorPitch - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=GetActorPitch&oldid=42689`) + source-verified against `p_acs.cpp:12039-12044, 4445-4453`, `r_swrenderer.cpp:182-185` for pitch-limit derivation, and `zt-bcc/src/builtin.c:149`. The fixed-point pitch encoding, `fixed` return type, and nonzero-TID read-only-first-match asymmetry with `SetActorPitch` all verified. **Wiki/fork divergence noted:** the wiki describes pitch bounds as renderer-dependent (software vs GL), but the Zandronum engine fork's source shows renderer-specific `GetMaxViewPitch()` implementation only in the software renderer path; GL implementation was not traced to completion, so the actual GL bounds in the Zandronum engine fork remain unverified. Documented as a known gap. The `GetActorPitch`/`SetActorPitch` asymmetry is unmentioned on the wiki but is real in the fork and documented in `SetActorPitch`'s own entry.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 
 Gets an actor's view/aim pitch. Compiler builtin (`PCD_GETACTORPITCH`,
@@ -17,9 +19,9 @@ the internal BAM representation to ACS fixed-point.
   values mean looking up, positive values mean looking down, 0 means level.** The wiki describes
   pitch bounds as renderer-dependent: software renderer bounded to approximately `-0.0888977`
   (about `-32°`) to `0.155548` (about `+56°`), GL renderer to `-0.25` to `0.25` (`-90°` to
-  `+90°`). This fork's implementation uses `GetMaxViewPitch()` (`r_swrenderer.cpp:182-185`) which
+  `+90°`). The Zandronum fork's implementation uses `GetMaxViewPitch()` (`r_swrenderer.cpp:182-185`) which
   returns 32 degrees (looking up) or 56 degrees (looking down) as the default pitch limits;
-  whether GL enforces different limits was not traced in source. No clamping is enforced by the
+  whether GL enforces different limits was not traced in that fork's source. No clamping is enforced by the
   getter itself — an actor can have an out-of-normal-range pitch set via `SetActorPitch` and will
   be read back verbatim. See the `SetActorPitch` doc for the actual range limits enforced by
   player-input code.
@@ -48,7 +50,7 @@ the internal BAM representation to ACS fixed-point.
 
 This script will modify a projectile's trajectory based on the activator's pitch:
 
-```c
+```acs
 script 1 (void)
 {
     int speed, vspeed;

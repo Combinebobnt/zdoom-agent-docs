@@ -1,8 +1,10 @@
 # `bool A_GiveInventory(class<Inventory> itemtype, int amount = 0, int giveto = AAPTR_DEFAULT)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_GiveInventory` (retrieved 2026-07-31, oldid=52121) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp` (`DoGiveInventory`) and `wadsrc/static/actors/actor.txt:217` (action native declaration).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_GiveInventory` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_GiveInventory&oldid=52121) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp` (`DoGiveInventory`) and `wadsrc/static/actors/actor.txt:217` (action native declaration).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:2120-2180` (`static void DoGiveInventory`; dispatched via `A_GiveInventory` macro at `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_GiveInventory)` line 2182 and related thin wrappers).
 
 Adds inventory items of a specified type to an actor's inventory. The function will not add more items than the inventory item's `MaxAmount` property permits.

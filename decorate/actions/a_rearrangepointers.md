@@ -1,15 +1,17 @@
 # `A_RearrangePointers` (actor pointer reassignment)
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_RearrangePointers` (retrieved 2026-08-01, oldid=50165) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:203-263`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_RearrangePointers` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RearrangePointers&oldid=50165) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:203-263`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_RearrangePointers)` in `src/thingdef/thingdef_codeptr.cpp`.
 
 Reassigns the calling actor's `target`, `master`, and `tracer` pointers to any of the actor's current pointers or to `NULL`, with optional safeguards against infinite pointer chains.
 
 ## Signature
 
-```
+```text
 void A_RearrangePointers(int target, int master, int tracer, int flags = 0)
 ```
 
@@ -73,7 +75,7 @@ Setting `target` to `AAPTR_NULL` using `A_RearrangePointers` *only* sets the `ta
 
 ## Example (Zandronum DECORATE)
 
-```
+```text
 ACTOR AmnesiacImp : DoomImp
 {
   States

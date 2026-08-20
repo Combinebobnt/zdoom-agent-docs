@@ -1,24 +1,24 @@
 # `StrLeft`
 
-**Bucket:** Extension function (`zcommon.bcs`: `-65:StrLeft(str,int):str`) — `ACSF_StrLeft` in
-the Zandronum source's `src/p_acs.cpp`'s `EACSFunctions` enum (declared right before `ACSF_StrRight`,
-which shares the identical `case` block).
-
-**Tier:** A. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD —
-see "Engine scope" in `../../shared/AUTHORING.md`).
-
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `StrLeft - ZDoom Wiki.html`
 (`https://zdoom.org/w/index.php?title=StrLeft&oldid=37592`), verified against
 the Zandronum source's `src/p_acs.cpp:6640-6659` (`case ACSF_StrLeft: case ACSF_StrRight:`) on
 2026-07-29.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** Extension function (`zcommon.bcs`: `-65:StrLeft(str,int):str`) — `ACSF_StrLeft` in
+the Zandronum source's `src/p_acs.cpp`'s `EACSFunctions` enum (declared right before `ACSF_StrRight`,
+which shares the identical `case` block).
 
 ## Signature
 
-```
+```text
 str StrLeft(str string, int length);
 ```
 
-Both parameters are mandatory in this fork's `zcommon.bcs` declaration — there is no
+Both parameters are mandatory in the zt-bcc compiler fork's `zcommon.bcs` declaration — there is no
 zero-argument or one-argument overload to worry about.
 
 ## Behavior

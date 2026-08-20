@@ -1,8 +1,13 @@
 # `int Thing_Damage(int tid, int amount [, int mod])`
 
-Applies damage (or healing) to actor(s) selected by TID. Action special 119 (dispatched as `FUNC(LS_Thing_Damage)` in the Zandronum source's `src/p_lnspec.cpp:1373-1378`), calls the engine's `P_Thing_Damage()` helper (the Zandronum source's `src/p_things.cpp:469-502`).
-
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Provenance:** wiki page `Thing_Damage - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28, `https://zdoom.org/w/index.php?title=Thing_Damage&oldid=53478`) + source-verified against `p_lnspec.cpp:1373-1378`, `p_things.cpp:469-502`, `p_interaction.cpp:1152-1210` (P_DamageMobj entry), `MODtoDamageType` switch (`p_lnspec.cpp:97-119`), `zcommon.bcs:85-108` (MOD enum). Wiki/fork divergence recorded: `Thing_Damage2` (mentioned in wiki as an ACS function alternative for named damage types) does not exist in Zandronum (`zcommon.bcs` defines only `Thing_Damage` at index 119, and `zandronum/src` implements it in `p_lnspec.cpp` with no `Thing_Damage2` variant) — use the `MOD_*` int codes with `Thing_Damage` instead, accepting the enumerated-list limit (no custom damage-type names).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** action special.
+
+Applies damage (or healing) to actor(s) selected by TID. Action special 119 (dispatched as `FUNC(LS_Thing_Damage)` in the Zandronum source's `src/p_lnspec.cpp:1373-1378`), calls the engine's `P_Thing_Damage()` helper (the Zandronum source's `src/p_things.cpp:469-502`).
 
 ## Parameters
 
@@ -26,20 +31,18 @@ When `tid=0` (targeting the activator) **and the script's activator is also the 
 
 **Damage enemies with TID 100 for 20 damage, railgun means of death:**
 
-```
+```text
 Thing_Damage(100, 20, MOD_RAILGUN);
 ```
 
 **Heal all actors with TID 50 (if below spawn health):**
 
-```
+```text
 Thing_Damage(50, -10); // Negative amount heals; mod parameter is optional and ignored on heal path
 ```
 
-## Multiplayer / client-side caveat
+## Zandronum-specific: multiplayer / client-side caveat
 
 The positive-`amount` damage branch calls `P_DamageMobj`, which has full `SERVERCOMMANDS_*` netcode synchronization to clients. However, the negative-`amount` healing branch writes `actor->health` directly with no `SERVERCOMMANDS_*` calls (not even for players — the code writes `actor->player->health` too, but no message is sent). In a networked server, healing via `Thing_Damage(tid, -amount)` is invisible to clients, who continue seeing the (lower) pre-heal health. **Do not rely on `Thing_Damage(tid, -amount, ...)` for gameplay-critical healing in multiplayer.**
 
 ---
-
-**Provenance:** wiki page `Thing_Damage - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28, `oldid=53478`) + source-verified against `p_lnspec.cpp:1373-1378`, `p_things.cpp:469-502`, `p_interaction.cpp:1152-1210` (P_DamageMobj entry), `MODtoDamageType` switch (`p_lnspec.cpp:97-119`), `zcommon.bcs:85-108` (MOD enum). Wiki/fork divergence recorded: `Thing_Damage2` (mentioned in wiki as an ACS function alternative for named damage types) does not exist in this fork (`zcommon.bcs` defines only `Thing_Damage` at index 119, and `zandronum/src` implements it in `p_lnspec.cpp` with no `Thing_Damage2` variant) — use the `MOD_*` int codes with `Thing_Damage` instead, accepting the enumerated-list limit (no custom damage-type names). **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD). **Tier:** A.

@@ -1,8 +1,10 @@
 # `State A_CheckBlock(StateLabel label, int flags = 0, int ptr = AAPTR_DEFAULT, double xofs = 0, double yofs = 0, double zofs = 0, double angle = 0)`
 
 **Tier:** A
-**Engine:** UZDoom 4.15pre / GZDoom-family — does not exist in Zandronum
-**Provenance:** ZDoom Wiki `A_CheckBlock` (retrieved 2026-08-01, oldid=50190) + verified against the UZDoom source's `src/playsim/p_actionfunctions.cpp:4694`.
+**Applies to:** UZDoom=yes, Zandronum=no
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15)
+**Provenance:** ZDoom Wiki `A_CheckBlock` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_CheckBlock&oldid=50190) + verified against the UZDoom source's `src/playsim/p_actionfunctions.cpp:4694`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, CheckBlock)` — native primitive is a bool check that the DECORATE wrapper resolves into a state jump.
 
 Checks if a specified actor pointer would be blocked at a position computed from offsets relative to the caller's current angle. If the position is blocked, the caller jumps to the given state. Otherwise, execution continues.
@@ -44,7 +46,7 @@ The function tests whether the pointer can exist at the target position without 
 
 A monster that runs away if obstacles appear near it:
 
-```
+```text
 Actor NervousZombieman : Zombieman
 {
     States
@@ -80,6 +82,6 @@ Actor NervousZombieman : Zombieman
 }
 ```
 
-## Engine availability
+## Engine-family divergence
 
 This action exists only in UZDoom/GZDoom-family engines (including GZDoom 2.3.1 and later). It does not exist in Zandronum's DECORATE codebase, which traces to an older ZDoom baseline predating this function's introduction.

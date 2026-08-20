@@ -1,15 +1,17 @@
 # A_JumpIfInTargetLOS
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_JumpIfInTargetLOS` (retrieved 2026-07-31, oldid=42406) + verified against Zandronum source `src/thingdef/thingdef_codeptr.cpp:4373-4448`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_JumpIfInTargetLOS` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_JumpIfInTargetLOS&oldid=42406) + verified against Zandronum source `src/thingdef/thingdef_codeptr.cpp:4373-4448`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_JumpIfInTargetLOS)` (`src/thingdef/thingdef_codeptr.cpp:4373`).
 
 Jumps to a target state if the calling actor is visible and in the line of sight of its target, optionally subject to a field-of-view cone centered on the target.
 
 ## Signatures
 
-```
+```text
 state A_JumpIfInTargetLOS(int offset[, float fov[, int flags[, float dist_max[, float dist_close]]]])
 state A_JumpIfInTargetLOS(str "state"[, float fov[, int flags[, float dist_max[, float dist_close]]]])
 ```
@@ -56,11 +58,41 @@ Once a target is resolved, the function checks:
 5. **Sight check:** If not disabled, call `P_CheckSight(target, self, SF_IGNOREVISIBILITY)`. If false, return without jumping.
 6. **Jump:** Perform the state jump, updating the calling actor's frame on both server and client.
 
+## Engine-family divergence: 3D distance calculation
+
+Zandronum's `dist_max`/`dist_close` checks (steps 2-3 above) compute distance via `P_AproxDistance`
+applied twice — once to combine the x/y deltas, once more to fold in the z delta — using the
+classic Doom-engine octagonal estimate (`larger + smaller - smaller/2`), not a true Euclidean
+distance. That formula overestimates the real distance by about 6% at a 45° 2D angle, and the
+second application (folding in z) compounds the error further for targets with significant height
+difference from the caller.
+
+UZDoom computes this distance as a genuine 3D Euclidean length (`AActor::Distance3D`, backed by
+`DVector3::Length()`) with no approximation. The two engines can therefore disagree on whether a
+target is within `dist_max` or `dist_close` for the same actor positions, specifically near the
+threshold boundary — most noticeably for diagonal or elevation-heavy geometry, where Zandronum's
+approximation error is largest.
+
 ## Network synchronization
 
 Unlike `A_JumpIf`, which evaluates its condition expression before checking client-side status (risking RNG desync), `A_JumpIfInTargetLOS` is **server-authoritative**. The check at the start (`NETWORK_InClientModeAndActorNotClientHandled(self)`) causes client-side callers in networked games to return immediately without evaluating any sight logic — the server synchronizes the jump outcome via `ACTION_JUMP(jump, CLIENTUPDATE_FRAME)`. No target pointer update (`CLIENTUPDATE_POSITION`) is sent, only the frame. This is simpler than `A_JumpIfTargetInLOS` (which adds position updates for non-players) because the target resolution here is asymmetric: if the caller is a non-player, the server must arbitrate what the target "sees."
 
 See [`concepts/network-jump-synchronization.md`](../concepts/network-jump-synchronization.md) for a broader network synchronization model and risks of RNG-bearing conditions in state jumps.
+
+## Engine-family divergence: no client/server split on UZDoom
+
+UZDoom's source tree has no client-authoritative/server-authoritative split at all for this
+function (or anywhere else — no `NETWORK_InClientMode`-equivalent guard exists in the UZDoom
+source tree). `A_JumpIfInTargetLOS` runs its full sight/FOV/distance check and state jump
+unconditionally, every time it ticks, with no server-arbitration or client-side early-return step.
+
+The implementation is also structured differently: UZDoom splits the single Zandronum native
+function into a native bool-returning check, `AActor.CheckIfInTargetLOS` (the UZDoom source's
+`src/playsim/p_actionfunctions.cpp`), and a thin ZScript wrapper, `A_JumpIfInTargetLOS` (the
+UZDoom source's `wadsrc/static/zscript/actors/checks.zs`), that calls the check and performs the
+state jump itself via `ResolveState`. The condition logic (target resolution order, dead/distance/
+FOV/sight checks in the same order) otherwise matches Zandronum's, aside from the distance-
+calculation divergence noted above.
 
 ## Null-safety
 

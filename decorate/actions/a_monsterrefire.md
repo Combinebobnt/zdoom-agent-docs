@@ -1,8 +1,10 @@
 # `State A_MonsterRefire(int chance, statelabel label)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_MonsterRefire` (retrieved 2026-08-01, oldid=53989) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4933-4956`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_MonsterRefire` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_MonsterRefire&oldid=53989) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4933-4956`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_MonsterRefire)` — applies to any monster or actor with a state table.
 
 Checks whether a monster should abort its attack sequence and transition to a different state. This function is commonly used to give monsters a chance to lose sight of their target and stop attacking, or to break off an attack if the target is dead or no longer visible.
@@ -25,6 +27,10 @@ Checks whether a monster should abort its attack sequence and transition to a di
 ## Network behavior
 
 - **Server-side only** in multiplayer: the function returns early if called in client mode on a non-client-handled actor. When a jump is triggered, the server sends a client update to ensure state synchronization across the network.
+
+## Zandronum-specific: server-authoritative execution
+
+UZDoom has no client/server authority split for this function at all. UZDoom's implementation (`src/playsim/p_actionfunctions.cpp`, `DEFINE_ACTION_FUNCTION(AActor, A_MonsterRefire)`) has no equivalent of Zandronum's `NETWORK_InClientModeAndActorNotClientHandled()` early-return guard, and no `CLIENTUPDATE_FRAME`-style update is sent when the state jump fires. UZDoom runs the full sequence — `A_FaceTarget`, the `pr_monsterrefire()` probability check, then the target/ally/health/sight checks — unconditionally on whichever side calls it, with no per-client/per-server distinction. The "Network behavior" section above describes Zandronum-only behavior; UZDoom performs no equivalent synchronization step because it has no server-authoritative/client-prediction split for actor state to synchronize in the first place.
 
 ## Usage note
 

@@ -1,9 +1,20 @@
 # `void ConsoleCommand(str consolecommand [, int, int])`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Provenance:** wiki page `ConsoleCommand - Zandronum Wiki.html` (`_intake/`, retrieved
+2026-07-28, `https://wiki.zandronum.com/w/index.php?title=ConsoleCommand&oldid=1620`) + source-verified (`p_acs.cpp:11284-11291,13648`, `c_dispatch.cpp:673-677,749,792-793,1160-1168`,
+`c_cmds.cpp:173-189,965,982,1009`, `c_bind.cpp:534,702,717`, `p_writemap.cpp:36`,
+`c_cvars.cpp:95,194-224,1749-1760,1892-1896`, `builtin.c:77`). The wiki's command-denylist and
+`cl_protectcvars` claims hold; the dead trailing-int params, the "no single blacklist" mechanism,
+and the `UNSAFE_CCMD`-vs-`ACS_IsCalledFromConsoleCommand` distinction are this doc's
+source-verified additions, not wiki-sourced.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
+**Bucket:** compiler builtin.
+
 Runs a single console command as if typed at the local console. Compiler builtin
 (`PCD_CONSOLECOMMAND`), implementation in `p_acs.cpp:11284-11291`.
-
-**Bucket:** compiler builtin.
 
 - **The two optional trailing ints are dead.** `zt-bcc`'s own signature (`builtin.c:77`:
   `{ "consolecommand", ";s;ii" }`) accepts up to 2 extra int args and they compile fine, but
@@ -23,9 +34,9 @@ Runs a single console command as if typed at the local console. Compiler builtin
   (`c_dispatch.cpp:792-793`, specifically called out in-source as closing an exploit: `wait` would
   otherwise let a queued command run *after* the ACS-command context ends, bypassing these checks).
   **Practical implication: this list is not exhaustive by construction** — any new `CCMD` added to
-  this fork is console-callable via `ConsoleCommand` from ACS unless its author remembered to add
-  the same guard. Don't assume a command is safe against `ConsoleCommand` just because it's absent
-  from the wiki's list.
+  the Zandronum engine fork is console-callable via `ConsoleCommand` from ACS unless its author
+  remembered to add the same guard. Don't assume a command is safe against `ConsoleCommand` just
+  because it's absent from the wiki's list.
 - **Aliases are blocked as a category, not by name.** `c_dispatch.cpp:673-677`:
   `if (ACS_IsCalledFromConsoleCommand() && com->IsAlias()) return;` — *every* alias (KEYCONF- or
   runtime-defined via the `alias` CCMD) is silently rejected, matching the wiki's "including any
@@ -58,19 +69,24 @@ Runs a single console command as if typed at the local console. Compiler builtin
   the wiki) — this is just normal `C_DoCommand` execution context, no ACS-specific machinery
   beyond what's documented above.
 
+## Engine-family divergence: not implemented at all on UZDoom
+
+Everything documented above — the per-`CCMD` denylist mechanism, alias blocking, the
+`UNSAFE_CCMD`-vs-`ACS_IsCalledFromConsoleCommand()` distinction, `cl_protectcvars`, and the
+CVARINFO/`archivecvar` interaction — is Zandronum-only and does not carry over. UZDoom's script
+interpreter (`DLevelScript::RunScript`, `src/playsim/p_acs.cpp`) handles both `PCD_CONSOLECOMMAND`
+and `PCD_CONSOLECOMMANDDIRECT` as a shared no-op case: it prints a console message stating that the
+engine doesn't support running console commands from scripts, then discards the opcode's stack
+arguments (or skips its inline operand bytes, for the direct-string variant) without executing
+anything. No command ever runs, no cvar is ever set, and none of the Zandronum-side
+denylist/`cl_protectcvars`/alias-blocking machinery is reachable because there's nothing left for
+it to guard. The two optional trailing ints (dead on Zandronum too, see above) are equally inert
+here.
+
 **Example:**
 
-```
+```text
 ConsoleCommand("sv_survivalcountdowntime 3");
 ```
 
 **Returns:** nothing (`void`).
-
-**Provenance:** wiki page `ConsoleCommand - Zandronum Wiki.html` (`_intake/`, retrieved
-2026-07-28, `oldid=1620`) + source-verified (`p_acs.cpp:11284-11291,13648`, `c_dispatch.cpp:673-677,749,792-793,1160-1168`,
-`c_cmds.cpp:173-189,965,982,1009`, `c_bind.cpp:534,702,717`, `p_writemap.cpp:36`,
-`c_cvars.cpp:95,194-224,1749-1760,1892-1896`, `builtin.c:77`). The wiki's command-denylist and
-`cl_protectcvars` claims hold; the dead trailing-int params, the "no single blacklist" mechanism,
-and the `UNSAFE_CCMD`-vs-`ACS_IsCalledFromConsoleCommand` distinction are this doc's
-source-verified additions, not wiki-sourced. **Engine:** Zandronum 3.2.1 (verified against
-the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.

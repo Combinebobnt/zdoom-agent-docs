@@ -1,8 +1,10 @@
 # `transsouls` (cvar)
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `CVARs:Display` (retrieved 2026-08-02, oldid=54715) + verified against Zandronum source's `src/g_doom/a_lostsoul.cpp`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-16); Zandronum 3.2.1 @28f736fb3 (2026-08-02)
+**Provenance:** ZDoom Wiki `CVARs:Display` (retrieved 2026-08-02, https://zdoom.org/w/index.php?title=CVARs%3ADisplay&oldid=54715) + verified against Zandronum source's `src/g_doom/a_lostsoul.cpp`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 Controls the alpha transparency level for lost souls and other actors using the `SoulTrans` render style.
 

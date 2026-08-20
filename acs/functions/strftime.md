@@ -1,8 +1,10 @@
 # `str Strftime(int timestamp, str format [, bool utc])`
 
 **Tier:** A.
-**Engine:** Zandronum 3.2.1 (confirmed predates the 3.2.1 version-bump commit).
-**Provenance:** wiki page `Strftime - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `oldid=1338`) + source-verified against `p_acs.cpp:7409-7426`, `zt-bcc/lib/zcommon.bcs:1762`, and version-gated against `f614049b4`/`28f736fb3` per shared/AUTHORING.md's "Engine scope" section.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `Strftime - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=Strftime&oldid=1338`) + source-verified against `p_acs.cpp:7409-7426`, `zt-bcc/lib/zcommon.bcs:1762`, and version-gated against `f614049b4`/`28f736fb3` per shared/AUTHORING.md's "Engine scope" section.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
 
 Formats a Unix timestamp (as returned by `SystemTime()`) into a human-readable string, using the
@@ -55,7 +57,7 @@ of the host's own `time_t` width — the timestamp value itself can't represent 
 
 ## Example
 
-```
+```text
 script 1 (void)
 {
     Print (s: Strftime (SystemTime(), "%B %d %Y", true));
@@ -70,3 +72,25 @@ this intake batch's collision guard; not merged into a shared family file here e
 three are closely related. A future pass may want to consolidate
 `SystemTime`/`GetTimeProperty`/`Strftime` into `families/time.md` since none is very useful
 without `SystemTime` supplying the timestamp.
+
+## Engine-family divergence
+
+`Strftime` is bound as ACSF (CALLFUNC) index 129, inside the 100–199 range UZDoom's own ACSF enum
+reserves for Zandronum's extensions and implements none of — named directly as one of the confirmed
+silent-0 functions in [Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md).
+A Zandronum-compiled object calling `Strftime` under UZDoom hits `CallFunction`'s `default: break;`
+case: no error, no log line, and the interpreter stack is rebalanced as if the call had succeeded,
+so script execution just continues with `0` in place of the real return value.
+
+That `0` doesn't survive as a usable value the way it might for an int-returning extension. Per
+this file's own Return value section above, `Strftime` returns a dynamic ACS string — a string-pool
+handle, not a raw int. A genuine pool-origin string handle always has its top library-ID bits set to
+a reserved sentinel value that can never be `0`; the fallback `0` therefore isn't a valid pool
+handle at all, and a caller that hands it to a string-consuming opcode gets an *untagged*
+module-local string-table lookup instead of the empty-pool string this file's own Zandronum-side
+`""`-on-failure case actually returns. In practice that resolves to whichever literal (if any)
+happens to occupy slot 0 of that lookup's target module — unrelated, unpredictable text, not
+guaranteed to be empty — or nothing at all if that slot is unused, depending entirely on what else
+the calling module's compiled string table happens to contain. Either way there is no error path to
+catch and no way to tell "ran under UZDoom and was silently skipped" apart from "ran on Zandronum
+and the format string happened to produce nothing."

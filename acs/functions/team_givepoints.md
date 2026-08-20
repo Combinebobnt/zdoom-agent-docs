@@ -1,5 +1,27 @@
 # `int Team_GivePoints(int team, int howMuch, bool announce)`
 
+**Tier:** A.
+**Applies to:** N/A — zt-bcc-declared, neither engine implements it
+**Verified against:** none
+**Provenance:** wiki page `Team_GivePoints - Zandronum Wiki.html` (`_intake/`, retrieved
+2026-07-29, `https://wiki.zandronum.com/w/index.php?title=Team_GivePoints&oldid=1343`) + source-verified against the Zandronum source
+(`p_lnspec.cpp:2123-2143`, `p_lnspec.h:49`, `team.cpp:868-891`, `announcer.cpp:217-241`,
+`cl_main.cpp:6558-6587`, `wadsrc/static/teaminfo.txt`) and
+`zt-bcc/lib/zcommon.bcs:1500,808-811`. The wiki's signature, parameter count, and default
+0-3 team/color mapping all hold; its unqualified "displays a message to all players" claim for
+`announce` does not (sound only, verified against `ANNOUNCER_PlayEntry` — no text/chat output
+exists in this path), and the always-`false` return value, gamemode-flag gate, per-player side
+effect, strict-increase-only announce gating, and data-driven (not hardcoded) team/color mapping
+are this doc's source-verified additions. `Team_GivePoints` is present in the original imported
+Skulltag 0.97c2 source (`bc562a817`) and was later fixed for broader gamemode compatibility by
+`52569e7d6` ("Fixed Team_Score and Team_GivePoints not working properly on all gamemodes that
+support teams and give points."); both commits confirmed via `git merge-base --is-ancestor` to
+be ancestors of `28f736fb3` (the 3.2.1 version-string commit), so this long predates the 3.2.1
+target and is safe to verify against it.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
+**Bucket:** action special.
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+
 Adds `howMuch` to one team's point counter directly (not tied to any activator/player). Action
 special (`LS_Team_GivePoints`, index 153 in `zt-bcc/lib/zcommon.bcs` and `p_lnspec.h`),
 implementation at the Zandronum source's `src/p_lnspec.cpp:2123-2143`, delegating to
@@ -7,8 +29,6 @@ implementation at the Zandronum source's `src/p_lnspec.cpp:2123-2143`, delegatin
 [ChangeTeamScore](changeteamscore.md) for the related extension-function API that can *set* (not
 just add to) any of a team's four score counters — the two are separate code paths (action
 special vs. `ACSF_*` extension function) that happen to overlap on "points."
-
-**Bucket:** action special.
 
 ```cpp
 FUNC( LS_Team_GivePoints )
@@ -96,22 +116,3 @@ FUNC( LS_Team_GivePoints )
 
 **Returns:** `int`/bool-like — always `0`/`false` on every path (success and every failure case
 alike); not usable to detect whether the point change actually happened.
-
-**Provenance:** wiki page `Team_GivePoints - Zandronum Wiki.html` (`_intake/`, retrieved
-2026-07-29, `oldid=1343`) + source-verified against the Zandronum source
-(`p_lnspec.cpp:2123-2143`, `p_lnspec.h:49`, `team.cpp:868-891`, `announcer.cpp:217-241`,
-`cl_main.cpp:6558-6587`, `wadsrc/static/teaminfo.txt`) and
-`zt-bcc/lib/zcommon.bcs:1500,808-811`. The wiki's signature, parameter count, and default
-0-3 team/color mapping all hold; its unqualified "displays a message to all players" claim for
-`announce` does not (sound only, verified against `ANNOUNCER_PlayEntry` — no text/chat output
-exists in this path), and the always-`false` return value, gamemode-flag gate, per-player side
-effect, strict-increase-only announce gating, and data-driven (not hardcoded) team/color mapping
-are this doc's source-verified additions. `Team_GivePoints` is present in the original imported
-Skulltag 0.97c2 source (`bc562a817`) and was later fixed for broader gamemode compatibility by
-`52569e7d6` ("Fixed Team_Score and Team_GivePoints not working properly on all gamemodes that
-support teams and give points."); both commits confirmed via `git merge-base --is-ancestor` to
-be ancestors of `28f736fb3` (the 3.2.1 version-string commit), so this long predates the 3.2.1
-target and is safe to verify against it. **Engine:** Zandronum 3.2.1 (verified against
-the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.
-
-**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.

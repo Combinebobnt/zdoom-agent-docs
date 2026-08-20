@@ -1,5 +1,15 @@
 # `void TagWait(int tag)`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** `TagWait - ZDoom Wiki.html`
+(`https://zdoom.org/w/index.php?title=TagWait&oldid=35806`), verified against
+the Zandronum source's `src/p_acs.cpp` and the Zandronum source's `src/p_spec.cpp` on 2026-07-29. The wiki
+page is thin — signature, one paragraph of usage, one example, one lift-specific note — and its
+"will always wait 1 tic" claim is stated as a bare fact with no mechanism given; the explanation
+below (and the tag-matching/busy-definition details) comes from reading the engine directly.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin (`zt-bcc/src/builtin.c:39`, `{ "tagwait", ";i" }` — one required int
 arg, no optional args, matches the wiki's signature exactly; table-flagged `PCD_TAGWAIT |
 F_LATENT` at `builtin.c:187`, marking it a *latent* — i.e. potentially script-suspending — call,
@@ -7,17 +17,6 @@ in the same `g_deds[]` family as `Delay`/`PolyWait`/`ScriptWait`/`Suspend`). Imp
 `PCD_TAGWAIT` in `p_acs.cpp`; there's also a `PCD_TAGWAITDIRECT` opcode the compiler emits instead
 when the argument is a compile-time constant — same runtime behavior, just skips a stack push
 (same pattern as `ScriptWait`/`ScriptWaitDirect` — see [ScriptWait](scriptwait.md)).
-
-**Tier:** A. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD —
-see "Engine scope" in `../../shared/AUTHORING.md`; `TagWait`/tagged sectors are inherited from Hexen-era ACS,
-long predating the fork, so there's no 3.2.1-vs-3.3-alpha ancestry concern here).
-
-**Provenance:** `TagWait - ZDoom Wiki.html`
-(`https://zdoom.org/w/index.php?title=TagWait&oldid=35806`), verified against
-the Zandronum source's `src/p_acs.cpp` and the Zandronum source's `src/p_spec.cpp` on 2026-07-29. The wiki
-page is thin — signature, one paragraph of usage, one example, one lift-specific note — and its
-"will always wait 1 tic" claim is stated as a bare fact with no mechanism given; the explanation
-below (and the tag-matching/busy-definition details) comes from reading the engine directly.
 
 Suspends the calling script until every sector matching `tag` has stopped moving.
 

@@ -1,8 +1,10 @@
 # `void LocalSetMusic(str song [, int order [, int unused]])`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (checked out source reports 3.3-alpha; `PCD_LOCALSETMUSIC` and its `SVCF_ONLYTHISCLIENT` targeting are long-standing, not netcode-gated additions postdating 3.2.1, so this is not expected to be version-sensitive).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `LocalSetMusic - ZDoom Wiki` (https://zdoom.org/w/index.php?title=LocalSetMusic&oldid=35967), verified 2026-07-29 against fork source.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 
 Changes the background music, but only for the script's activator — unlike `SetMusic`, which 
@@ -62,7 +64,7 @@ broadcasts the change to all players and persists it for late-joining clients. C
 
 **Example:**
 
-```
+```text
 script 1 OPEN
 {
     if (PlayerNumber() == 0) {
@@ -71,7 +73,7 @@ script 1 OPEN
 }
 ```
 
-```
+```text
 script 2 RESPAWN
 {
     LocalSetMusic("*");  // restore the default map music for this activator only

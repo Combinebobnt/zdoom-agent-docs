@@ -1,8 +1,11 @@
 # `void SoundSequenceOnSector(int tag, string seqname, int location)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (feature predates the fork; verified against the `3.3-alpha` local checkout, no version-gap concern for this one).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `SoundSequenceOnSector - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=SoundSequenceOnSector&oldid=27391`), verified 2026-07-29 against the Zandronum source's `src`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
 ## Bucket
 
@@ -64,7 +67,7 @@ channel number, which simply won't collide with (or be stoppable via) any of the
 
 ## Fork/wiki notes
 
-The wiki page itself is thin (no examples) and matches this fork's behavior for the documented,
+The wiki page itself is thin (no examples) and matches both engines' behavior for the documented,
 in-range constants. The unused-clamp quirk above is not mentioned by the wiki at all — it's
 purely a Zandronum/ZDoom-fork implementation detail found by reading `p_acs.cpp` directly.
 

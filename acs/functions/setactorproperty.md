@@ -1,10 +1,20 @@
 # `void SetActorProperty(int tid, int property, raw value)`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `SetActorProperty - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
+`https://zdoom.org/w/index.php?title=SetActorProperty&oldid=44527`) + source-verified against `p_acs.cpp:4445-4456, 4524-4919, 12365-12368`,
+`zt-bcc/lib/zcommon.bcs:266-314`, `zt-bcc/src/builtin.c:108,256`, and real-world call sites
+exhibiting the `APROP_SpawnHealth` gotcha documented above. Wiki/fork discrepancies (eight compile-but-dead `APROP_*` names for the
+write path, plus the Health-on-dead-actor guard and the multi-actor-vs-single-actor TID asymmetry
+with `GetActorProperty`) recorded above rather than silently trusted or overridden.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** compiler builtin.
+
 Writes a property onto actor(s) by TID. Compiler builtin (`PCD_SETACTORPROPERTY`,
 the Zandronum source's `src/p_acs.cpp:12365-12368`), implementation in
 `DLevelScript::SetActorProperty` / `DoSetActorProperty` (`p_acs.cpp:4524-4919`).
-
-**Bucket:** compiler builtin.
 
 - `tid` — **`0` means "the activator"**, applied directly (`p_acs.cpp:4526-4529`). A **nonzero
   `tid` applies the write to every actor sharing that TID** — `SetActorProperty` loops a full
@@ -17,7 +27,7 @@ the Zandronum source's `src/p_acs.cpp:12365-12368`), implementation in
   ever sees one of them — not a bug, but easy to assume symmetric and get wrong.
 - `value` — declared `raw` in the actual builtin (`builtin.c:108`, `";iir"` = void return, two
   ints, one raw), not three separate overloads. The wiki's three signatures
-  (`int`/`float`/`str` value) don't correspond to distinct BCS entry points in this fork — there is
+  (`int`/`float`/`str` value) don't correspond to distinct BCS entry points in zt-bcc — there is
   no `zcommon.bcs`-side overload set for `SetActorProperty` at all (checked; it isn't declared
   there), just the one raw-third-arg builtin. It works anyway because `fixed` values and string
   handles already share the same bit representation as `int` at the BCS level — a `fixed`
@@ -30,12 +40,14 @@ the Zandronum source's `src/p_acs.cpp:12365-12368`), implementation in
   `actor->player && actor->player->bSpectating` (`p_acs.cpp:4549-4551`) — a Zandronum
   multiplayer-specific guard with no equivalent in single-player ZDoom, not mentioned on the wiki
   page at all.
-- **`APROP_Health` has a built-in "don't touch the dead" guard this fork added**: if
+- **`APROP_Health` has a built-in "don't touch the dead" guard the engine added**: if
   `actor->health <= 0` or the actor is a dead player (`playerstate == PST_DEAD`), the whole case
   is a no-op (`p_acs.cpp:4560-4566`) — before ever reaching `actor->health = value`. The wiki's own
   "Do not do this" example (worrying about re-zeroing an already-dead monster's health) describes
-  a mistake this fork's engine code already makes harmless; setting `<= 0` on a *live* actor still
-  calls `actor->Die()` as documented.
+  a mistake the engine already makes harmless; setting `<= 0` on a *live* actor still
+  calls `actor->Die()` as documented. Confirmed identical (same two conditions, same order) in
+  UZDoom's `DoSetActorProperty` (`src/playsim/p_acs.cpp:4138-4154`) — not a Zandronum-only
+  addition, both engine families guard this the same way.
 - **`APROP_SpawnHealth` only takes effect on `APlayerPawn` actors** (`IsKindOf(RUNTIME_CLASS(APlayerPawn))`
   guard, `p_acs.cpp:4709-4726`) — calling it on a monster TID is a silent no-op, matching the
   wiki's "Only players may have their max health set this way" line. Verified as a real gotcha
@@ -45,42 +57,53 @@ the Zandronum source's `src/p_acs.cpp:12365-12368`), implementation in
   same `APlayerPawn`-only guard (`p_acs.cpp:4665-4679, 4878-4901`) and are silent no-ops on
   non-player actors too, though the wiki doesn't call that out for those three.
 
-## Wiki lists eight settable properties this fork's `SetActorProperty` switch doesn't implement
+## Wiki/engine divergence: eight settable properties Zandronum's `SetActorProperty` switch doesn't implement
 
 Cross-checking every property the wiki page lists against the actual `switch (property)` in
-`DoSetActorProperty` (`p_acs.cpp:4558-4918`, `default: // do nothing; break;` at the end):
+Zandronum's `DoSetActorProperty` (`p_acs.cpp:4558-4918`, `default: // do nothing; break;` at the end):
 **`APROP_DamageMultiplier`, `APROP_DamageType`, `APROP_Friction`, `APROP_FriendlySeeBlocks`,
 `APROP_MaxDropOffHeight`, `APROP_MaxStepHeight`, `APROP_SoundClass`, and `APROP_MeleeRange`** all
 have BCS-side constants in `zt-bcc/lib/zcommon.bcs:266-314` (so they compile without complaint)
-but no `case` in this switch — every one of them silently falls through to `default` and writes
-nothing. This overlaps but isn't identical to the seven dead names `functions/getactorproperty.md`
+but no `case` in Zandronum's switch — every one of them silently falls through to `default` and
+writes nothing. This overlaps but isn't identical to the seven dead names `functions/getactorproperty.md`
 found on the *read* side: `APROP_MeleeRange` is the odd one out — it **is** implemented for
 `GetActorProperty` (`p_acs.cpp:4986`, read-only) but **not** for `SetActorProperty`, so
 `GetActorProperty(tid, APROP_MELEERANGE)` works while
 `SetActorProperty(tid, APROP_MELEERANGE, ...)` does nothing, with no error either way. Treat all
-eight names above as **not usable to write** in this fork despite compiling.
+eight names above as **not usable to write in Zandronum** despite compiling. (UZDoom differs — see
+the divergence section below.)
+
+## Engine-family divergence: UZDoom implements all eight
+
+UZDoom's `DoSetActorProperty` switch (`src/playsim/p_acs.cpp:4130-4370`) implements every one of
+the eight properties Zandronum's `SetActorProperty` switch leaves unhandled above —
+`APROP_MeleeRange`, `APROP_Friction`, `APROP_MaxStepHeight`, `APROP_MaxDropOffHeight`,
+`APROP_DamageType`, `APROP_SoundClass`, `APROP_FriendlySeeBlocks`, and `APROP_DamageMultiplier` —
+each writing straight into the corresponding actor field (`actor->meleerange`, `actor->Friction`,
+`actor->MaxStepHeight`, `actor->MaxDropOffHeight`, `actor->DamageType`, `actor->friendlyseeblocks`,
+`actor->DamageMultiply`), using the same fixed-point/string-handle conventions as the rest of the
+switch. `APROP_SoundClass` additionally carries the same player-pawn-only guard `APROP_SpawnHealth`
+has above — setting it on a non-player TID is a no-op even on UZDoom. Practical effect: the
+`APROP_MeleeRange` get/set asymmetry documented above is Zandronum-only — on UZDoom,
+`SetActorProperty(tid, APROP_MELEERANGE, ...)` actually changes the actor's melee range, so BCS
+written and tested against UZDoom that relies on any of these eight properties will silently stop
+working (writes become no-ops, with no compiler or runtime error) if the same object is later run
+on Zandronum, and vice versa: code that assumes these eight are permanently inert (safe to pass a
+wrong/placeholder value without consequence) is only safe under Zandronum.
 
 (`APROP_TargetTID`, `APROP_TracerTID`, `APROP_WaterLevel`, `APROP_Dormant`, `APROP_Height`, and
 `APROP_Radius` are also unimplemented in the Set switch, but the wiki's own `SetActorProperty`
 page doesn't list them as settable either — they're documented as get-only by design, not a
-wiki/fork divergence.)
+wiki/engine divergence. Confirmed unimplemented in UZDoom's Set switch too, for the same reason.)
 
 **Example — the safe way to reduce a live actor's speed without accidentally reviving math on a dead one:**
 
-```
+```text
 SetActorProperty(mons_tid, APROP_Speed, GetActorProperty(mons_tid, APROP_Speed) - 4.0);
 ```
 
 **Example — this looks like it should scale a monster's max health, but is a silent no-op on anything that isn't a player:**
 
+```text
+SetActorProperty(mons_tid, APROP_SpawnHealth, new_health); // no-op: SpawnHealth is player-pawn-only (both engines)
 ```
-SetActorProperty(mons_tid, APROP_SpawnHealth, new_health); // no-op: SpawnHealth is player-pawn-only in this fork
-```
-
-**Provenance:** wiki page `SetActorProperty - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
-`oldid=44527`) + source-verified against `p_acs.cpp:4445-4456, 4524-4919, 12365-12368`,
-`zt-bcc/lib/zcommon.bcs:266-314`, `zt-bcc/src/builtin.c:108,256`, and real-world call sites
-exhibiting the `APROP_SpawnHealth` gotcha documented above. Wiki/fork discrepancies (eight compile-but-dead `APROP_*` names for the
-write path, plus the Health-on-dead-actor guard and the multi-actor-vs-single-actor TID asymmetry
-with `GetActorProperty`) recorded above rather than silently trusted or overridden.
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.

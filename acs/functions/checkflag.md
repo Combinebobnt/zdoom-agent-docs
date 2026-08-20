@@ -1,8 +1,10 @@
 # `bool CheckFlag(int tid, str flag)`
 
 **Tier:** A.
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD; function introduced in commit `61c94648d`, confirmed as an ancestor of 3.2.1 version-bump commit `28f736fb3`).
-**Provenance:** ZDoom Wiki page `CheckFlag` (retrieved 2026-07-29, oldid=44244) + verification against the Zandronum source's `src/p_acs.cpp:6802-6810` (ACSF_CheckFlag case), `thingdef/thingdef_properties.cpp` (CheckActorFlag implementation, flag lookup/error handling), and `p_acs.cpp` (SingleActorFromTID for TID 0 and shared-TID behavior). ZDoom wiki describes function correctly for this fork.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** ZDoom Wiki page `CheckFlag` (retrieved 2026-07-29, https://zdoom.org/w/index.php?title=CheckFlag&oldid=44244) + verification against the Zandronum source's `src/p_acs.cpp:6802-6810` (ACSF_CheckFlag case), `thingdef/thingdef_properties.cpp` (CheckActorFlag implementation, flag lookup/error handling), and `p_acs.cpp` (SingleActorFromTID for TID 0 and shared-TID behavior). ZDoom wiki describes function correctly for Zandronum.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function (index −75 in `zcommon.bcs`'s `special` table; dispatched as `ACSF_CheckFlag` in `p_acs.cpp:6802-6810`).
 
 Checks whether an actor with a given TID has a specified actor flag set.
@@ -33,6 +35,6 @@ If multiple actors share the same TID, `CheckFlag` returns true/false **only for
 
 Flag strings support both simple names and dot notation. Simple lookup (`"FLOAT"`) searches in the actor's own class and its parent hierarchy. Dot notation (`"Parent.Subfield"`) allows qualification; typical patterns in ZDoom/Zandronum are flags like `"CountInvulnerable.Missile"`. See the DECORATE documentation and/or the engine's `FFlagDef` and `FindFlag` implementations for the full flag namespace.
 
-## Fork-specific caveat: asymmetry with `SetActorFlag`
+## Zandronum-specific: SetActorFlag absence
 
-This function **does work** — the implementation is present and verified as far back as Zandronum 3.2.1. However, the inverse function `SetActorFlag` (documented on the same ZDoom Wiki page) **does not exist in this fork** — it is declared in the compiler's `zcommon.bcs` to match upstream ZDoom, but was never merged into Zandronum `master` (the 3.2.1 target). See `functions/setactorflag.md` for the full details and a DECORATE-based workaround. Effectively, `CheckFlag` is the only working named-flag reader in this fork; there is no working named-flag setter from ACS (though dedicated property setters and DECORATE-based workarounds exist — see that file for both).
+This function **does work** on both engines — the implementation is present and verified as far back as Zandronum 3.2.1, and equivalently on UZDoom (`ACSF_CheckFlag` at `src/playsim/p_acs.cpp`, dispatching to the shared `CheckActorFlag` helper). However, the inverse function `SetActorFlag` (documented on the same ZDoom Wiki page) **does not exist in the Zandronum engine fork** — it is declared in the compiler's `zcommon.bcs` to match upstream ZDoom, but was never merged into Zandronum `master` (the 3.2.1 target); it does work on UZDoom, which implements `ACSF_SetActorFlag`. See `functions/setactorflag.md` for the full details and a DECORATE-based workaround. Effectively, on Zandronum `CheckFlag` is the only working named-flag reader; there is no working named-flag setter from ACS on that engine (though dedicated property setters and DECORATE-based workarounds exist — see that file for both).

@@ -3,7 +3,8 @@
 **Tier:** B (the `A_Jump`/`A_JumpIf`-specific claims below are tier-A source-verified — see those
 files; generalizing to other `A_JumpIf*` siblings is architectural reasoning from the confirmed
 client/server model, not independently traced per function).
-**Engine:** Zandronum 3.2.1
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-31)
 **Provenance:** Synthesized from this repo's own verified [`A_Jump`](../actions/a_jump.md) and
 [`A_JumpIf`](../actions/a_jumpif.md) findings (both wiki-intake + source-verified, 2026-07-31),
 [`../../acs/concepts/clientside-scripting.md`](../../acs/concepts/clientside-scripting.md)'s
@@ -42,7 +43,7 @@ DECORATE expression across the entire map**, verified in `src/thingdef/thingdef_
 doesn't name a specific RNG via `random[name](...)`). So one wasted roll shifts every *later*
 unnamed-RNG expression evaluated on that client relative to the server or to any other client.
 
-**The actual severity is narrower than "desync" implies.** This fork has no RNG-state consistency
+**The actual severity is narrower than "desync" implies.** Zandronum has no RNG-state consistency
 check between server and client (no code path compares `FRandom` state over the network), and a
 server-authoritative actor's real outcome always arrives via `SERVERCOMMANDS_*` regardless of what
 the client's wasted computation produced — so this bug causes no disconnect and no wrong gameplay
@@ -76,6 +77,42 @@ documented at its declaration in `src/actor.h`: "only spawned by the clients... 
 game in any way (visuals aside)." It stops being inconsequential the moment a modder gives a
 clientside-only actor's random jump outcome any gameplay weight another player needs to agree on.
 
+## Cause 4: a not-taken branch's own side effects still execute on every client (verified: `A_JumpIf`)
+
+The three causes above are about the jump *decision* diverging or costing an RNG roll. This one is
+about ordinary action functions placed in the state range a broken jump was supposed to skip.
+
+`A_JumpIf` on a non-`+CLIENTSIDEONLY` actor never actually jumps in client mode — it returns before
+`ACTION_JUMP` runs (see [`A_JumpIf`](../actions/a_jumpif.md)'s source excerpt). "Doesn't jump" means
+state advancement simply continues to the very next state, exactly as if the condition had evaluated
+false. If the states in between the `A_JumpIf` and its (never-reached-on-client) target contain their
+own action functions — spawning something, playing a sound, giving inventory — those actions are not
+skipped by the broken jump. They run, on every client, every single time the state machine reaches
+that point, regardless of what the condition was actually testing for.
+
+This is most damaging when the skipped action spawns a `+CLIENTSIDEONLY` actor. `A_SpawnItemEx`
+(and `A_SpawnItem`) let a `+CLIENTSIDEONLY` spawn *type* proceed on the client even when the
+*spawning* actor isn't `+CLIENTSIDEONLY` — `NETWORK_ShouldActorNotBeSpawned`'s `bSpawnOnClient`
+check independently considers `GetDefaultByType(pSpawnType)->NetworkFlags & NETFL_CLIENTSIDEONLY`
+(`src/thingdef/thingdef_codeptr.cpp`, the shared spawn-gating helper used by both functions), not
+just the caller's own flag. So a server-authoritative actor's `A_JumpIf`-gated `Spawn:` loop that
+tries to conditionally show a `+CLIENTSIDEONLY` cosmetic (an overlay icon, a status effect glow, a
+UI-only number) based on the actor's own state (velocity, health, distance, anything) will show that
+cosmetic **unconditionally on every joined client**, for the actor's entire lifetime, because the
+gating jump that was supposed to suppress it never fires there. The condition still evaluates
+correctly server-side (and in true singleplayer, where the actor is never in client mode at all) —
+only clients see the cosmetic ignore its own gate.
+
+**Fix:** don't gate a `+CLIENTSIDEONLY` side effect from the parent's (non-`+CLIENTSIDEONLY`)
+`A_JumpIf`. Move the condition into the spawned `+CLIENTSIDEONLY` actor's *own* `Spawn:` state
+chain instead — its `A_JumpIf` network-check is on `self` too, and `self` there genuinely is
+`+CLIENTSIDEONLY`, so the check's `NETWORK_InClientMode() && (self->NetworkFlags &
+NETFL_CLIENTSIDEONLY) == false` gate correctly evaluates false and the jump fires as written on
+every machine. Whatever the condition needs to read from the parent (its velocity, a distance, a
+flag) has to be handed to the child explicitly at spawn time — e.g. `A_SpawnItemEx`'s `xvel`/`yvel`/
+`zvel` parameters, or a `SXF_TRANSFERSPECIAL`/args-based value — since the child cannot read the
+parent's fields itself once spawned.
+
 ## Strategies to avoid these in your own DECORATE
 
 1. **Never put an RNG call inside a condition expression that runs on a non-`+CLIENTSIDEONLY` actor
@@ -96,6 +133,29 @@ clientside-only actor's random jump outcome any gameplay weight another player n
 4. **Give position/LOS/inventory-gated jumps slack instead of exact-tic dependence.** A mod that
    needs to "look right" the instant a networked value changes should tolerate a tic of visible lag
    on the client rather than assuming the jump fires in perfect lockstep with the server's update.
+5. **Never rely on a non-`+CLIENTSIDEONLY` actor's `A_JumpIf` to gate whether a `+CLIENTSIDEONLY`
+   cosmetic gets spawned.** The gate is inert on every client, so the "skip" branch's action
+   functions run unconditionally there. Put the condition inside the cosmetic's own state chain,
+   passing it whatever parent data it needs at spawn time.
+
+## Engine-family divergence
+
+This entire file is Zandronum-specific. Confirmed directly in UZDoom source: `A_Jump`
+(`src/playsim/p_actionfunctions.cpp`) is a plain RNG-gated jump with no network check of any kind —
+no `NETWORK_InClientMode`-equivalent guard exists anywhere in the function. `A_JumpIf` isn't even a
+native action function in UZDoom; it's a trivial two-line ZScript wrapper
+(`wadsrc/static/zscript/actors/checks.zs`) that evaluates its boolean argument and calls
+`ResolveState`, again with no network gating. More broadly, `NETWORK_InClientMode`,
+`SERVERCOMMANDS_*`, and `NETFL_CLIENTSIDEONLY` — the mechanisms every cause in this file is built
+on — don't exist in UZDoom at all; `CLIENTSIDEONLY` is parsed only as a recognized-but-ignored
+"dummy flag" (`src/scripting/thingdef_data.cpp`) kept around for DECORATE-source compatibility, not
+a functioning network-scope mechanism. This tracks the two engines' fundamentally different
+networking models: Zandronum's client-server architecture with per-actor server authority and
+client-side prediction/correction (the model this file and
+[`clientside-scripting.md`](../../acs/concepts/clientside-scripting.md) document) versus UZDoom's
+simpler ZDoom-heritage networking, which has no equivalent client-side prediction layer for actor
+state machines to diverge from in the first place. None of the four causes documented above, nor
+the RNG-desync/`+CLIENTSIDEONLY`-contract reasoning built on them, apply to UZDoom.
 
 ## See also
 

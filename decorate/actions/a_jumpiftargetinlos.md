@@ -1,15 +1,17 @@
 # A_JumpIfTargetInLOS
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_JumpIfTargetInLOS` (retrieved 2026-08-01, oldid=44161) + verified against Zandronum source `src/thingdef/thingdef_codeptr.cpp:4242-4340`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_JumpIfTargetInLOS` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_JumpIfTargetInLOS&oldid=44161) + verified against Zandronum source `src/thingdef/thingdef_codeptr.cpp:4242-4340`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_JumpIfTargetInLOS)` (callable from any actor's state table).
 
 Jumps to a target state if the calling actor can see its target, optionally subject to field-of-view and distance constraints. Behavior differs between monster/projectile callers and player weapon/inventory callers.
 
 ## Signatures
 
-```
+```text
 state A_JumpIfTargetInLOS(int offset[, float fov[, int flags[, float dist_max[, float dist_close]]]])
 state A_JumpIfTargetInLOS(str "state"[, float fov[, int flags[, float dist_max[, float dist_close]]]])
 ```
@@ -40,6 +42,10 @@ state A_JumpIfTargetInLOS(str "state"[, float fov[, int flags[, float dist_max[,
 **dist_max** (optional, default 0) — Maximum distance (map units, fixed-point) between the caller and target for the jump to occur. A value of 0 disables the distance check. Distance is 3D approximated via two `P_AproxDistance` calls (XY distance, then incorporating Z), not true Euclidean distance. For weapon/inventory callers, the target search itself is capped at `MISSILERANGE` (2048 map units), so `dist_max` can further constrain it but cannot extend it beyond that engine limit.
 
 **dist_close** (optional, default 0) — If non-zero and the target is closer than this distance, applies the `JLOSF_CLOSE*` modifiers (above). Otherwise has no effect.
+
+## Engine-family divergence: JLOSF_CHECKTRACER flag
+
+Unlike Zandronum (see the Wiki divergence note above), UZDoom does implement `JLOSF_CHECKTRACER` (value 4096, `1 << 12`) — the `JLOS_flags` enum in the UZDoom source's `src/playsim/p_actionfunctions.cpp` includes it alongside the twelve flags Zandronum defines. When set, target resolution for non-player callers uses `tracer` unconditionally: the flag both enters the tracer-selection branch (bypassing the `MF_MISSILE`+`JLOSF_PROJECTILE` gate) and, within that branch, selects `tracer` over `NULL` regardless of `MF2_SEEKERMISSILE`. This matches the ZDoom Wiki's description of the flag ("checks the calling actor's tracer instead of target for non-missile actors") that Zandronum does not support — on UZDoom it is fully functional, for missile and non-missile callers alike.
 
 ## Behavior
 
@@ -83,9 +89,17 @@ When `self->player` is non-NULL, the function performs a weapon aim trace:
 6. Sight and FOV checks occur as determined above.
 7. If all checks pass, jump with position updates: `ACTION_JUMP(jump, CLIENTUPDATE_FRAME | (!self->player ? CLIENTUPDATE_POSITION : ...))`.
 
+## Engine-family divergence: distance calculation
+
+Zandronum computes the caller-to-target distance via two chained `P_AproxDistance` calls (the Zandronum source's `src/thingdef/thingdef_codeptr.cpp`, in this function's `A_JumpIfTargetInLOS` body: an XY approximation, then combined with the Z delta) — the classic Doom octagonal approximation (`dx+dy-(min(dx,dy)>>1)`), which overestimates true Euclidean distance by up to ~6% along a 45-degree diagonal. UZDoom instead calls `AActor::Distance3D` (the UZDoom source's `src/playsim/actor.h`), which computes `(Pos() - otherpos).Length()` — a true 3D Euclidean distance via vector length. The two engines can therefore disagree on whether a target is within `dist_max`/`dist_close` for targets sitting near the boundary distance off-axis, since Zandronum's approximation reads as farther away than UZDoom's exact calculation for the same true position.
+
 ## Network Synchronization
 
 Unlike `A_JumpIfInTargetLOS` (which is server-authoritative with an explicit client-mode gate), `A_JumpIfTargetInLOS` does not check `NETWORK_InClientModeAndActorNotClientHandled` at the start. The function evaluates sight logic on both server and client, but for non-player callers, it sends a position update (`CLIENTUPDATE_POSITION`) alongside the frame jump to sync any movement that occurred on the client during prediction. For player callers, only the frame is updated (`CLIENTUPDATE_FRAME`). This asymmetry is important: a networked non-player actor's position may diverge between client and server during tick-local evaluation, and the position update re-syncs it. Player weapon actions are less subject to this desync because the player's own position is more frequently synchronized through other channels.
+
+## Engine-family divergence: network execution model
+
+The client/server authority split described above (`CLIENTUPDATE_FRAME`/`CLIENTUPDATE_POSITION`, and the general server-authoritative/client-prediction split it implies) is specific to Zandronum's netcode. UZDoom has no equivalent concept: a search of UZDoom's entire source tree turns up zero occurrences of `NETWORK_InClientMode`/`SERVERCOMMANDS_*` or any comparable mechanism, for this function or in general. UZDoom's `A_JumpIfTargetInLOS` (the UZDoom source's `wadsrc/static/zscript/actors/checks.zs`, calling the native `CheckIfTargetInLOS` in `src/playsim/p_actionfunctions.cpp`) is a plain boolean check followed by a `ResolveState`/state-return — no client-mode branch, no server-authoritative early return, and no cross-machine update-flag distinction between the player and non-player branches. The entire "Network Synchronization" topology above, including the position-vs-frame-only update asymmetry, does not apply to UZDoom.
 
 ## Null Safety
 

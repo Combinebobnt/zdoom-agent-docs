@@ -1,15 +1,17 @@
 # `A_Weave` (generalized sinusoidal movement)
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_Weave` (retrieved 2026-07-31, oldid=34283) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:5325-5376` and cross-checked against UZDoom.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_Weave` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_Weave&oldid=34283) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:5325-5376` and cross-checked against UZDoom.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_Weave)` in `src/thingdef/thingdef_codeptr.cpp`.
 
 A generalized projectile-weaving action that moves an actor in sinusoidal patterns along two independent axes: horizontal (XY plane) and vertical (Z). Must be called each time the state runs (the effect depends on state duration) to maintain continuous weaving. Equivalent to, and a generalization of, the earlier `A_BishopMissileWeave` and `A_CStaffMissileSlither` actions (which remain available but are considered deprecated).
 
 ## Signature
 
-```
+```text
 void A_Weave(int horzspeed, int vertspeed, float horzdist, float vertdist)
 ```
 

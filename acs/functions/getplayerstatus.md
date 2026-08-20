@@ -1,11 +1,23 @@
 # `int GetPlayerStatus(int player)`
 
+**Tier:** A.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Provenance:** wiki page `GetPlayerStatus - Zandronum Wiki.html` (`_intake/`, retrieved
+2026-07-28, `https://wiki.zandronum.com/w/index.php?title=GetPlayerStatus&oldid=2251`) + source-verified (`p_acs.cpp:8713-8716`, `d_player.h:271-280`,
+`p_interaction.cpp:3006-3014`, `zcommon.bcs:1346-1352`, `sv_main.cpp:5066-5077`,
+`voicechat.cpp:545-732`, `wi_stuff.cpp:2801`). The wiki's 5-flag bitmask and invalid-index-returns-0
+behavior both check out exactly; the `READYTOGOON` sixth bit and the server-authoritative/sync
+notes are this doc's source-verified additions, not from the wiki (the wiki page states no
+examples and no caveats beyond the 5-flag table).
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
+**Bucket:** extension function.
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+
 Returns a bitmask of a player's UI/network status flags (chatting, talking, in the console, in a
 menu, lagging) — the same states the scoreboard/HUD use to draw a status icon above a player's
 name. Extension function (`ACSF_GetPlayerStatus`, index -173 in `zcommon.bcs`), implementation at
 the Zandronum source's `src/p_acs.cpp:8713-8716`.
-
-**Bucket:** extension function.
 
 ```cpp
 case ACSF_GetPlayerStatus:
@@ -48,13 +60,19 @@ case ACSF_GetPlayerStatus:
 **Returns:** `int` — bitmask of `PLAYERSTATUS_*` (see above; may include the undocumented `32`/
 `READYTOGOON` bit during intermission), or `0` for an invalid/not-in-game player index.
 
-**Provenance:** wiki page `GetPlayerStatus - Zandronum Wiki.html` (`_intake/`, retrieved
-2026-07-28, `oldid=2251`) + source-verified (`p_acs.cpp:8713-8716`, `d_player.h:271-280`,
-`p_interaction.cpp:3006-3014`, `zcommon.bcs:1346-1352`, `sv_main.cpp:5066-5077`,
-`voicechat.cpp:545-732`, `wi_stuff.cpp:2801`). The wiki's 5-flag bitmask and invalid-index-returns-0
-behavior both check out exactly; the `READYTOGOON` sixth bit and the server-authoritative/sync
-notes are this doc's source-verified additions, not from the wiki (the wiki page states no
-examples and no caveats beyond the 5-flag table). **Engine:** Zandronum 3.2.1 (verified against
-the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.
+## Engine-family divergence
 
-**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+`GetPlayerStatus` is bound as ACSF index 173 (`-173:GetPlayerStatus(int):int` in `zcommon.bcs`),
+inside the 100-199 range UZDoom reserves for Zandronum's own extensions and implements none of.
+UZDoom's `CallFunction` dispatcher falls through the `default: break;` case for that index with no
+error and no log line — a Zandronum-compiled object calling `GetPlayerStatus` under UZDoom always
+gets `0` back, regardless of the target player's real chat/console/menu/lag state.
+
+That `0` is a plausible-looking wrong answer, not an obviously broken one: `0` is also the correct
+return for a player with no `PLAYERSTATUS_*` bits set — the ordinary, most-common case (not
+chatting, not talking, not in the console or a menu, not lagging). A script polling this function
+under UZDoom will silently see "no status flags" for every player, every time, including the ones
+that actually are chatting or lagging, and nothing distinguishes that from a genuinely idle player
+without cross-checking on Zandronum. See [Zandronum/UZDoom
+compatibility](../concepts/zandronum-uzdoom-compat.md) for the general reserved-ACSF-range
+mechanism this is an instance of.

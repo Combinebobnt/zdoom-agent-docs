@@ -49,11 +49,11 @@ CONCEPT = "concept"             # prose; same header block as CALLABLE, no signa
 # Tier:/Provenance:/Engine: block directly under the H1.
 HEADER_BLOCK_ARCHETYPES = (CALLABLE, TABLE_NOTES, CONCEPT)
 
-# key -> {"index": "<section>/INDEX.md", "claude": "<section>/CLAUDE.md", "dirs": {dir: archetype}}
+# key -> {"index": "<section>/INDEX.md", "agents": "<section>/AGENTS.md", "dirs": {dir: archetype}}
 SECTIONS = {
     "acs": {
         "index": "acs/INDEX.md",
-        "claude": "acs/CLAUDE.md",
+        "agents": "acs/AGENTS.md",
         "dirs": {
             "acs/functions": CALLABLE,
             "acs/families": CALLABLE,
@@ -70,9 +70,10 @@ SECTIONS = {
     },
     "decorate": {
         "index": "decorate/INDEX.md",
-        "claude": "decorate/CLAUDE.md",
+        "agents": "decorate/AGENTS.md",
         "dirs": {
             "decorate/actions": CALLABLE,
+            "decorate/classes": CALLABLE,
             "decorate/families": CALLABLE,
             "decorate/inventory": TABLE_INVENTORY,
             "decorate/notes": TABLE_NOTES,
@@ -81,7 +82,7 @@ SECTIONS = {
     },
     "zscript": {
         "index": "zscript/INDEX.md",
-        "claude": "zscript/CLAUDE.md",
+        "agents": "zscript/AGENTS.md",
         "dirs": {
             "zscript/classes": CALLABLE,
             "zscript/families": CALLABLE,
@@ -90,7 +91,7 @@ SECTIONS = {
     },
     "mapinfo": {
         "index": "mapinfo/INDEX.md",
-        "claude": "mapinfo/CLAUDE.md",
+        "agents": "mapinfo/AGENTS.md",
         "dirs": {
             "mapinfo/inventory": TABLE_INVENTORY,
             "mapinfo/notes": TABLE_NOTES,
@@ -99,7 +100,7 @@ SECTIONS = {
     },
     "gldefs": {
         "index": "gldefs/INDEX.md",
-        "claude": "gldefs/CLAUDE.md",
+        "agents": "gldefs/AGENTS.md",
         "dirs": {
             "gldefs/inventory": TABLE_INVENTORY,
             "gldefs/notes": TABLE_NOTES,
@@ -108,7 +109,7 @@ SECTIONS = {
     },
     "sbarinfo": {
         "index": "sbarinfo/INDEX.md",
-        "claude": "sbarinfo/CLAUDE.md",
+        "agents": "sbarinfo/AGENTS.md",
         "dirs": {
             "sbarinfo/inventory": TABLE_INVENTORY,
             "sbarinfo/notes": TABLE_NOTES,
@@ -117,7 +118,7 @@ SECTIONS = {
     },
     "cvarinfo": {
         "index": "cvarinfo/INDEX.md",
-        "claude": "cvarinfo/CLAUDE.md",
+        "agents": "cvarinfo/AGENTS.md",
         "dirs": {
             "cvarinfo/inventory": TABLE_INVENTORY,
             "cvarinfo/notes": TABLE_NOTES,
@@ -126,7 +127,7 @@ SECTIONS = {
     },
     "console": {
         "index": "console/INDEX.md",
-        "claude": "console/CLAUDE.md",
+        "agents": "console/AGENTS.md",
         "dirs": {
             "console/inventory": TABLE_INVENTORY,
             "console/notes": TABLE_NOTES,
@@ -135,7 +136,7 @@ SECTIONS = {
     },
     "sprites": {
         "index": "sprites/INDEX.md",
-        "claude": "sprites/CLAUDE.md",
+        "agents": "sprites/AGENTS.md",
         "dirs": {
             "sprites/concepts": CONCEPT,
         },

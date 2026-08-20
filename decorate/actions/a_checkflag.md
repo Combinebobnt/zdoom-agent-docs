@@ -1,8 +1,10 @@
 # `void A_CheckFlag(string flagname, state label, int check_pointer = AAPTR_DEFAULT)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_CheckFlag` (retrieved 2026-08-01, oldid=54541) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4752-4769`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_CheckFlag` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_CheckFlag&oldid=54541) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4752-4769`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:4752` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_CheckFlag)`).
 
 Checks whether an actor (specified by actor pointer) has a given actor flag set, and jumps to a target state if the flag is set. Called on any actor; the actor being checked defaults to the calling actor if not specified.
@@ -19,6 +21,10 @@ void A_CheckFlag (string flagname, state label [, int check_pointer])
 - **`label`** — the state to jump to if the flag is set on the target actor. If a state label (e.g., `"Death"`, `"DeathFade"`), the name is resolved in the calling actor's derived class's state table (virtual resolution). If the flag is not set, no jump occurs — execution continues to the next action or frame in the current state.
 - **`check_pointer`** (optional) — the actor on which to perform the flag check, specified as an actor pointer. Default is `AAPTR_DEFAULT`, which refers to the calling actor itself. Other common pointers are `AAPTR_TARGET`, `AAPTR_MASTER`, `AAPTR_TRACER` (see `actorptrselect.h` in the Zandronum source for the full enum of selectors).
 
+## Engine-family divergence
+
+**UZDoom deprecates `A_CheckFlag`.** In UZDoom's ZScript stdlib (`wadsrc/static/zscript/actors/checks.zs`), the action is declared with `deprecated("2.3", "Use a combination of direct flag access and SetStateLabel()")`, so calling it from DECORATE or ZScript on UZDoom emits a compile-time deprecation warning recommending direct flag-field access plus `SetStateLabel()` instead. It remains fully functional and behaves identically to the description below: the ZScript wrapper calls a private native `CheckFlag()` (`src/playsim/p_actionfunctions.cpp`, `DEFINE_ACTION_FUNCTION(AActor, CheckFlag)`) that resolves the pointer via `COPY_AAPTR` and, on a non-null result, routes through the same `CheckActorFlag()`/`FindFlag()`/`CheckDeprecatedFlags()` machinery described here, with the same "Unknown flag" error message and the same silent no-jump behavior on a null pointer. Zandronum carries no such deprecation notice; `A_CheckFlag` remains its standard, non-deprecated flag-check action.
+
 ## Behavior
 
 **Flag state check:** If the target actor (resolved via `check_pointer`) has the flag set, the function jumps to the specified state. The check uses `CheckActorFlag()` to find the flag definition and test whether the bit is set.
@@ -31,7 +37,7 @@ void A_CheckFlag (string flagname, state label [, int check_pointer])
 
 **Dot notation:** Actor-class-specific flags can be checked using dot notation (e.g., `"weapon.nohitscanscan"`), which allows checking flags on actors of different classes without switching the context. This works identically to `A_ChangeFlag`'s dot-notation support.
 
-## Zandronum network note
+## Zandronum-specific: network handling
 
 Unlike `A_ChangeFlag` (which broadcasts state changes to clients via `SERVERCOMMANDS_SetThingFlags`) or `A_CheckSight` (which branches on `NETWORK_InClientMode()` and broadcasts the jump decision), **`A_CheckFlag` performs no explicit network handling**. The source comment notes that clients already mirror actor flag state; the function checks this state without synchronization overhead. Because it is a read-only check, no client-side inconsistency guard is present. The jump decision is made identically on both server and client (assuming their flag state is synchronized), and no `CLIENTUPDATE_FRAME` flag is passed to the underlying `ACTION_JUMP` macro.
 

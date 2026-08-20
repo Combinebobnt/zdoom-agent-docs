@@ -1,8 +1,10 @@
 # `void A_DamageChildren(int amount, name damagetype = "none")`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_DamageChildren` (retrieved 2026-08-01, oldid=46971) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4483-4507` and `wadsrc/static/actors/actor.txt:281`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_DamageChildren` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_DamageChildren&oldid=46971) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4483-4507` and `wadsrc/static/actors/actor.txt:281`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:4483` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_DamageChildren)`).
 
 Damages all of the calling actor's child actors (those with `master == self`) by a specified amount; negative amounts heal instead. **Zandronum only: drastically simplified compared to GZDoom/UZDoom, which support flags and actor/species filters.**
@@ -40,6 +42,10 @@ Negative `amount` values trigger the healing path via `P_GiveBody`, which:
 - Applies the prosperity cheat if active on the target player.
 
 **BUG (Zandronum 3.2.1):** The `amount` parameter is negated and **reassigned inside the iteration loop** (`amount = -amount;` in `thingdef_codeptr.cpp:4502`, identical pattern to `A_DamageSiblings`). After the first child is healed, `amount` is now positive, so all *subsequent* children found in the same call are **damaged** instead of healed. This function is unreliable for healing more than one child at a time in Zandronum — call it once per child, or use `A_DamageMaster` if only a single target is needed.
+
+## Engine-family divergence: healing-reassignment bug does not reproduce on UZDoom
+
+**UZDoom does not have the Zandronum healing bug described above.** UZDoom's `A_DamageChildren` (`src/playsim/p_actionfunctions.cpp:4057-4080`) iterates all thinkers and, for each matching child, calls a shared `DoDamage(mo, inflictor, source, amount, damagetype, flags, filter, species)` helper (`p_actionfunctions.cpp:3922-3955`), passing the loop's `amount` **by value** on every call. The negation for the healing path (`amount = -amount;`) happens only inside `DoDamage`'s own local parameter copy and is discarded when that call returns — it never mutates the outer loop variable. Each child in a single `A_DamageChildren` call therefore always receives the original, correctly-signed `amount`, so healing (or damaging) multiple children in one call works reliably on UZDoom. Additionally, UZDoom's `A_DamageChildren` takes the full `(amount, damagetype, flags, filter, species, src, inflict)` signature described by the wiki (see the comparison table below), including `DMSS_FOILINVUL`/`DMSS_FOILBUDDHA` flags to bypass `+INVULNERABLE`/Buddha that have no Zandronum equivalent, and the `god2`/`buddha2` cheats (`CF_GODMODE2`/`CF_BUDDHA2`) the wiki mentions do genuinely exist in UZDoom's `p_interaction.cpp`.
 
 ## Dead targets and edge cases
 

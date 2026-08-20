@@ -1,8 +1,10 @@
 # `raw GetMapRotationInfo(int position, int info)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 — added in `4e38a84d7` ("Added ACS functions: GetMapRotationSize and GetMapRotationInfo..."), confirmed an ancestor of `28f736fb3` (the "changed the version string to 3.2.1" commit), so this predates and is included in the 3.2.1 target, not just the local 3.3-alpha checkout.
-**Provenance:** `GetMapRotationInfo - Zandronum Wiki.html` (wiki `oldid=1369`), verified against the Zandronum source 2026-07-29.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** `GetMapRotationInfo - Zandronum Wiki.html` (wiki `https://wiki.zandronum.com/w/index.php?title=GetMapRotationInfo&oldid=1369`), verified against the Zandronum source 2026-07-29.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
 
 Reads one property of one entry in the server's map rotation list. Extension function
@@ -61,7 +63,7 @@ The wiki does not mention this, and it's the main reason this page earns a doc f
 
 ## Example (from the wiki, semantics unchanged)
 
-```
+```text
 Script 1 OPEN {
 	int size = GetMapRotationSize();
 	Log(d: size, s: " maps are in the rotation.");
@@ -90,3 +92,26 @@ Script 1 OPEN {
   future pass decides `GetMapRotationInfo`/`GetMapRotationSize`/`GetMapPosition` belong together
   as a `families/map-rotation.md`, that consolidation should happen as a deliberate follow-up,
   not as a side effect of processing one intake file.
+
+## Engine-family divergence
+
+`GetMapRotationInfo` is bound as ACSF (CALLFUNC) index 150 — inside the 100–199 range UZDoom's own
+ACSF enum reserves for Zandronum's extensions and implements none of (confirmed via
+`tools/engine_matrix.py GetMapRotationInfo`, bin `zandronum-only-silent`). UZDoom's `CallFunction`
+dispatcher is a plain `switch` over the ACSF index with `default: break;` falling through to
+`return 0` — no error, no log line, execution just continues. A Zandronum-compiled object calling
+`GetMapRotationInfo` under UZDoom silently gets `0` back in place of whatever the real call would
+have returned, for every `info` value and every `position`. See
+[Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md) for the general mechanism
+— this function is one of the confirmed instances it names directly, alongside its map-rotation
+siblings `GetMapPosition` and `GetMapRotationSize`.
+
+That silent `0` is a plausible-looking value in this function's own return space, not an obvious
+tell: for `MAPROTATION_USED`, `0` reads as "not yet played this cycle", and for
+`MAPROTATION_MINPLAYERS`/`MAPROTATION_MAXPLAYERS`, `0` collides with the documented "no minimum"
+sentinel. It's also indistinguishable from this function's own documented invalid-`position`
+fallback (see "Failure behavior" above), which returns the same `0` for those three `info` values
+on Zandronum itself. Only the string-returning properties give it away —
+`MAPROTATION_NAME`/`MAPROTATION_LUMPNAME` return a string handle on Zandronum, so a UZDoom caller
+gets back plain integer `0` where it expected a string, which is more likely to surface as a type
+mismatch than the int-returning properties are to surface as silently wrong data.

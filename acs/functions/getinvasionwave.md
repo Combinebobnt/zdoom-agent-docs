@@ -1,8 +1,10 @@
 # GetInvasionWave
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (the `PCD_GETINVASIONWAVE` case dates back to the original Skulltag 0.97c2 import, commit `bc562a817`, confirmed an ancestor of the 3.2.1 version-bump commit `28f736fb3` — well predates the target).
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** Wiki intake `GetInvasionWave - Zandronum Wiki.html` (https://wiki.zandronum.com/w/index.php?title=GetInvasionWave&oldid=1290), verified against source 2026-07-29.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 
 ## Bucket
 
@@ -12,7 +14,7 @@ function. Declared in `zt-bcc/lib/zcommon.bcs`/`src/builtin.c` as `getinvasionwa
 
 ## Signature
 
-```
+```text
 int GetInvasionWave(void);
 ```
 
@@ -48,3 +50,16 @@ first wave's monsters actually spawn).
   getter, documented separately. This page and that one are closely related (both read
   Invasion-gametype state) and may eventually belong in a shared `families/invasion.md` —
   left as two separate per-function files for now; not consolidated here.
+
+## Engine-family divergence
+
+`GetInvasionWave` is a base PCD opcode (`PCD_GETINVASIONWAVE`, index 129), not a CALLFUNC/ACSF
+extension — a different name space from the 100–199 reserved-and-silent CALLFUNC range most
+other Zandronum-only functions fall into (see
+[Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md)). UZDoom's interpreter
+has no `case` for this opcode at all, so a Zandronum-compiled object calling it under UZDoom hits
+UZDoom's unknown-PCD path: the interpreter prints `"Unknown P-Code %d in %s"` naming the script
+and **terminates that script outright** — loud and fatal, the opposite failure mode from the
+silent-0 return most other Zandronum-only functions produce. There is no return value to
+misinterpret because the script never continues past the call; treat any script that polls
+`GetInvasionWave()` as entirely non-portable to UZDoom, not merely "returns a wrong wave number."

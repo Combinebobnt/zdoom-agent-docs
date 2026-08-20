@@ -1,12 +1,15 @@
 # MorphActor
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki, verified against Zandronum source, 2026-07-30
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-06)
+**Provenance:** ZDoom Wiki (https://zdoom.org/w/index.php?title=MorphActor&oldid=53654), verified against Zandronum source (src/p_acs.cpp PCD_MORPHACTOR, src/g_shared/a_morph.cpp, src/g_shared/a_morph.h), 2026-08-06
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** compiler builtin (`PCD_MORPHACTOR` in `src/p_acs.cpp`).
 
 ## Signature
 
-```
+```text
 int MorphActor(int tid [, str playerclass [, str monsterclass [, int duration [, int style [, str morphflash [, str unmorphflash]]]]])
 ```
 
@@ -19,7 +22,7 @@ Morphs actors (players and monsters) into specified classes. Returns the count o
 - **tid**: Target actor(s). If `0`, uses the activator; otherwise searches for actors with this TID. Non-existent TID succeeds with return value `0` (no actors to morph).
 - **playerclass**: Destination class for players (string name). Defaults to empty string; if omitted or empty, the morph fails for players.
 - **monsterclass**: Destination class for monsters (string name). Defaults to empty string; if omitted or empty, the morph fails for monsters.
-- **duration**: Morph duration in tics. Defaults to `0`; if `0`, uses engine default (`MORPHTICS = 40 * TICRATE`, ~1.3 seconds at standard 35 FPS). All actors use the same timer regardless of player/monster class.
+- **duration**: Morph duration in tics. Defaults to `0`; if `0`, uses engine default (`MORPHTICS = 40 * TICRATE`, approximately 40 seconds at standard 35 FPS). For players, morphing uses the exact duration. For monsters, morphing duration has 0–255 tics of random jitter added (cosmetic variation, not a functional difference).
 - **style**: Bit flags controlling morph behavior (see Style flags below). Defaults to `0` (legacy Heretic/Hexen semantics).
 - **morphflash**: Spawn class for the morph entrance flash effect (string name). Defaults to empty string; if omitted or empty, uses engine default (teleport fog). Only spawned for the first morph call; subsequent calls (e.g., super-morphing) may skip it.
 - **unmorphflash**: Spawn class for the unmorph exit flash effect (string name). Defaults to empty string; if omitted or empty, uses engine default (teleport fog). Spawned by `UnMorphActor`, not by `MorphActor` itself.
@@ -57,7 +60,7 @@ Zandronum exposes morph style flags via the `MRF_*` enum in `zcommon.bcs`. The e
 | `MRF_UNDOBYDEATH` | `0x200` | Actor unmorphs when killed (and stays dead, unless `MRF_UNDOBYDEATHSAVES` is also set). |
 | `MRF_UNDOBYDEATHFORCED` | `0x400` | Forces unmorph when killed (mainly useful with `MRF_UNDOBYDEATHSAVES`). |
 | `MRF_UNDOBYDEATHSAVES` | `0x800` | Actor (if unmorphed upon death) regains health and doesn't die. |
-| `MRF_UNDOALWAYS` | `0x1000` | Player unmorphs once the countdown expires. |
+| `MRF_UNDOALWAYS` | `0x1000` | Player unmorphs once the countdown expires. (Engine calls this flag `MORPH_UNDOBYTIMEOUT` in `a_morph.h`, same value, different name.) |
 | `MRF_TRANSFERTRANSLATION` | `0x2000` | **Engine note:** defined in `zcommon.bcs` but not implemented in this Zandronum version; has no effect. |
 
 ### Known divergence from ZDoom wiki
@@ -65,6 +68,15 @@ Zandronum exposes morph style flags via the `MRF_*` enum in `zcommon.bcs`. The e
 The ZDoom wiki page names the style parameter flag `MRF_WHENINVULNERABLE`; Zandronum's C++ source calls it `MORPH_WHENINVULNERABLE`. The zcommon.bcs header uses the `MRF_` prefix for all morph-style flags, consistent with the script API. Both refer to the same flags.
 
 The wiki states that this flag allows "when used on a player, provided that player is also the activator." The source code (`src/g_shared/a_morph.cpp:49`) enforces a stricter condition: an invulnerable player can morph **only if they are the activator AND the flag is set**. Morphing an invulnerable player who is not the activator always fails, regardless of the flag's state.
+
+## Engine-family divergence: morph style flags (UZDoom)
+
+UZDoom's `EMorphFlags` enum (`wadsrc/static/zscript/constants.zs`) keeps every flag from the Zandronum-derived table above at the same bit value through `MRF_UNDOBYDEATHSAVES` (`0x800`), but diverges from that point on:
+
+- **`MRF_UNDOALWAYS` and `MRF_UNDOBYTIMEOUT` are two distinct flags in UZDoom, not aliases.** `MRF_UNDOBYTIMEOUT` keeps value `0x1000` and the "unmorphs once the countdown expires" meaning the doc's table attributes to `MRF_UNDOALWAYS`. `MRF_UNDOALWAYS` moves to `0x2000` and instead means "powerup-style morphs must always unmorph regardless of other conditions." A script relying on the doc's Zandronum-derived claim that these are the same flag under two names will be wrong on UZDoom.
+- **`MRF_TRANSFERTRANSLATION` moves from `0x2000` to `0x4000`, and is now actually implemented** (it copies the pre-morph actor's translation onto the morphed monster, when the morphed actor doesn't have `DONTTRANSLATE`), unlike Zandronum where the doc notes it's defined but has no effect. Because `~/source/zt-bcc/lib/zcommon.bcs` still defines `MRF_TRANSFERTRANSLATION` as `0x2000` (matching Zandronum, not UZDoom), a BCS script compiled against that header and run on UZDoom would set UZDoom's `MRF_UNDOALWAYS` bit instead of requesting translation transfer — a real constant/engine mismatch trap for cross-engine scripts, not just a documentation nuance.
+- **Two flags exist in UZDoom with no equivalent in the doc's table or in zt-bcc's `zcommon.bcs`:** `MRF_KEEPARMOR` (`0x8000`, skips the automatic armor-removal that normally happens when a monster morphs) and `MRF_IGNOREINVULN` (`0x10000`, bypasses the invulnerability check entirely for both morph and unmorph, regardless of activator identity or whether `MRF_WHENINVULNERABLE` is set). Scripts targeting UZDoom must pass these as raw integer literals since no named BCS constant exists for them yet.
+- **The monster-morph failure case "named class is not a descendant of `AMorphedMonster`" no longer holds in UZDoom.** `MorphMonster()` (`wadsrc/static/zscript/actors/morph.zs`) only optionally casts the spawned actor to `MorphedMonster` — the source comments this is kept "for backwards compatibility as MorphedMonster used to be required" — and proceeds regardless of whether the cast succeeds. Any `Actor`-derived class can now be a morph target for monsters; `AMorphedMonster`-specific bookkeeping (its stored pre-morph alternate/style/flags fields) is simply skipped for classes that aren't descendants, rather than the morph failing outright.
 
 ## Network replication
 
@@ -82,7 +94,7 @@ In multiplayer, the morph operation is automatically replicated to all clients:
 
 Morph a cyberdemon (TID 1) into a different actor class, with a 3-second morph duration and entrance flash:
 
-```c
+```acs
 script 1 (void)
 {
     int count = MorphActor(1, "", "MorphDemon", 105, 0, "CustomMorphFlash", "");

@@ -1,11 +1,20 @@
 # `mixed GetControlPointInfo(int point, int type)`
 
+**Tier:** A.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `GetControlPointInfo - Zandronum Wiki.html` (`_intake/`, retrieved
+2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetControlPointInfo&oldid=2273`) + source-verified against `p_acs.cpp:7996-8026`/`5547`,
+`sectinfo.h:61-70`, `sectinfo.cpp:267-312`, `domination.cpp:90-102`, `teaminfo.h:38`,
+`zt-bcc/lib/zcommon.bcs:807-811,1269-1273,1810`. Wiki page itself is accurate as far as it goes
+(it just doesn't mention either divergence above — both were only found by reading the C++).
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
+**Bucket:** extension function (negative index, `p_acs.cpp`'s `ACSF_*`/`ASCF_*` switch).
+
 Reads one piece of state about a Domination-gametype control point (a `SECTINFO` "point" entry,
 not a generic map sector). Extension function, `zcommon.bcs:1810` declares it at index `-182`
 (`ASCF_GetControlPointInfo`, the Zandronum source's `src/p_acs.cpp:5547`), implementation is the
 `case ASCF_GetControlPointInfo:` block at `p_acs.cpp:7996-8026`.
-
-**Bucket:** extension function (negative index, `p_acs.cpp`'s `ACSF_*`/`ASCF_*` switch).
 
 - `point` — zero-based index into `level.info->SectorInfo.Points` (the array parsed from the
   map's `SECTINFO` lump, the Zandronum source's `src/sectinfo.cpp:267-312`). **Out-of-range `point`
@@ -52,7 +61,7 @@ Domination is the active gametype.
 
 **Example — print a point's name and whether it's claimed (Domination gametype only):**
 
-```
+```text
 str pointName = GetControlPointInfo(0, POINTINFO_NAME);
 int owner = GetControlPointInfo(0, POINTINFO_OWNER);
 if (owner == 255) // TEAM_None has no BCS constant; NO_TEAM (2) is NOT the same value
@@ -61,13 +70,23 @@ else
     Log(s: pointName, s: " is owned by team ", i: owner);
 ```
 
-**Provenance:** wiki page `GetControlPointInfo - Zandronum Wiki.html` (`_intake/`, retrieved
-2026-07-29, `oldid=2273`) + source-verified against `p_acs.cpp:7996-8026`/`5547`,
-`sectinfo.h:61-70`, `sectinfo.cpp:267-312`, `domination.cpp:90-102`, `teaminfo.h:38`,
-`zt-bcc/lib/zcommon.bcs:807-811,1269-1273,1810`. Wiki page itself is accurate as far as it goes
-(it just doesn't mention either divergence above — both were only found by reading the C++).
-**Engine:** Zandronum 3.2.1 — the introducing commit (`7e92bc6ff`, "Add ACS function to get
-control point info...") was confirmed via `git merge-base --is-ancestor` to predate both the
-`28f736fb3` ("changed the version string to 3.2.1") and `0dc8d30cc` ("Added tag ZA_3.2.1")
-commits in the Zandronum source's checkout, i.e. it ships in 3.2.1, not just the
-checkout's `3.3-alpha` HEAD. **Tier:** A.
+## Engine-family divergence
+
+Bound at ACSF (CALLFUNC) index 182 — inside the 100–199 range UZDoom's own ACSF enum reserves for
+Zandronum's extensions and implements none of (see
+[Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md)). A Zandronum-compiled
+object calling `GetControlPointInfo` under UZDoom hits UZDoom's `CallFunction` dispatcher's
+`default: break;` case: no error, no log line, and the call returns a plain `0` regardless of
+`type` — the interpreter continues as if the call had succeeded.
+
+That `0` collapses this function's own three real return shapes into one indistinguishable value,
+and two of the three already have a `0`-shaped "nothing to see here" default on Zandronum itself:
+`POINTINFO_DISABLED` reads `false` either way, and `POINTINFO_OWNER`'s silent `0` is not
+`TEAM_None` (`255`, this function's own real "unclaimed" sentinel) but numeric team `0`
+(`TEAM_BLUE`) — a script using this file's own documented `== 255` check to detect an unclaimed
+point sees every UZDoom call as **owned by the blue team**, never unclaimed, which is a more
+actively misleading failure than the Zandronum-side gotcha this file already warns about.
+`POINTINFO_NAME` is the one case where `0` doesn't fit at all — the real return is a string
+handle, and a caller feeding a raw untagged `0` to a string-consuming opcode gets an unrelated
+string-table lookup rather than an empty name, the same string-pool-tag mismatch documented on
+this function's sibling `GetPlayerCountry`.

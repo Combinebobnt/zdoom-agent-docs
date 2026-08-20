@@ -1,8 +1,10 @@
 # `void A_DamageSiblings(int amount, name damagetype = "none")`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_DamageSiblings` (retrieved 2026-08-01, oldid=46972) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4517-4545` and `wadsrc/static/actors/actor.txt`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_DamageSiblings` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_DamageSiblings&oldid=46972) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4517-4545` and `wadsrc/static/actors/actor.txt`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:4517` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_DamageSiblings)`).
 
 Damages all actors that share the calling actor's master (spawner), excluding the calling actor itself; negative amounts heal instead. **Zandronum only: drastically simplified compared to GZDoom/UZDoom, which support 7 parameters with flags and actor/species filters.**
@@ -49,6 +51,18 @@ This function scans the entire thinker list (all actors in the level) on every c
 ## Network behavior
 
 **Zandronum multiplayer:** The action carries no explicit network synchronization guard in the action function itself — `P_DamageMobj` and `P_GiveBody` are responsible for server/client state replication. On servers, damage is applied and propagated to clients. On network clients, execution depends on the actor's `+CLIENTSIDEONLY` flag.
+
+## Engine-family divergence: no client/server authority split
+
+The "Network behavior" section above describes Zandronum's client/server netcode split. UZDoom's `A_DamageSiblings` (`src/playsim/p_actionfunctions.cpp:4087-4113`) contains no network-role branch at all — no check for local-player ownership, no server/client split, and no `+CLIENTSIDEONLY`-gated early-out. This matches the cohort-wide pattern: UZDoom's source tree has zero `NETWORK_InClientMode`/`SERVERCOMMANDS_*` occurrences anywhere (confirmed by tree-wide grep). On UZDoom, the sibling scan and damage/heal calls simply run unconditionally wherever the action executes.
+
+## Engine-family divergence: 7-parameter signature is real and functional in UZDoom
+
+The table in "Zandronum-specific" above describes the wiki's extra parameters and flags as things Zandronum omits. Verified directly against UZDoom's native declaration (`wadsrc/static/zscript/actors/actor.zs:1399`) and implementation (`src/playsim/p_actionfunctions.cpp:4087-4113`, dispatching into the shared `DoDamage` helper at `p_actionfunctions.cpp:3922-3955`), they are real, functioning UZDoom/GZDoom-family behavior: all ten `DMSS_*` flags (`FOILINVUL`, `AFFECTARMOR`, `KILL`, `NOFACTOR`, `FOILBUDDHA`, `NOPROTECT`, `EXFILTER`, `EXSPECIES`, `EITHER`, `INFLICTORDMGTYPE`) are read and applied per sibling, the `filter`/`species` arguments gate which siblings are affected at all (before any damage/heal call, via `DoCheckClass`/`DoCheckSpecies`), and `src`/`inflict` (via `COPY_AAPTR`) let the caller redirect the damage's source and inflictor pointers away from the defaults (the acting sibling itself, per `DoDamage`'s Zandronum-equivalent `P_DamageMobj(sibling, self, self, ...)` call). None of this is reachable from Zandronum, where the function only ever accepts `amount` and `damagetype`.
+
+## Engine-family divergence: the Zandronum healing bug does not reproduce on UZDoom
+
+The "Healing behavior" section above documents a Zandronum-only bug: `amount` is negated and reassigned in place inside the shared `while` loop, so after the first sibling is healed every subsequent sibling in the same call is damaged instead. UZDoom's `A_DamageSiblings` loop (`p_actionfunctions.cpp:4106-4110`) calls the `DoDamage` helper function once per sibling, passing the action function's own `amount` local by value on every iteration; `DoDamage` negates and reassigns `amount` only inside its own function-local copy (`p_actionfunctions.cpp:3949-3953`), which is discarded when it returns. The caller's `amount` is never mutated across iterations. As a result, a negative `amount` correctly heals **every** sibling in a single UZDoom `A_DamageSiblings` call — the workarounds described in the Zandronum bug note (call once per sibling, or use `A_DamageChildren`/`A_DamageMaster` instead) are unnecessary on UZDoom.
 
 ## Zandronum-specific: drastically simplified vs. GZDoom/UZDoom
 

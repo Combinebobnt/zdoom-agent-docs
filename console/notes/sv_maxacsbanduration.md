@@ -1,8 +1,10 @@
 # `sv_maxacsbanduration`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-02)
 **Provenance:** Zandronum Wiki "Server variables" (https://wiki.zandronum.com/w/index.php?title=Server_variables&oldid=2534, saved 2026-08-02), whose version-availability claim this file corrects; Zandronum source `src/sv_main.cpp` (CUSTOM_CVAR declaration) and ACS BanFromGame function implementation, verified against server ban enforcement and version ancestry against the 3.2.1 version-bump commit (`28f736fb3`).
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 
 Sets the maximum duration (in minutes) that a mod can ban a player using the ACS `BanFromGame()` function. A value of 0 **forbids mods entirely from banning players**, effectively disabling the ACS ban mechanism server-wide.
 
@@ -34,3 +36,9 @@ Marked `CVAR_SERVERINFO | CVAR_GAMEPLAYSETTING`, so the value is replicated to c
 - **`BanFromGame(int minutes, str message)`** — ACS function to ban a player; respects this cvar's limit.
 - **`sv_enforcebans`** — controls whether the ban list is actually enforced (independent of ACS bans).
 - **`sv_banfile`** / **`sv_banexemptionfile`** — ban and whitelist file lists (for manual/admin bans, not ACS-triggered).
+
+## Engine-family divergence
+
+`sv_maxacsbanduration` does not exist in UZDoom at all — confirmed absent from source, not merely undocumented. UZDoom's ACS implementation and administration surface carry no equivalent policy cap on ACS-triggered ban duration.
+
+Attempting to set it under UZDoom (via the console, a config file, or ACS's `ConsoleCommand()`) prints `Unknown command "sv_maxacsbanduration"` to console/log and does nothing else — the write silently fails to apply, so no cap is ever enforced. This is visible if someone's watching the console at the time, but easy to miss in an unattended server startup script or `autoexec.cfg` line. As a result, a UZDoom server admin has no way to cap or prohibit how long a mod's ACS-triggered ban logic can ban a player for — this specific policy boundary is simply unavailable on UZDoom.

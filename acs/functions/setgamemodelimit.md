@@ -1,5 +1,20 @@
 # `void SetGameModeLimit(int limit, int value)`
 
+**Tier:** A.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `SetGameModeLimit - Zandronum Wiki.html` (`_intake/`, retrieved
+2026-07-29, `https://wiki.zandronum.com/w/index.php?title=SetGameModeLimit&oldid=1329`) + source-verified (`p_acs.cpp:7588-7592`, `gamemode.cpp:1572-1657`,
+`gamemode.h:134-140`, plus the six CVar definitions in `deathmatch.cpp`, `team.cpp`,
+`duel.cpp`, `lastmanstanding.cpp`, `invasion.cpp` listed above) and version-gated: added in
+commit `c487ff0a5` ("Added new ACS functions: SetGamemodeLimit()... SetCurrentGamemode()...
+GetCurrentGamemode()..."), confirmed via `git merge-base --is-ancestor c487ff0a5 28f736fb3` to
+be an ancestor of the 3.2.1 version-bump commit `28f736fb3` — existed in Zandronum 3.2.1, not
+just the `master`/`3.3-alpha` checkout.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
+**Bucket:** extension function (negative index, `ACSF_SetGamemodeLimit`).
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+
 Sets one of the six game-mode "limit" CVars (`fraglimit`, `timelimit`, `pointlimit`,
 `duellimit`, `winlimit`, `wavelimit`) directly from ACS, bypassing console/rcon access checks.
 Extension function, index `-134` in `zt-bcc/lib/zcommon.bcs:1767` (declared there as
@@ -16,8 +31,6 @@ case ACSF_SetGamemodeLimit:
     break;
 }
 ```
-
-**Bucket:** extension function (negative index, `ACSF_SetGamemodeLimit`).
 
 **Parameters:**
 
@@ -72,7 +85,7 @@ above.
 
 **Example:**
 
-```
+```text
 // Cap the current invasion round at 10 waves.
 SetGameModeLimit(GAMELIMIT_WAVES, 10);
 
@@ -83,14 +96,24 @@ SetGameModeLimit(GAMELIMIT_TIME, 15.0);
 **Returns:** nothing meaningful — always compiles to `0` if used as an expression (see above),
 per the wiki's own `void` signature this isn't intended to be used as one.
 
-**Provenance:** wiki page `SetGameModeLimit - Zandronum Wiki.html` (`_intake/`, retrieved
-2026-07-29, `oldid=1329`) + source-verified (`p_acs.cpp:7588-7592`, `gamemode.cpp:1572-1657`,
-`gamemode.h:134-140`, plus the six CVar definitions in `deathmatch.cpp`, `team.cpp`,
-`duel.cpp`, `lastmanstanding.cpp`, `invasion.cpp` listed above) and version-gated: added in
-commit `c487ff0a5` ("Added new ACS functions: SetGamemodeLimit()... SetCurrentGamemode()...
-GetCurrentGamemode()..."), confirmed via `git merge-base --is-ancestor c487ff0a5 28f736fb3` to
-be an ancestor of the 3.2.1 version-bump commit `28f736fb3` — existed in Zandronum 3.2.1, not
-just the `master`/`3.3-alpha` checkout.
-**Engine:** Zandronum 3.2.1. **Tier:** A.
+## Engine-family divergence
 
-**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+`SetGamemodeLimit` is bound as ACSF (CALLFUNC) index 134 — inside the 100–199 range UZDoom's own
+ACSF enum reserves for Zandronum's extensions and implements none of (confirmed via
+`python3 tools/engine_matrix.py SetGamemodeLimit`, bin `zandronum-only-silent`). UZDoom's
+`CallFunction` dispatcher is a plain `switch` over the ACSF index with `default: break;` falling
+through to `return 0` — no error, no log line, execution just continues. A Zandronum-compiled
+object calling `SetGameModeLimit` under UZDoom therefore never reaches `GAMEMODE_SetLimit` at all:
+none of the six CVar writes, clamping, lock-bypass, or `SERVER_SettingChanged` sync documented
+above happen — the call is a pure no-op that returns `0`, same as any other value-returning use of
+this function. See [Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md) for the
+general mechanism — this function is one of the confirmed instances it names directly.
+
+Because the function is declared `void` and its wiki-documented use is fire-and-forget, the silent
+no-op is the most dangerous shape this failure mode takes among the reserved-range extensions: a
+caller has no return value to check even in principle, and the CVar it meant to change
+(`fraglimit`/`timelimit`/`pointlimit`/`duellimit`/`winlimit`/`wavelimit`) simply keeps whatever
+value it already had. A script that calls `SetGameModeLimit(GAMELIMIT_WAVES, 10)` expecting the
+current invasion round to end at wave 10 sees the round run to whatever `wavelimit` was already
+set to instead — the round doesn't end early, doesn't end late in an obviously-wrong way, just
+never honors the intended override, with nothing in the log pointing at why.

@@ -1,8 +1,10 @@
 # Custom damage types
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `Custom damage types` (retrieved 2026-08-02, oldid=52258) + verified against the Zandronum source's damage-type implementation in `src/p_interaction.cpp`, `src/p_mobj.cpp`, `src/g_shared/a_armor.cpp`, `src/info.cpp`, and `src/thingdef/thingdef_parse.cpp`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-02)
+**Provenance:** ZDoom Wiki `Custom damage types` (retrieved 2026-08-02, https://zdoom.org/w/index.php?title=Custom_damage_types&oldid=52258) + verified against the Zandronum source's damage-type implementation in `src/p_interaction.cpp`, `src/p_mobj.cpp`, `src/g_shared/a_armor.cpp`, `src/info.cpp`, and `src/thingdef/thingdef_parse.cpp`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 DECORATE allows you to define custom damage types for projectiles, attacks, and actors — and to create specialized behavior (different pain/death/impact states, armor-bypassing, resistance/vulnerability) tailored to each type.
 
@@ -16,7 +18,7 @@ Damage types are names (like `Fire`, `Ice`, `Poison`) that you assign to a proje
 
 Use the `DamageType` property to specify what type of damage a projectile inflicts:
 
-```
+```text
 Actor Fireball : Actor
 {
     Projectile
@@ -31,7 +33,7 @@ The damage type is passed along to the actor that takes damage from the projecti
 
 Hitscan weapons and melee attacks don't carry damage type directly on the weapon or monster — they inflict damage through **puff actors** (the small impact actors spawned at the bullet or fist hit point). The puff carries the damage type via its own `DamageType` property, so you must create a custom puff to assign a damage type to hitscan/melee:
 
-```
+```text
 Actor CustomPuff : BulletPuff
 {
     DamageType CustomType
@@ -46,7 +48,7 @@ Actors can respond to specific damage types by defining state labels using the `
 
 Define custom pain reactions to specific damage types using `Pain.<DamageType>` labels:
 
-```
+```text
 Actor MyZombie : ZombieMan
 {
     States
@@ -67,7 +69,7 @@ When the zombie takes damage of type `Fire`, it enters the `Pain.Fire` state ins
 
 Define custom death sequences for each damage type using `Death.<DamageType>` labels:
 
-```
+```text
 Actor MyZombie : ZombieMan
 {
     States
@@ -89,13 +91,13 @@ The engine searches for damage-typed death states in this order:
 4. If still no state found and death is extreme: `Death.Extreme` (the generic extreme/gib death)
 5. If still no state found: `Death` (the default death sequence)
 
-**Engine-gate note (Zandronum vs. GZDoom):** The ZDoom wiki notes "custom XDeath states are not currently supported" with a GZDoom-version qualifier (pre-1.8.10). Zandronum **does** support damage-typed XDeath states via the `Death.Extreme.<DamageType>` path — this fork diverges from the wiki's GZDoom-era statement.
+**Engine-gate note (Zandronum vs. GZDoom):** The ZDoom wiki notes "custom XDeath states are not currently supported" with a GZDoom-version qualifier (pre-1.8.10). Zandronum **does** support damage-typed XDeath states via the `Death.Extreme.<DamageType>` path — Zandronum diverges from the wiki's GZDoom-era statement.
 
 ### Wound states
 
 For projectile impacts and grazes, define `Wound.<DamageType>` states:
 
-```
+```text
 Actor MyZombie : ZombieMan
 {
     States
@@ -111,7 +113,7 @@ Actor MyZombie : ZombieMan
 
 For unblocked projectiles hitting non-actors (floor/ceiling/wall impacts), define `Crash.<DamageType>` states. Crash states apply both in 2-name form (`Crash.<DamageType>`) and in 3-name form with extreme gib (`Crash.Extreme.<DamageType>`):
 
-```
+```text
 Actor IceShard : Actor
 {
     Projectile
@@ -129,7 +131,7 @@ Actor IceShard : Actor
 
 Use `PainChance` with a damage-type parameter to set the probability an actor enters pain state for that damage type specifically:
 
-```
+```text
 Actor MyZombie : ZombieMan
 {
     PainChance "Fire", 255     // Always enter pain state for Fire damage (100%)
@@ -144,7 +146,7 @@ The numeric argument is out of 256 (where 256 = 100%). Set it to `0` to suppress
 
 Use the `DamageFactor` property to make an actor take more or less damage from a specific type:
 
-```
+```text
 Actor RaiDoom : DoomImp
 {
     DamageFactor "Electric", 0.2   // Takes 20% damage from Electric (80% reduction)
@@ -166,7 +168,7 @@ The global `ReplaceFactor` flag (see below) can suppress step 3 by making the gl
 
 Define a damage type globally in DECORATE using the `DamageType` block:
 
-```
+```text
 DamageType Fire
 {
     Factor 1.0          // Default damage factor for actors with no specific DamageFactor
@@ -189,7 +191,7 @@ DamageType Fire
 
 A custom damage type that does nothing by default unless an actor explicitly allows it:
 
-```
+```text
 DamageType SpecialDamage
 {
     Factor 0
@@ -203,7 +205,7 @@ Actor VulnerableToSpecial
 
 Redefining a built-in type (in this case `Drowning`) to ignore armor:
 
-```
+```text
 DamageType Drowning
 {
     NoArmor
@@ -215,3 +217,15 @@ DamageType Drowning
 ## Engine-specific caveats
 
 **MAPINFO damagetype blocks:** The ZDoom wiki mentions declaring damage types via MAPINFO as an alternative to (and recommended replacement for) the DECORATE `DamageType` block. This is a GZDoom-family feature only — **Zandronum has no MAPINFO damagetype support**. In Zandronum, the DECORATE `DamageType` block is the only way to declare global damage-type properties.
+
+## Engine-family divergence
+
+Confirmed directly in the UZDoom source (not just the wiki's mention above): UZDoom's MAPINFO parser
+recognizes a `damagetype` block (`src/gamedata/g_mapinfo.cpp`) alongside the DECORATE-level
+`DamageType { }` block (`src/scripting/decorate/thingdef_parse.cpp`, the same `Factor`/
+`ReplaceFactor`/`NoArmor` mechanics documented above) — both mechanisms coexist on UZDoom. Zandronum
+only ever had the DECORATE-level block. This is the only confirmed divergence in this file; the
+DECORATE-side mechanics documented everywhere else above (the `DamageType` property, puff-carried
+damage types, `Pain.`/`Death.`/`Wound.`/`Crash.<DamageType>` state labels, `PainChance`, and
+`DamageFactor`/global `DamageType` block resolution) were spot-checked against UZDoom's
+`thingdef_properties.cpp` and `thingdef_parse.cpp` and match the behavior described above.

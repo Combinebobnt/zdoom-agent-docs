@@ -1,13 +1,15 @@
 # `A_Explode(int damage, int distance, int flags, bool alert, int fulldamagedistance, int nails, int naildamage, class<Actor> pufftype)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_Explode` (retrieved 2026-07-31, oldid=54802) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1010-1061` and actor definition in `wadsrc/static/actors/actor.txt:268`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_Explode` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_Explode&oldid=54802) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1010-1061` and actor definition in `wadsrc/static/actors/actor.txt:268`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_Explode)` in `src/thingdef/thingdef_codeptr.cpp`.
 
 Performs a radius attack (explosion), optionally with additional nail/hitscan components, across the given distance. A wrapper around the engine's internal `P_RadiusAttack` function.
 
-## Zandronum vs. ZDoom-family divergence
+## Engine-family divergence
 
 **This page describes the Zandronum implementation, which is significantly simpler than the newer ZDoom-family versions.** The ZDoom Wiki describes upstream ZDoom/GZDoom/UZDoom features including:
 - **Return value:** ZDoom-family versions return the count of actors damaged; Zandronum's `A_Explode` returns nothing (void).
@@ -16,6 +18,12 @@ Performs a radius attack (explosion), optionally with additional nail/hitscan co
 - **Parameter types:** Zandronum uses `int` for `distance` and `fulldamagedistance`; the wiki shows `double`.
 
 Mods written with the upstream flags will compile in Zandronum only if those constants are re-defined elsewhere, but they will silently no-op (the engine will only recognize `XF_HURTSOURCE`/`XF_NOTMISSILE`).
+
+Confirmed directly against UZDoom's `A_Explode` (`wadsrc/static/zscript/actors/attacks.zs:591`, `int A_Explode(int damage = -1, double distance = -1.0, int flags = XF_HURTSOURCE, bool alert = false, double fulldamagedistance = 0.0, int nails = 0, int naildamage = 10, class<Actor> pufftype = "BulletPuff", name damagetype = "none", double nailrange = MISSILERANGE)`): the function does return an `int` actor-damaged count; all seven extra flags (`XF_EXPLICITDAMAGETYPE`, `XF_NOSPLASH`, `XF_THRUSTZ`, `XF_THRUSTLESS`, `XF_NOALLIES`, `XF_CIRCULAR`, `XF_CIRCULARTHRUST`) are defined (`wadsrc/static/zscript/constants.zs:283-291`) and functional; the 9th parameter is a `name damagetype` as the wiki describes; and `distance`/`fulldamagedistance` are `double`, not `int`. UZDoom also adds a 10th parameter not covered by the wiki excerpt this page cites, `double nailrange = MISSILERANGE`, which sets the line-attack range used for each nail (Zandronum's fixed nail attacks always use `MISSILERANGE` with no way to override it).
+
+## Engine-family divergence: no client/server authority split
+
+The "Server-side only" bullet under Behavior notes below describes Zandronum's client/server netcode split. UZDoom's `A_Explode` (`wadsrc/static/zscript/actors/attacks.zs:591-640`) contains no network-role branch at all — no check for local-player ownership, no server/client split, and no `+CLIENTSIDEONLY`-gated early return. This matches the cohort-wide pattern: UZDoom's source tree has zero `NETWORK_InClientMode`/`SERVERCOMMANDS_*` occurrences anywhere (confirmed by tree-wide grep). On UZDoom, the radius attack, nail attacks, splash check, and alert all simply run to completion wherever the action executes, regardless of which machine that is.
 
 ## Parameters
 

@@ -1,11 +1,13 @@
 # A toucher's position change during a pickup's touch handler gets overwritten
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
 **Provenance:** The mechanism itself (the call-stack trace and the position-overwrite behavior) is
 source-verified end-to-end against `src/p_map.cpp`, `src/p_interaction.cpp`,
 `src/g_shared/a_pickups.cpp`, and `src/p_acs.cpp` (2026-08-01) and holds regardless of what
 prompted the investigation. Not a wiki-intake page — this is engine behavior no wiki documents.
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 **Attribution:** this was written up while investigating a real reported bug — a `CustomInventory`
 item whose `Pickup:` chain called ACS `SetActorPosition` on the toucher appeared to have no lasting
 effect. **Confirmed as the actual cause of that historical bug**: the affected item was
@@ -22,7 +24,7 @@ position-not-applied symptom in that reworked code, unrelated to this one.
 Touching an item by walking into it runs entirely inside the mover's own `P_TryMove` call, nested
 several frames deep:
 
-```
+```text
 P_TryMove(thing, x, y, ...)                    // src/p_map.cpp:1889 — x, y captured as locals
   → P_CheckPosition(thing, x, y, tm)           // pure query: "can thing legally reach x, y?"
     → PIT_CheckThing(...)                      // src/p_map.cpp:1354, per nearby-item blockmap entry
@@ -72,6 +74,19 @@ own `P_TryMove` call** — i.e. walking into the item. It does not apply to:
 - **A stationary item given directly** (`A_GiveInventory` spawning and immediately granting an
   item with no intervening `P_TryMove` on the receiver) — same reasoning: no enclosing `P_TryMove`
   call to clobber the position afterward.
+
+## Engine-family divergence
+
+Both UZDoom and Zandronum exhibit the position-clobbering behavior identically — the mechanism is core to how both engines structure `P_TryMove`, and the outcome is the same. However, the implementation differs:
+
+- **UZDoom** captures the destination as a `const DVector2 &pos` reference parameter (double-precision), and on non-portal-crossing moves, calls `thing->SetXY(pos)` after `P_CheckPosition` returns (lines 2691, 2317 respectively in `src/playsim/p_map.cpp`).
+- **Zandronum** captures `fixed_t x, y` locals, and unconditionally stamps `thing->x = x; thing->y = y;` (lines 2157-2158, 1889 in `src/p_map.cpp`).
+
+Additionally, UZDoom's `P_TryMove` includes a portal-crossing exception: if a portal was crossed during the move, the position-finalization block is skipped entirely and the portal-transition code handles repositioning instead. Zandronum's `P_TryMove` has no equivalent portal machinery.
+
+UZDoom also routes the `Touch` virtual through `AActor::CallTouch`, which dispatches to the ZScript `Inventory.Touch` override rather than running DECORATE state chains — but the effect is identical: arbitrary custom code can run from within the touch, and any position changes it makes are still overwritten.
+
+The documented scope restrictions (`Use:` and stationary gift items) hold for both engines unchanged.
 
 ## Fix/avoidance
 

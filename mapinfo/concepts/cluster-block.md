@@ -1,18 +1,20 @@
 # Cluster block definition
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 / UZDoom 4.15pre
-**Provenance:** ZDoom Wiki `MAPINFO/Cluster_definition` (retrieved 2026-08-01, oldid=49574) + verified against Zandronum source (`src/g_mapinfo.cpp:702-791`, `src/g_level.cpp`) and UZDoom source (`src/gamedata/g_mapinfo.cpp:829-972`, `src/g_level.cpp`).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `MAPINFO/Cluster_definition` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=MAPINFO%2FCluster_definition&oldid=49574) + verified against Zandronum source (`src/g_mapinfo.cpp:702-791`, `src/g_level.cpp`) and UZDoom source (`src/gamedata/g_mapinfo.cpp:829-972`, `src/g_level.cpp`).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 A cluster is a logical grouping of maps that can optionally display transition messages and/or form a hub with shared state. The cluster block in MAPINFO defines cluster-wide settings: intermission messages, music, graphics, hub behavior, and cutscene blocks.
 
 ## Block syntax
 
-```
+```text
 cluster <number> { properties }
 ```
 
-`<number>` is the cluster identifier (a positive integer; cluster 0 is reserved internally to mean "no cluster" and should be avoided). Properties are whitespace-separated key-value pairs, most accepting a single value or a type-specific set of values.
+`<number>` is the cluster identifier (a positive integer). Cluster 0 is the default unset value in level definitions, so using a cluster number ≥ 1 is recommended to avoid confusion with maps that lack an explicit cluster assignment. Properties are whitespace-separated key-value pairs, most accepting a single value or a type-specific set of values.
 
 ## Properties
 
@@ -25,10 +27,10 @@ Transition messages displayed when entering or leaving the cluster. Both accept 
 The music to play during intermission sequences (entering/exiting messages). References a SNDINFO logical music name or a `$<constant>` reference to a language string.
 
 **Flat**  
-The background flat to display during intermission messages. Accepts a lump name up to 8 characters; `pic` and `flat` write the same underlying field — if both are present, `pic` takes effect and additionally sets a flag to interpret the lump as a sprite/picture rather than a repeating flat pattern.
+The background flat to display during intermission messages. Accepts a lump name (no length limit in modern engines); `pic` and `flat` write to the same underlying field and additionally set/modify the `CLUSTER_FINALEPIC` flag — if both are specified, both change take effect in order (last name wins), but the flag set by `pic` persists.
 
 **Pic**  
-The background picture (sprite/graphic) to display during intermission messages. Functionally equivalent to `flat` but sets the interpretation flag; both use the same field, so specifying both results in the latter overwriting the former.
+The background picture (sprite/graphic) to display during intermission messages. Functionally equivalent to `flat` but sets the `CLUSTER_FINALEPIC` flag to interpret the lump as a full-sized picture instead of a repeating flat pattern; both write to the same name field. If `flat` is specified after `pic`, the name is replaced but the `CLUSTER_FINALEPIC` flag persists, causing the flat's name to be drawn as a picture.
 
 **Hub**  
 A flag (no value) marking this cluster as a hub. When set, Zandronum and UZDoom both retain the in-memory state of every level visited within the hub: actor positions, deaths, items collected, switches triggered. Approximately 20 KB per level is retained in memory; levels in non-hub clusters are discarded to save memory. Exiting a hub to a different cluster clears the saved state for that hub.
@@ -69,8 +71,8 @@ Zandronum projects may include GZDoom-family properties in a MAPINFO source file
 
 ## Implementation notes
 
-- **Hub state retention and memory:** The Zandronum and UZDoom engines both save hub-level state in a per-level data structure; the wiki's ~20 KB per-level estimate is verified against source patterns (actor state dumps, trigger tables, item records). Levels are restored when re-entered within the same hub.
-- **Message suppression in hubs:** UZDoom's `CLUSTER_ALLOWINTERMISSION` flag prevents a counter-intuitive loss of intermission screens in hubs; the default (flag unset) hides intermissions when moving within the same hub cluster. Zandronum lacks this flag entirely and does not adjust intermission visibility based on hub status.
+- **Hub state retention and memory:** The Zandronum and UZDoom engines both save hub-level state in a per-level data structure (visible in source as snapshot serialization, actor records, and switch state storage). The wiki's ~20 KB per-level estimate reflects typical snapshot sizes for average-complexity maps. Levels are restored when re-entered within the same hub.
+- **Message suppression in hubs:** Both engines suppress intermission screens by default when moving between levels in the same hub cluster. UZDoom adds the `CLUSTER_ALLOWINTERMISSION` flag to override this behavior; Zandronum lacks this flag and always suppresses intermissions within the same hub (subject to an additional `!deathmatch` condition in multiplayer mode).
 - **ExitTextIsLump and Hexen handling:** Both engines support `ExitTextIsLump` (and `EnterTextIsLump`, the latter not listed in the wiki) to interpret the message value as a lump name and print its contents directly. UZDoom adds a special-case handler that remaps HEXEN.WAD/HEXDD.WAD lump references to the string table automatically, a behavior absent in Zandronum.
 
 ## Known gaps

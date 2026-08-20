@@ -1,8 +1,10 @@
 # `void A_XScream()`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_XScream` (retrieved 2026-08-01, oldid=49049) + verified against the Zandronum source's `src/p_enemy.cpp:3346-3362`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_XScream` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_XScream&oldid=49049) + verified against the Zandronum source's `src/p_enemy.cpp:3346-3362`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_XScream)` in `src/p_enemy.cpp` — defined on `AActor`, callable from any actor's state table.
 
 Plays a hardcoded gibbed sound on the voice channel. The sound is `*gibbed` (the player's skin-specific gibbed sound) if the actor has a player pointer; otherwise `misc/gibbed` (the default non-player gibbed sound). No parameters.
@@ -34,6 +36,12 @@ Both functions play sounds in death states, but differ fundamentally:
 - **`A_XScream`** plays a hardcoded gibbed sound (`*gibbed` or `misc/gibbed`), ignoring `DeathSound`. It checks the `player` pointer for sound selection, not flags. Multiplayer-aware: temporarily restores player pointers from the body queue. Network behavior: implicit (no local gate).
 
 The choice between them depends on the death state: use `A_Scream` for death speeches, `A_XScream` for gibbed/explosive-death sound effects.
+
+## Zandronum-specific: multiplayer player-pointer restoration
+
+The "Player pointer handling" behavior described above — temporarily restoring a dead corpse's player pointer from the body queue via `G_TransferPlayerFromCorpse` so the gibbed sound uses the correct skin — is a Zandronum-only addition (marked `[AK]` in the Zandronum source, i.e. not inherited from upstream ZDoom). **UZDoom's `A_XScream` has no equivalent.** UZDoom's implementation (`Actor.A_XScream()`, defined natively in the ZScript stdlib's `actors/actor.zs`, not as a C++ `DEFINE_ACTION_FUNCTION`) is a one-line function that checks only the live `player` pointer and calls `A_StartSound` — there is no corpse-queue lookup or player-pointer restoration step at all. On UZDoom, a gibbed corpse whose player has already respawned plays `misc/gibbed` (falls to the non-player branch), not the departed player's skin-specific gibbed sound.
+
+Sound selection (`*gibbed` vs `misc/gibbed`), channel (`CHAN_VOICE`), and attenuation (`ATTN_NORM`, the default) otherwise match between engines. UZDoom's call additionally passes `CHANF_NORUMBLE` (a controller-rumble suppression flag; Zandronum's `S_Sound` call has no flags parameter to carry an equivalent) — this doesn't change the audible sound, only controller haptics.
 
 ## Related
 

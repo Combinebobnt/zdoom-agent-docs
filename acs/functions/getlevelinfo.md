@@ -1,8 +1,10 @@
 # `int GetLevelInfo(int levelinfo)`
 
 **Tier:** A.
-**Engine:** Zandronum 3.2.1 (`PCD_GETLEVELINFO` and all fields read above are original ZDoom-era code with no Zandronum-version-specific gating found — safe to stamp for 3.2.1, not just the checked-out `3.3-alpha` snapshot).
-**Provenance:** wiki page `GetLevelInfo - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `oldid=38211`) + source-verified against `p_acs.cpp:12516-12531` (`PCD_GETLEVELINFO` switch), `p_acs.h:998-1008` (engine-side `LEVELINFO_*` enum), `zt-bcc/lib/zcommon.bcs:344-355` (BCS-side enum), `zt-bcc/src/builtin.c:126` (signature), `g_mapinfo.cpp:254-255,961-979` (`partime`/ `sucktime` MAPINFO parsing and defaults), `g_mapinfo.cpp:1567-1658` (`GetDefaultLevelNum`/ `ParseMapHeader`, the levelnum auto-derivation-from-mapname path), `g_level.cpp:962-963,2086-2087` (par/sucktime tic conversion happening only at intermission-screen build time, cluster/levelnum assignment), `d_dehacked.cpp:1997-2011` (DeHackEd `[Par Times]` patch, confirming `level.partime`'s raw-seconds convention holds across both its writers, not just MAPINFO), `p_setup.cpp:3937` (ruled out as an unrelated `wbparms_t`-only default, not a second writer of `level.partime`), `wi_stuff.cpp:1199` (the one in-fork consumer of `level.sucktime`, used to check — not assume — its intended unit), and `sv_commands.cpp:3904-3922` (Zandronum secret/item/monster-counter replication). Per the ZDoom-wiki intake process, every one of the 10 `LEVELINFO_*` selectors was checked individually against the fork's enum and switch for the "compiles but engine doesn't implement it" trap seen elsewhere in this tree — none reproduced; the divergence that *did* turn up is the undocumented raw/unconverted (not tics) unit of `PAR_TIME`/`SUCK_TIME`, recorded above (seconds confirmed for `PAR_TIME` via two independent writers; `SUCK_TIME`'s intended unit is explicitly left unresolved rather than guessed).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `GetLevelInfo - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=GetLevelInfo&oldid=38211`) + source-verified against `p_acs.cpp:12516-12531` (`PCD_GETLEVELINFO` switch), `p_acs.h:998-1008` (engine-side `LEVELINFO_*` enum), `zt-bcc/lib/zcommon.bcs:344-355` (BCS-side enum), `zt-bcc/src/builtin.c:126` (signature), `g_mapinfo.cpp:254-255,961-979` (`partime`/ `sucktime` MAPINFO parsing and defaults), `g_mapinfo.cpp:1567-1658` (`GetDefaultLevelNum`/ `ParseMapHeader`, the levelnum auto-derivation-from-mapname path), `g_level.cpp:962-963,2086-2087` (par/sucktime tic conversion happening only at intermission-screen build time, cluster/levelnum assignment), `d_dehacked.cpp:1997-2011` (DeHackEd `[Par Times]` patch, confirming `level.partime`'s raw-seconds convention holds across both its writers, not just MAPINFO), `p_setup.cpp:3937` (ruled out as an unrelated `wbparms_t`-only default, not a second writer of `level.partime`), `wi_stuff.cpp:1199` (the one in-fork consumer of `level.sucktime`, used to check — not assume — its intended unit), and `sv_commands.cpp:3904-3922` (Zandronum secret/item/monster-counter replication). Per the ZDoom-wiki intake process, every one of the 10 `LEVELINFO_*` selectors was checked individually against the fork's enum and switch for the "compiles but engine doesn't implement it" trap seen elsewhere in this tree — none reproduced; the divergence that *did* turn up is the undocumented raw/unconverted (not tics) unit of `PAR_TIME`/`SUCK_TIME`, recorded above (seconds confirmed for `PAR_TIME` via two independent writers; `SUCK_TIME`'s intended unit is explicitly left unresolved rather than guessed).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
@@ -119,7 +121,7 @@ copy.
 
 **Example — from the wiki, report kill progress:**
 
-```
+```text
 script 2 (void)
 {
     int mtotal = GetLevelInfo (LEVELINFO_TOTAL_MONSTERS),

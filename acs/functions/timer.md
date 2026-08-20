@@ -1,8 +1,10 @@
 # `int Timer()`
 
 **Tier:** A.
-**Engine:** Zandronum 3.2.1 (`PCD_TIMER` and all read/write sites above are original ZDoom-era code with no Zandronum-version-specific gating found — safe to stamp for 3.2.1, not just the checked-out `3.3-alpha` snapshot).
-**Provenance:** wiki page `Timer - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `oldid=38125`) + source-verified against `p_acs.cpp:11321-11323` (`PCD_TIMER`), `p_tick.cpp:437-439` (per-tic increment of `time`/`maptime`/`totaltime`), `g_level.cpp:585` (`G_InitNew` reset), `g_level.cpp:1036` (`G_DoCompleted` non-hub reset), `g_level.cpp:1483` (per-load `maptime` reset), `g_level.cpp:2210-2243` (`G_SerializeLevel`, confirming `level.time` is excluded from hub snapshots), and the Zandronum-only `sv_commands.cpp:3892-3897` / `cl_main.cpp:7469-7487` client sync path. This is a ZDoom wiki page, so per the intake process it was checked for existence-first divergence — `PCD_TIMER` exists and behaves as described; the hub-vs-non-hub claim, which is easy to hand-wave past, was traced to the actual reset sites rather than trusted at face value. No feature-gap divergence found (a case where the ZDoom description holds), beyond the added Zandronum server→client sync behavior noted above.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `Timer - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=Timer&oldid=38125`) + source-verified against `p_acs.cpp:11321-11323` (`PCD_TIMER`), `p_tick.cpp:437-439` (per-tic increment of `time`/`maptime`/`totaltime`), `g_level.cpp:585` (`G_InitNew` reset), `g_level.cpp:1036` (`G_DoCompleted` non-hub reset), `g_level.cpp:1483` (per-load `maptime` reset), `g_level.cpp:2210-2243` (`G_SerializeLevel`, confirming `level.time` is excluded from hub snapshots), and the Zandronum-only `sv_commands.cpp:3892-3897` / `cl_main.cpp:7469-7487` client sync path. This is a ZDoom wiki page, so per the intake process it was checked for existence-first divergence — `PCD_TIMER` exists and behaves as described; the hub-vs-non-hub claim, which is easy to hand-wave past, was traced to the actual reset sites rather than trusted at face value. No feature-gap divergence found (a case where the ZDoom description holds), beyond the added Zandronum server→client sync behavior noted above.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
@@ -41,7 +43,7 @@ case PCD_TIMER:
     every load (`g_level.cpp:1483`) and then gets overwritten back to its saved value if
     `G_UnSnapshotLevel` restores a snapshot for that specific level (i.e. `maptime` is
     per-level-visit, `time` is whole-hub-session).
-  - Net effect matches the wiki's framing exactly for this fork: on a map that isn't part of a
+  - Net effect matches the wiki's framing exactly for Zandronum: on a map that isn't part of a
     hub, `Timer()` is time since that level started; on a hub map, it's time since the user
     started the current game (survives every level transition within the hub, including
     revisiting an earlier hub map).
@@ -59,7 +61,7 @@ case PCD_TIMER:
 **Example — HUD stopwatch (from the wiki, minus its `HudMessage` syntax typo — the wiki's example
 is missing a closing paren before the `;` argument separator):**
 
-```
+```text
 script 1 ENTER
 {
 	int t;

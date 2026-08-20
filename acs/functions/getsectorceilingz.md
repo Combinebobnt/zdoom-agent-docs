@@ -1,5 +1,20 @@
 # `fixed GetSectorCeilingZ(int tag, int x, int y)`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `GetSectorCeilingZ - ZDoom Wiki.html` (`_intake/`, retrieved
+2026-07-29, `https://zdoom.org/w/index.php?title=GetSectorCeilingZ&oldid=44121`) + source-verified (`p_acs.cpp:12057-12089`, shared block with
+`PCD_GETSECTORFLOORZ`; `p_spec.cpp:270-277` `P_FindSectorFromTag`; `p_setup.cpp:3463-3474`
+`P_InitTagLists`; `r_defs.h:267` `ZatPoint`). The wiki page's description of `tag`/`x`/`y`, the
+`tag == 0` behavior, the flat-vs-sloped-plane distinction, and the "lowest sector number"
+tiebreak all check out against the Zandronum engine fork's source — no divergence found for this particular
+function, and none expected given it shares its implementation block with the already-verified
+`GetSectorFloorZ`. The one addition beyond the wiki is the silent `0` return on total failure (no
+matching tag / point outside any sector), which the wiki doesn't mention.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** compiler builtin.
+
 Returns the ceiling height of a tagged sector (or the sector at a point) at a given `(x, y)`
 location, as a fixed-point value. Compiler builtin (`zt-bcc/src/builtin.c` `g_funcs[]` entry
 `{ "getsectorceilingz", "f;iii" }`, opcode `PCD_GETSECTORCEILINGZ`), semantics in
@@ -7,8 +22,6 @@ the Zandronum source's `src/p_acs.cpp`, `case PCD_GETSECTORCEILINGZ:` (line 1205
 `case` block with `PCD_GETSECTORFLOORZ` that differs only in which plane (`floorplane` vs
 `ceilingplane`) is sampled at the end. See `functions/getsectorfloorz.md` for the floor-side
 sibling; the two share every mechanic below except the plane sampled.
-
-**Bucket:** compiler builtin.
 
 - `x`, `y` — **plain map-unit integers, not fixed-point**, despite the fixed-point return value.
   The engine converts them (`x = STACK(2) << FRACBITS`) before evaluating the plane equation.
@@ -38,21 +51,9 @@ sibling; the two share every mechanic below except the plane sampled.
 
 **Example — read the ceiling height at the tagged sector's own origin (works for flat sectors):**
 
-```
+```text
 fixed z = GetSectorCeilingZ(sectorTag, 0, 0);
 ```
 
 **Returns:** `fixed`, the ceiling height at `(x, y)` in the resolved sector, or `0.0` if no
 matching sector could be resolved (see the silent-failure note above).
-
-**Provenance:** wiki page `GetSectorCeilingZ - ZDoom Wiki.html` (`_intake/`, retrieved
-2026-07-29, `oldid=44121`) + source-verified (`p_acs.cpp:12057-12089`, shared block with
-`PCD_GETSECTORFLOORZ`; `p_spec.cpp:270-277` `P_FindSectorFromTag`; `p_setup.cpp:3463-3474`
-`P_InitTagLists`; `r_defs.h:267` `ZatPoint`). The wiki page's description of `tag`/`x`/`y`, the
-`tag == 0` behavior, the flat-vs-sloped-plane distinction, and the "lowest sector number"
-tiebreak all check out against this fork's source — no divergence found for this particular
-function, and none expected given it shares its implementation block with the already-verified
-`GetSectorFloorZ`. The one addition beyond the wiki is the silent `0` return on total failure (no
-matching tag / point outside any sector), which the wiki doesn't mention. **Engine:** Zandronum
-3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`).
-**Tier:** A.

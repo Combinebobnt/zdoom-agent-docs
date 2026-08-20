@@ -1,8 +1,10 @@
 # SkipJoinQueue
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 — confirmed via git ancestry: the feature was added in commit `d2f6ac2a9` ("Added ACS function: 'SkipJoinQueue' ...", 2024-08-15), which `git merge-base --is-ancestor d2f6ac2a9 28f736fb3` confirms predates the 3.2.1 version-bump commit `28f736fb3` (2025-08-04). So this exists in the actual 3.2.1 release, not just the ahead-of-target `3.3-alpha` checkout.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `SkipJoinQueue - Zandronum Wiki.html` (`https://wiki.zandronum.com/w/index.php?title=SkipJoinQueue&oldid=2269`), verified against the Zandronum source's `src/p_acs.cpp` (ACSF_SkipJoinQueue), `src/p_interaction.cpp` (`PLAYER_IsTrueSpectator`), and `src/joinqueue.cpp` on 2026-07-29.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 
 `int SkipJoinQueue(int player)`
 
@@ -30,8 +32,27 @@ otherwise — but "otherwise" covers several distinct failure modes the wiki pag
   it only lets someone jump the line within the existing slot budget.
 - **Must actually be queued.** The player's position is looked up via
   `JOINQUEUE_GetPositionInLine(player)`; if it's `-1` (not in the queue at all), the call returns
-  `0` even if the player is a valid true spectator. Use `GetPlayerJoinQueuePosition` (ACSF -180,
-  same family, not yet documented here) to check queue membership first if that distinction
-  matters.
+  `0` even if the player is a valid true spectator. Use [`GetPlayerJoinQueuePosition`](getplayerjoinqueueposition.md) (ACSF -180,
+  same family) to check queue membership first if that distinction matters.
 - On success, it calls `JOINQUEUE_PlayerJoinsAtPosition(joinQueuePosition)` — the same internal
   path used when the queue naturally advances — and returns `1`.
+
+## Engine-family divergence
+
+`SkipJoinQueue` is bound as ACSF (CALLFUNC) index 181, inside the 100–199 range UZDoom reserves
+for Zandronum's own extensions and implements none of. Under UZDoom, `CallFunction`'s dispatch
+switch has no `case` for it and falls to `default: break;`, which returns `0` — no error, no log
+line, script execution continues normally as if the call had simply failed.
+
+That silent `0` is indistinguishable from the function's own legitimate failure returns documented
+above (not a true spectator, server full, not actually queued, running client-side). A script
+calling `SkipJoinQueue` under UZDoom gets back exactly what a real-but-ordinary rejection looks
+like, with no way to tell the two apart from the return value alone — and the queue mechanism
+itself never runs: `JOINQUEUE_PlayerJoinsAtPosition` is never called, so the target player is never
+moved out of Zandronum's join-queue system, which doesn't exist on UZDoom in the first place. A
+script written assuming a queue-jump succeeded (or that treats a `0` return as "try again later")
+will instead leave that player waiting indefinitely, since there is no queue state under UZDoom for
+a later call to ever resolve.
+
+See [Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md) for the general
+reserved-ACSF-range silent-miss mechanism this is an instance of.

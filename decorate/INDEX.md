@@ -1,7 +1,7 @@
 # DECORATE doc index
 
 Router only — one line per documented action function/family/class/inventory table. Read a target
-file only when you need it. See `CLAUDE.md` for engine-source buckets and layout, `../shared/
+file only when you need it. See `AGENTS.md` for engine-source buckets and layout, `../shared/
 AUTHORING.md` for tiers/engine-scope/licensing.
 
 ## Concepts
@@ -65,7 +65,7 @@ AUTHORING.md` for tiers/engine-scope/licensing.
 - [Crash-and-bug checklist](concepts/crash-and-bug-checklist.md) — tier A. **Read this
   before/during a DECORATE code review.** Checklist-style index of verified, recurring
   crash/bug-causing patterns: a "looks risky but verified safe" `A_Chase` pointer path,
-  wiki-documented `CHF_*` flags that don't exist in this fork and silently no-op, and three
+  wiki-documented `CHF_*` flags that don't exist in the Zandronum engine fork and silently no-op, and three
   reviewable `A_Jump`/`A_JumpIf*` network-synchronization footguns (RNG inside a non-`A_Jump`
   condition, a `+CLIENTSIDEONLY` actor's jump outcome given non-cosmetic weight, exact-tic
   assumptions on networked position/LOS/inventory state) each with its concrete fix inlined, not
@@ -95,6 +95,11 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   silently overwritten when the touch was triggered by walking into the item — `P_TryMove` caches
   its destination coordinates before the nested touch runs and unconditionally restores them
   afterward, independent of whether the pickup succeeds or fails. Does not apply to `Use:`.
+- [Using a `Powerup` subclass as an inert countdown timer](concepts/powerup-as-inert-timer.md) —
+  tier B. The `Speed 1.0` `PowerSpeed`-as-timer trick for gating `A_JumpIfInventory` checks on a
+  self-expiring duration with zero gameplay side effects; the three side-effect channels (speed
+  trail, HUD icon, screen blend) that must each be closed independently; giving it directly with
+  `A_GiveInventory` instead of a `PowerupGiver` wrapper.
 - [Custom damage types](concepts/custom-damage-types.md) — tier A. Assigning `DamageType` to
   projectiles and puff actors; creating type-specific `Pain.<Type>`, `Death.<Type>`, `Wound.<Type>`,
   and `Crash.<Type>` states including extreme-death variants; `PainChance` per type; `DamageFactor`
@@ -102,6 +107,14 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   globally with `Factor`/`ReplaceFactor`/`NoArmor` rules. **Engine differences:** Zandronum
   supports damage-typed XDeath (`Death.Extreme.<Type>`) states contrary to the wiki's GZDoom-era
   "not supported" note; MAPINFO damagetype blocks are GZDoom-only and do not exist in Zandronum.
+- [Monster and player falling damage](concepts/falling-damage.md) — tier B. `P_MonsterFallingDamage`
+  and `P_FallingDamage` are separate functions with separate gates; the monster path computes a
+  velocity-scaled formula and a threshold, then discards both and always deals a flat
+  `TELEFRAG_DAMAGE` kill once its `LEVEL2_MONSTERFALLINGDAMAGE` gate is open — unlike the player
+  path, which has no unconditional-kill floor. Covers the per-sector `SECF_NOFALLINGDAMAGE`
+  escape hatch, why `DamageFactor "Falling", 0` works as a mitigation but `+INVULNERABLE` does not,
+  and a netcode caveat around `P_DamageMobj` running on both server and client while `Die()` stays
+  server-only.
 
 ## Families
 
@@ -122,7 +135,9 @@ AUTHORING.md` for tiers/engine-scope/licensing.
 - [CustomInventory](classes/custominventory.md) — tier A. Scripted inventory base class executing
   `Pickup:`/`Use:`/`Drop:` state chains via `CallStateChain` (OR-accumulated results, `Fail`
   self-jump hard-aborts); side effects from action functions and ACS calls run immediately with no
-  rollback if a later state in the same chain fails.
+  rollback if a later state in the same chain fails. Also covers the `+INVENTORY.ALWAYSPICKUP`
+  backstop in `AInventory::CallTryPickup` — a second, independent mechanism above the chain's own
+  OR result that can force pickup success even when `Pickup:` returns false.
 - [Health](classes/health.md) — tier A. Built-in base class for health-restoring pickup items;
   controls health restoration via `Inventory.Amount`/`MaxAmount`, pickup message conditions via
   `Health.LowMessage`, and `TryPickup` behavior (items fail if the actor is at max health without
@@ -149,10 +164,20 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   classes](concepts/creating-player-classes.md) for `Player.*` property configuration and MAPINFO
   registration. **Fork divergence:** several GZDoom-era `Player.*` properties and flags are absent
   from Zandronum.
+- [PowerProtection](classes/powerprotection.md) — tier B. `Powerup` subclass that reduces incoming
+  damage via the engine's passive damage-modifier mechanism (`ModifyDamage`); works on **any**
+  actor with an inventory, not just players. **Empty-`DamageFactors`-table trap:** zero declared
+  `DamageFactor` entries silently grants a blanket 25%-damage effect against every damage type,
+  while declaring some entries switches to a mode where an uncovered type gets no protection at
+  all — the two behaviors don't blend. Not magnitude-gated (applies at `TELEFRAG_DAMAGE`
+  magnitude too); stacks multiplicatively with other inventory-held damage modifiers.
 - [Powerup](classes/powerup.md) — tier A. Timed-effect inventory class; covers the
   `Powerup`/`PowerupGiver` split, the `CreateCopy`/`InitEffect`/`DoEffect`/`EndEffect` activation
-  lifecycle, and several Zandronum-vs-wiki divergences (no `MaxEffectTics` field, non-virtual
-  blink logic, `Tick()`'s permanent-powerup handling).
+  lifecycle, several Zandronum-vs-wiki divergences (no `MaxEffectTics` field, non-virtual
+  blink logic, `Tick()`'s permanent-powerup handling), re-pickup/refresh semantics
+  (`HandlePickup`'s four branches and the `BLINKTHRESHOLD`-gated silent-discard trap),
+  death/level-change destruction paths, and why `PowerStrength`'s permanence is a `Tick()`
+  override, not a `Powerup.Duration 1` special case.
 - [RandomSpawner](classes/randomspawner.md) — tier A. Built-in actor class that spawns one
   randomly-selected actor from a weighted `DropItem` list; **boss-death tracking** only activates
   when the spawner's own class declares `replaces <BossClass>` (verified against `A_BossDeath`'s
@@ -197,7 +222,7 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   integers).
 - [A_CheckBlock](actions/a_checkblock.md) — tier A. Checks if an actor pointer would be blocked
   at a specified position relative to the caller's angle/position; jumps to a target state if
-  blocked. **Engine:** UZDoom/GZDoom-family only — does not exist in Zandronum.
+  blocked. **UZDoom/GZDoom-family only** — does not exist in Zandronum.
 - [A_CheckCeiling](actions/a_checkceiling.md) — tier A. Jumps to a target state if the actor is
   touching or submerged into the ceiling; the check includes actor height in the calculation
   (z + height vs. ceilingz).
@@ -292,12 +317,12 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   inside the sibling loop, causing every sibling after the first healed one to be damaged
   instead**; full thinker-list scan per call (O(n) cost).
 - [A_DamageTarget](actions/a_damagetarget.md) — tier A. Damages the calling actor's target
-  pointer by a specified amount; **Engine:** UZDoom/GZDoom-family only — does not exist in
+  pointer by a specified amount; **UZDoom/GZDoom-family only** — does not exist in
   Zandronum. Supports extended flags (`DMSS_*`), class/species filters, and source/inflictor
   control pointers; Zandronum provides only 2-parameter Master/Children/Siblings damage variants
   without filtering or control pointers.
 - [A_DamageTracer](actions/a_damagetracer.md) — tier A. Damages the calling actor's tracer actor
-  by a specified amount; negative amounts heal. **Engine:** UZDoom/GZDoom-family only — does not
+  by a specified amount; negative amounts heal. **UZDoom/GZDoom-family only** — does not
   exist in Zandronum; the `tracer` pointer is available in Zandronum (used by `A_Tracer2`) but no
   damage-family action targets it.
 - [A_DeQueueCorpse](actions/a_dequeuecorpse.md) — tier A. Removes actor from corpse queue with
@@ -353,7 +378,7 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   specified probability; server-authoritative actors never touch the RNG client-side (client-mode
   check precedes the roll) so there's no alignment concern there, and `+CLIENTSIDEONLY` actors'
   independent per-machine `pr_cajump` rolls are confirmed **not** to be seed-synced (the legacy
-  `rngseed`-transmitting handshake is dead code in this fork) but that's inconsequential since such
+  `rngseed`-transmitting handshake is dead code in the Zandronum engine fork) but that's inconsequential since such
   actors are documented as visuals-only with no cross-machine consistency requirement; a parser
   limitation affects multi-frame offset jumps on a single state line.
 - [A_JumpIf](actions/a_jumpif.md) — tier A. Conditional state jump on a DECORATE expression;
@@ -435,11 +460,11 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   siblings survive; explicit server-side-only gate with +CLIENTSIDEONLY exception** (unlike
   A_KillMaster and A_KillChildren, which have no network check).
 - [A_KillTarget](actions/a_killtarget.md) — tier A. Kills the calling actor's target pointer with
-  optional class/species filtering and configurable damage source/inflictor pointers. **Engine:**
-  UZDoom/GZDoom-family only — does not exist in Zandronum.
+  optional class/species filtering and configurable damage source/inflictor pointers.
+  **UZDoom/GZDoom-family only** — does not exist in Zandronum.
 - [A_KillTracer](actions/a_killtracer.md) — tier A. Kills the calling actor's tracer with
   configurable filters, damage type, and invulnerability bypass. **UZDoom/GZDoom-family only** —
-  does not exist in Zandronum; tracer-kill variants missing entirely in this fork alongside
+  does not exist in Zandronum; tracer-kill variants missing entirely in the Zandronum engine fork alongside
   missing `A_DamageTracer` and `A_RemoveTracer`.
 - [A_Look](actions/a_look.md) — tier A. Default `Spawn`-state target-acquisition action;
   **server-authoritative in Zandronum** (early-returns in client mode except for one stealth-
@@ -504,7 +529,7 @@ AUTHORING.md` for tiers/engine-scope/licensing.
 - [A_RadiusThrust](actions/a_radiusthrust.md) — tier A. Applies radial thrust (knockback) to
   nearby actors without damage; **Zandronum lacks the 5th `species` parameter the wiki
   describes, and only 3 of the wiki's 5 `RTF_*` flags (`RTF_AFFECTSOURCE`, `RTF_NOIMPACTDAMAGE`,
-  `RTF_NOTMISSILE`) exist in this fork** (`RTF_THRUSTZ` and `RTF_CIRCULARTHRUST` are
+  `RTF_NOTMISSILE`) exist in the Zandronum engine fork** (`RTF_THRUSTZ` and `RTF_CIRCULARTHRUST` are
   GZDoom-family only); **server-side only**; triggers the same `P_CheckSplash` terrain-splash
   check as `A_Explode`.
 - [A_RailAttack](actions/a_railattack.md) — tier A. Hitscan piercing beam attack with particle
@@ -517,7 +542,7 @@ AUTHORING.md` for tiers/engine-scope/licensing.
 - [A_RaiseChildren](actions/a_raisechildren.md) — tier A. Resurrects spawned children (actors
   whose master pointer references the calling actor); **Zandronum version takes no parameters**
   — the ZDoom Wiki's optional `flags` parameter and `RF_TRANSFERFRIENDLINESS`/
-  `RF_NOCHECKPOSITION` flag constants do not exist in this fork and will cause compile errors if
+  `RF_NOCHECKPOSITION` flag constants do not exist in the Zandronum engine fork and will cause compile errors if
   passed.
 - [A_RaiseMaster](actions/a_raisemaster.md) — tier A. Resurrects the calling actor's master
   (spawner) from a corpse; **server-authoritative** (early-returns on network clients);
@@ -546,9 +571,11 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   `autoSwitch` parameter does not exist in Zandronum** — ammo checking is unconditional, always
   executed on button release.
 - [A_Remove](actions/a_remove.md) — tier A. Removes an actor pointed to by a given actor pointer
-  selector, optionally filtered by class and/or species. **Engine:** UZDoom/GZDoom-family only —
-  does not exist in Zandronum; Zandronum instead has separate `A_RemoveMaster`/
-  `A_RemoveChildren`/`A_RemoveSiblings` functions with no pointer-selector or flag system.
+  selector, optionally filtered by class and/or species. The `filter` match is exact class
+  identity, **not** `IsKindOf` — a subclass of the named class is not removed.
+  **UZDoom/GZDoom-family only** — does not exist in Zandronum. `A_RemoveMaster`/`A_RemoveChildren`/
+  `A_RemoveSiblings` exist in both engines with simpler signatures and no filtering; UZDoom also
+  adds `A_RemoveTarget`/`A_RemoveTracer`.
 - [A_RemoveChildren](actions/a_removechildren.md) — tier A. Removes spawned children; **critical
   fork divergence: Zandronum has only 1 parameter (removeall bool) vs. the ZDoom wiki's advanced
   version with flags/filter/species parameters that do not exist in Zandronum** and cause parse
@@ -562,10 +589,10 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   errors if attempted. **Unlike A_KillSiblings, A_RemoveSiblings has no explicit server-side-only
   network gate** — netcode handling is implicit in P_RemoveThing.
 - [A_RemoveTarget](actions/a_removetarget.md) — tier A. Removes the calling actor's target
-  pointer from the map. **Engine:** UZDoom/GZDoom-family only — does not exist in Zandronum.
+  pointer from the map. **UZDoom/GZDoom-family only** — does not exist in Zandronum.
 - [A_RemoveTracer](actions/a_removetracer.md) — tier A. Removes the actor in the calling actor's
-  tracer pointer, with optional filtering by type, class, and species. **Engine:**
-  UZDoom/GZDoom-family only — does not exist in Zandronum.
+  tracer pointer, with optional filtering by type, class, and species.
+  **UZDoom/GZDoom-family only** — does not exist in Zandronum.
 - [A_ScaleVelocity](actions/a_scalevelocity.md) — tier A. Multiplies an actor's velocity on all
   axes by a scale factor; **Zandronum divergence: does not support the `ptr` parameter the ZDoom
   wiki describes; modifies only the calling actor**.
@@ -600,7 +627,7 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   becomes scaleX); server-authoritative with change-gated replication.
 - [A_SetTranslucent](actions/a_settranslucent.md) — tier A. Sets an actor's alpha and render
   style mode; **Zandronum has no A_SetRenderStyle** (wiki's supersession note does not apply to
-  this fork); **STYLE_* enum constants unavailable** (pass raw integers 0/1/2).
+  the Zandronum engine fork); **STYLE_* enum constants unavailable** (pass raw integers 0/1/2).
 - [A_SetUserArray](actions/a_setuserarray.md) — tier A. Sets an array element of an integer user
   variable; validates that the variable exists and is of type `int[]`, and that the index is in
   bounds; required `user_` prefix; special weapon and CustomInventory item caveats.
@@ -713,3 +740,22 @@ promotes it out.
 - [radiusdamagefactor](notes/radiusdamagefactor-actor.md) — per-victim multiplier on radius-attack
   damage that (unlike `DamageFactor`) also scales thrust proportionally, since both derive from
   the same pre-`DamageFactor` value inside `P_RadiusAttack`.
+- [powerup.duration](notes/powerup.duration-inventory.md) — sign changes the unit: non-negative is
+  raw tics, negative is seconds (`-i * TICRATE`). Easy to set the wrong sign and get a ~0-second
+  effect with no compiler warning.
+- [+POWERSPEED.NOTRAIL](notes/powerspeed-notrail-flag.md) — a flag, not a property (a natural but
+  wrong guess). `APowerSpeed::DoEffect` never reads `Speed`, so even a `Speed 1.0` no-op subclass
+  spawns trails and can hijack another `PowerSpeed`'s trail-arbitration slot without this flag. No
+  `cl_speedtrails`-style cvar exists as an alternative.
+- [NOAUTOFIRE](notes/noautofire.md) — weapon flag. Suppresses **continuous** firing while fire is
+  held through consecutive tics in which the weapon is already ready, but does **not** suppress a
+  single shot fired the instant the weapon transitions into its ready state with fire already
+  down. `P_CheckWeaponFire` is its sole consumer.
+- [damagefactor](notes/damagefactor.md) — `P_DamageMobj` applies `DamageFactor`/`DamageFactors`
+  unconditionally, with no floor on the incoming damage value — including `TELEFRAG_DAMAGE`. A
+  `DamageFactor "<type>", 0` entry genuinely blocks a telefrag-magnitude hit of that type, unlike
+  `+INVULNERABLE`, whose own check is explicitly gated on `damage < TELEFRAG_DAMAGE`.
+- [maxdropoffheight](notes/maxdropoffheight.md) — only gates `P_Move`'s deliberate AI-stepping
+  call into `P_TryMove`; `P_XYMovement` (ordinary momentum-driven movement — knockback, thrust,
+  explosions) calls `P_TryMove` with a hardcoded `dropoff=true`, which skips the check entirely
+  regardless of the property's configured value.

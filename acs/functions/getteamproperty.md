@@ -1,8 +1,10 @@
 # `int GetTeamProperty(int team, int prop)`
 
 **Tier:** A.
-**Engine:** Zandronum 3.2.1 for `TPROP_NumLivePlayers` through `TPROP_LoserTheme` (function itself added in `dd6c1aba9`, confirmed ancestor of the 3.2.1 version-bump `28f736fb3`). `TPROP_WinnerThemeOrder`/`TPROP_LoserThemeOrder` are **3.3-alpha-only** (see above) — not verified/usable against the 3.2.1 target.
-**Provenance:** wiki page `GetTeamProperty - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `oldid=1300`) + source-verified against `p_acs.cpp:1595-1666,5455,5468,7180-7182`, `p_acs.h:430-453`, `team.cpp` (`TEAM_CheckIfValid:731`, `TEAM_GetName:741`, `TEAM_CountLivingAndRespawnablePlayers:194`, `TEAM_CountPlayers:173`, `TEAM_GetCarrier:1082`, `TEAM_GetAssistPlayer:1304`, `TEAM_GetSpread:1434`, `TEAM_GetPlayerStartThingNum:1694`, `TEAM_GetTeamItemName:1702`, `TEAM_GetReturnTicks:1119`, `TEAM_GetIntermissionTheme:1724`, `TEAM_GetIntermissionThemeOrder:1734`, `TEAM_GetNumAvailableTeams:1345`), `zstring.cpp:326-333`, `zt-bcc/lib/zcommon.bcs:813-832,1736`. Crash bug and version-gate findings both confirmed via git ancestry (`git merge-base --is-ancestor`), not just source reading.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `GetTeamProperty - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetTeamProperty&oldid=1300`) + source-verified against `p_acs.cpp:1595-1666,5455,5468,7180-7182`, `p_acs.h:430-453`, `team.cpp` (`TEAM_CheckIfValid:731`, `TEAM_GetName:741`, `TEAM_CountLivingAndRespawnablePlayers:194`, `TEAM_CountPlayers:173`, `TEAM_GetCarrier:1082`, `TEAM_GetAssistPlayer:1304`, `TEAM_GetSpread:1434`, `TEAM_GetPlayerStartThingNum:1694`, `TEAM_GetTeamItemName:1702`, `TEAM_GetReturnTicks:1119`, `TEAM_GetIntermissionTheme:1724`, `TEAM_GetIntermissionThemeOrder:1734`, `TEAM_GetNumAvailableTeams:1345`), `zstring.cpp:326-333`, `zt-bcc/lib/zcommon.bcs:813-832,1736`. Crash bug and version-gate findings both confirmed via git ancestry (`git merge-base --is-ancestor`), not just source reading.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
 
 Reads a single property off a team by team index. Extension function (`ACSF_GetTeamProperty`,
@@ -77,3 +79,26 @@ return-ticks path in a way that looks like a fix for this. This doc is recording
 plausible still-live caveat rather than a freshly-derived one — full client/server state-sync
 tracing for these two fields wasn't done here; treat `TPROP_ReturnTics`/`TPROP_Assister` as
 suspect on a `CLIENTSIDE` script until checked against actual client behavior.
+
+## Engine-family divergence
+
+Bound as ACSF (CALLFUNC) index 103 (`-103` in `zt-bcc/lib/zcommon.bcs`'s extern binding), squarely
+inside the 100–199 range UZDoom's `CallFunction` dispatcher reserves for Zandronum's own extensions
+and implements none of — see [Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md).
+The `default: break;` case returns a plain `0`, with no error and no log line, and the calling script
+keeps running as if `GetTeamProperty` had succeeded normally.
+
+For most `TPROP_*` properties this is an obviously-wrong `0` once you know to check for it — a
+team's real frag/player/point count, `TPROP_TEXTCOLOR`, and `TPROP_RETURNTICS` all read back as
+zero regardless of the team's actual state. Two properties are worse because `0` is a plausible
+value in its own right: `TPROP_CARRIER`/`TPROP_ASSISTER` (documented above as converting the
+engine's "nobody" sentinel to `-1` for a real absence) come back as player index `0` instead of
+"no carrier"/"no assister" under UZDoom — silently misattributing the flag or the frag assist to
+whichever player happens to be slot 0, not a value that looks broken on inspection.
+`TPROP_ISVALID` is the same trap in miniature: it reads back `0` (false) for *every* team under
+UZDoom, valid or not, which coincidentally matches the expected answer for an actually-invalid
+team index and only shows itself wrong against a valid one. The real crash documented above for
+`TPROP_TeamItem`/`TPROP_WinnerTheme`/`TPROP_LoserTheme` with an invalid `team` is Zandronum-only
+for the same root cause — under UZDoom none of the underlying getters ever run, so there's no
+`NULL` for `FString::operator+=` to segfault on; the caller just loses the real string in exchange
+for a silent `0` (empty string index) instead, which is safer but no more correct.

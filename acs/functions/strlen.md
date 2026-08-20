@@ -1,8 +1,10 @@
 # `int StrLen(str string)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (checked against the Zandronum source's master/3.3-alpha snapshot).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `StrLen - ZDoom Wiki.html` (https://zdoom.org/w/index.php?title=StrLen&oldid=35763), verified against fork source 2026-07-29.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 
 Returns the length (character count) of `string`. Compiler builtin (`PCD_STRLEN`,
@@ -29,5 +31,5 @@ the zt-bcc source's `src/builtin.c:116`), implementation in `p_acs.cpp:12483-125
 The ZDoom wiki page's usage note ("all strings in ACS are static... it is not really necessary to
 use this function unless...") is generic ZDoom commentary about the string model and isn't
 Zandronum-specific; nothing in it or the example script is wrong or fork-divergent. The function's
-existence, signature, and normal-path behavior match this fork exactly — the only material gap is
-the failure-path behavior above, which the wiki page doesn't mention at all.
+existence, signature, and normal-path behavior match both UZDoom and Zandronum exactly — the only
+material gap is the failure-path behavior above, which the wiki page doesn't mention at all.

@@ -1,8 +1,10 @@
 # ACS_Terminate
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `ACS_Terminate - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=ACS_Terminate&oldid=35856`), verified 2026-07-29 against the Zandronum source's `src`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 `bool Acs_Terminate(int script, int map)`
 
@@ -42,8 +44,8 @@ The wiki correctly states: "You may not terminate scripts that were executed usi
 - **Same map:** terminates immediately — `SetScriptState(script, SCRIPT_PleaseRemove)`.
 - **Different map:** does not terminate anything now. It queues a deferred action (`addDefered(..., acsdefered_t::defterminate, ...)`) that fires only if/when that target map is actually entered later (`P_DoDeferedScripts`, `p_acs.cpp:13190`). This is the same deferred-execution mechanism `ACS_Execute`/`ACS_Suspend` use for cross-map targets.
 
-## Fork/wiki notes
+## Zandronum-specific: CLIENTSIDE termination asymmetry
 
-**Zandronum-specific note:** No server-side broadcast exists for script termination (no `SERVERCOMMANDS_ACSScriptTerminate`). Terminating a `CLIENTSIDE` script server-side does **not** stop the client's running instance — only the server's state changes. Client termination requires the script to finish on its own or the client to execute its own termination call. This asymmetry is undocumented on the ZDoom wiki and is a Zandronum multiplayer peculiarity.
+No server-side broadcast exists for script termination (no `SERVERCOMMANDS_ACSScriptTerminate`). Terminating a `CLIENTSIDE` script server-side does **not** stop the client's running instance — only the server's state changes. Client termination requires the script to finish on its own or the client to execute its own termination call. This asymmetry is undocumented on the ZDoom wiki and is a Zandronum multiplayer peculiarity.
 
 The `SCRIPT_PleaseRemove` state request is processed by the script thinker (not an instant kill) — termination is effectively "next tic" rather than synchronous.

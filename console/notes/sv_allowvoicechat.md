@@ -1,8 +1,10 @@
 # `sv_allowvoicechat`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-02)
 **Provenance:** Zandronum Wiki "Server variables" (https://wiki.zandronum.com/w/index.php?title=Server_variables&oldid=2534, saved 2026-08-02) for the value-mode description; Zandronum source voice-chat implementation and version ancestry (commit `50f4ac1e5` vs. the 3.2.1 version-bump commit `28f736fb3`) to correct the wiki's version-availability claim.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 
 Controls whether voice chat is enabled and who can communicate via voice. Four modes control voice-chat scope: disabled, all players, teammates only, or separate player/spectator channels.
 
@@ -35,3 +37,17 @@ Marked `CVAR_SERVERINFO | CVAR_GAMEPLAYSETTING`, so the value replicates to clie
 - **`sv_proximityvoicechat`** — enable proximity-based (map-range-limited) voice chat.
 - **`sv_minproximityrolloffdist`** — proximity voice rolloff distance (begin fade).
 - **`sv_maxproximityrolloffdist`** — proximity voice max distance (silence threshold).
+
+## Engine-family divergence
+
+`sv_allowvoicechat` does not exist in UZDoom at all — confirmed absent from the engine's source (no
+matching `CVAR`/`CUSTOM_CVAR` declaration, and no bare mention of the name anywhere in the tree),
+not merely undocumented.
+
+Setting it under UZDoom — from the console, a config file, or ACS's `ConsoleCommand()` — prints
+`Unknown command "sv_allowvoicechat"` to the console/log and does nothing else: visible if
+someone's watching the console at the time, easy to miss if triggered from an unattended server
+startup script, since the attempted write silently fails to apply and no cvar of this name is ever
+created. Consequently a UZDoom server has no cvar-driven way to enable or scope in-game voice chat
+(all-players, teammates-only, or split player/spectator channels) the way Zandronum does — the
+entire mode-selection mechanism this cvar exposes is simply absent on UZDoom.

@@ -1,7 +1,8 @@
 # `sv_maxclients` and `sv_maxplayers`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-17)
 **Provenance:** Zandronum source `src/sv_main.cpp:CUSTOM_CVAR` declarations + verified against engine behavior.
 
 Two separate cvars that both limit player counts, but with fundamentally different semantics and admin-bypass rules. Both default to 32 for backward compatibility with older mods (the engine max is 64, see `MAXPLAYERS` in `src/doomdef.h`).
@@ -26,6 +27,20 @@ Both cvars clamp to the range `[0, 64]`. Setting either to `0` is allowed but re
 ## Admin bypass behavior
 
 Administrators (IPs in the admin-list file, per `sv_adminlistfile`) can connect to the server even when it is full at `sv_maxclients`, up to the absolute maximum of 64 total connections. Administrators are not exempt from `sv_maxplayers` — they still count toward the active-player limit and can be forced to spectate if `sv_maxplayers` is exceeded. This is an asymmetric bypass: administrators bypass the *connection* limit but not the *gameplay* limit.
+
+## Zandronum-specific: `sv_maxclients`/`sv_maxplayers` don't exist on UZDoom
+
+Neither cvar exists on UZDoom (checked the `~/source/UZDoom` checkout, `5a9b0ec511` (2026-08-15):
+no `sv_`-prefixed cvar of any kind is registered anywhere in the tree, and there's no admin-IP-list
+concept — `adminlist`/`IsAdmin` are absent too). This isn't a naming difference or a behavior tweak; the underlying
+model these two cvars implement doesn't apply. UZDoom keeps the original ZDoom peer-to-peer
+netcode (join-in-progress over a fixed `players[]`/`playeringame[]` array, no dedicated-server
+process, no distinct "connected but spectating" vs. "actively playing" cap, no admin bypass path)
+rather than Zandronum's client-server model with a real dedicated server, RCON, and an admin list
+that can bypass the connection cap. `MAXPLAYERS` is still `64` on UZDoom too (`src/common/engine/
+i_net.h`), so the absolute player-count ceiling this doc's `[0, 64]` clamp discussion refers to is
+shared — only the two cvars, their admin-bypass semantics, and the "connected but spectating"
+distinction are Zandronum-only.
 
 ## Related cvars
 

@@ -1,15 +1,18 @@
 # `A_CountdownArg` (countdown with state change)
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_CountdownArg` (retrieved 2026-08-01, oldid=42322) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3615-3640`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_CountdownArg` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_CountdownArg&oldid=42322) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3615-3640`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_CountdownArg)` in `src/thingdef/thingdef_codeptr.cpp`.
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
 Decrements one of an actor's argument counters and destroys or state-changes the actor when the countdown reaches zero. Replaces the simpler `A_Countdown` (which operates on the `reactiontime` field instead of an arg and is Strife-specific).
 
 ## Signature
 
-```
+```text
 void A_CountdownArg(int arg[, str state])
 ```
 
@@ -51,7 +54,7 @@ If the actor has the `+MISSILE` flag, the function calls `P_ExplodeMissile(self,
 
 If the actor has the `+SHOOTABLE` flag (but not MISSILE), the function calls:
 
-```
+```text
 P_DamageMobj(self, NULL, NULL, self->health, NAME_None, DMG_FORCED)
 ```
 
@@ -91,7 +94,7 @@ No special network logic — the countdown and state changes are decided server-
 
 ## Example (Zandronum DECORATE)
 
-```
+```text
 actor TimedDispenser : Actor
 {
     Default

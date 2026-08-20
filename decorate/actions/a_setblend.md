@@ -1,8 +1,10 @@
 # `action native A_SetBlend(color color1, float alpha, int tics, color color2 = "")`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (limited feature set); UZDoom/GZDoom-family add extended parameters
-**Provenance:** ZDoom Wiki `A_SetBlend` (retrieved 2026-08-01, oldid=54493) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3499-3515` and UZDoom's `src/playsim/p_actionfunctions.cpp:1903-1923`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_SetBlend` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_SetBlend&oldid=54493) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3499-3515` and UZDoom's `src/playsim/p_actionfunctions.cpp:1903-1923`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** action function (defined on `AActor`; only takes effect when called on a PlayerPawn-based actor).
 
 Applies a tinted color fade effect to a player's screen, animating from one color to another over a specified number of tics. This affects the player's visual perception only — it does not change any game-world state.
@@ -16,7 +18,7 @@ Applies a tinted color fade effect to a player's screen, animating from one colo
 
 ## Engine-family divergence
 
-**Zandronum (primary target):** The function takes exactly 4 parameters. The fade always animates from **color1** to fully transparent (alpha=0), completing over **tics**. The **color2** parameter, if provided, is ignored — the destination is always transparent. This limitation stems from the underlying `DFlashFader` class being called with a hardcoded destination alpha of 0.
+**Zandronum:** The function takes exactly 4 parameters. The fade always animates from **color1** to fully transparent (alpha=0), completing over **tics**. The **color2** parameter, if provided, is ignored — the destination is always transparent. This limitation stems from the underlying `DFlashFader` class being called with a hardcoded destination alpha of 0.
 
 **UZDoom/GZDoom-family:** A fifth parameter, **alpha2** (float, defaults to 0.0), controls the destination opacity. The fade animates from **color1** at **alpha** to **color2** at **alpha2**. This allows modders to create persistent tints (by setting alpha2 to a non-zero value) or to fade between two different colors with different opacities. **This extended signature does not exist in Zandronum and should not be used in mods targeting that engine.**
 
@@ -30,7 +32,7 @@ Applies a tinted color fade effect to a player's screen, animating from one colo
 
 A custom player class that briefly flashes the screen red when taking unfiltered damage:
 
-```
+```text
 class MyCustomPlayer : DoomPlayer
 {
 	States
@@ -45,7 +47,7 @@ class MyCustomPlayer : DoomPlayer
 
 A custom stimpack that briefly flashes green when picked up:
 
-```
+```text
 class GreenStimpack : Stimpack
 {
 	States

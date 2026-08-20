@@ -1,8 +1,10 @@
 # Thing_Destroy
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki, verified against Zandronum 3.3-alpha source (`p_lnspec.cpp`, `FUNC(LS_Thing_Destroy)`)
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-06)
+**Provenance:** ZDoom Wiki `Thing_Destroy` (retrieved 2026-08-06, https://zdoom.org/w/index.php?title=Thing_Destroy&oldid=33504) + verified against the Zandronum source's `src/p_lnspec.cpp:1335-1371`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Action special (index 133)
 
 **Signature:** `int Thing_Destroy(int tid, [int extreme, int tag])`

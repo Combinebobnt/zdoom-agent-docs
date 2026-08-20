@@ -1,9 +1,12 @@
 # FixedDiv
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (checked against the Zandronum source's master/3.3-alpha checkout; the macro chain involved is old Build-engine-derived code unlikely to have changed across that gap).
-**Provenance:** `_intake/FixedDiv - ZDoom Wiki.html` (zdoom.org, oldid 37311), verified against engine source 2026-07-28.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Provenance:** `_intake/FixedDiv - ZDoom Wiki.html` (zdoom.org, https://zdoom.org/w/index.php?title=_intake%2FFixedDiv&oldid=37311), verified against engine source 2026-07-28.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Compiler builtin (`zt-bcc/src/builtin.c` `g_funcs[]` entry `"fixeddiv", "f;ff"` → `PCD_FIXEDDIV`).
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
 `fixed FixedDiv(fixed a, fixed b)`
 

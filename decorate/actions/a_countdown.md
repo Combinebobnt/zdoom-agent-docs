@@ -1,15 +1,17 @@
 # `void A_Countdown()`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_Countdown` (retrieved 2026-08-01, oldid=47867) + verified against the Zandronum source's `src/g_strife/a_strifestuff.cpp:621-637`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_Countdown` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_Countdown&oldid=47867) + verified against the Zandronum source's `src/g_strife/a_strifestuff.cpp:621-637`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_Countdown)` in `src/g_strife/a_strifestuff.cpp` — callable from any actor's state table (defined on `AActor`).
 
 Decrements the calling actor's `ReactionTime` property once per call. When `ReactionTime` reaches 0 or below, explodes and destroys the calling actor.
 
 ## Signature
 
-```
+```text
 void A_Countdown()
 ```
 
@@ -34,7 +36,7 @@ This function is **intended for use with missile-type actors** — projectiles w
 
 A missile that follows its target (`A_Tracer`) for 25 tics, then explodes:
 
-```
+```text
 actor RevenantTracer2 : RevenantTracer
 {
     ReactionTime 25
@@ -54,6 +56,10 @@ In this example, each loop advances two frames with `A_Tracer` (4 tics total), t
 ## Network behavior
 
 **Zandronum multiplayer:** The server handles this action exclusively. On network clients, the action returns without effect if the actor is not marked as client-side-only. After the explosion occurs on the server, the destruction is synchronized to all clients via the normal actor-death replication.
+
+## Engine-family divergence: Network behavior
+
+**UZDoom has no client/server authority split for this action.** UZDoom's implementation (`wadsrc/static/zscript/actors/strife/strifefunctions.zs`) is a plain ZScript `extend class Actor` method with no network-mode check at all — it decrements `reactiontime` and calls `ExplodeMissile()` unconditionally on whichever peer runs it, every time. This mirrors the finding across this cohort: UZDoom's source tree has no client/server authority split anywhere (no `NETWORK_InClientMode`/`SERVERCOMMANDS_*` equivalents), unlike Zandronum's server-authoritative model described above.
 
 ## Related actions and properties
 

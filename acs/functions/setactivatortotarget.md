@@ -1,8 +1,10 @@
 # `bool SetActivatorToTarget(int tid)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (this is a long-standing ZDoom-lineage function, not a recent Zandronum-specific addition, so no 3.2.1-vs-3.3-alpha ancestry check was needed; verified directly against the Zandronum source's checkout).
-**Provenance:** ZDoom Wiki, "SetActivatorToTarget" (`oldid=35899`), processed 2026-07-29.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** ZDoom Wiki, "SetActivatorToTarget" (`https://zdoom.org/w/index.php?title=SetActivatorToTarget&oldid=35899`), processed 2026-07-29.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
 
 Changes the current script's activator, for the remainder of the executing script, to the
@@ -39,17 +41,54 @@ the Zandronum source's `src/p_acs.cpp:5963-5982`.
     apparently does this. if (source != NULL) target = source;`) — so reading a corpse's `target`
     after death gives you the killer, not whatever it was fighting when it died.
 
-## Wiki/fork divergence: "no target" does *not* fall back to the actor itself
+## Engine-family divergence: Zandronum added a wider live-player autoaim cone
+
+Step 2 above (the live-player branch) calls through to a shared autoaim helper, and that helper's
+own internals differ meaningfully between the two engines, changing whether this function actually
+finds a target for a live-player activator at an oblique angle:
+
+- **Angle sweep width.** Both engines' autoaim helpers skip the multi-angle sweep entirely and
+  only ever try one dead-center trace whenever the aiming player has freelook allowed on the
+  current level *and* their own autoaim-distance setting is at or below half a degree (i.e.
+  autoaim effectively off) — a very common modern client configuration. Outside that case (autoaim
+  meaningfully nonzero, or freelook disallowed), the two engines differ: UZDoom's helper is the
+  stock ZDoom-family behavior and always tries exactly three fixed candidates — dead center and
+  ±5.625° — with no way to widen it. Zandronum's helper adds a much finer sweep of up to fifteen
+  candidate angles (dead center, a run of small steps out to roughly ±5° in each direction, plus
+  the same two ±5.625° checks UZDoom has), used by default unless a server operator explicitly
+  turns on a compat flag that narrows it back down to UZDoom's three-angle behavior. Practically:
+  when the sweep actually runs (autoaim on, freelook off, or similar), a live player standing close
+  to but not precisely facing a valid target is more likely to have that target picked up by
+  `SetActivatorToTarget` on Zandronum's default settings than on UZDoom, where only the same three
+  fixed offsets are ever tried.
+- **Linked-portal restriction.** UZDoom's call site passes an "aim restricted through linked
+  portals" flag into the shared helper (relevant only on maps using its line-portal system), a
+  concept Zandronum's older two-argument version of the same helper has no equivalent for at all.
+  This has no practical effect on maps that don't use linked line portals.
+- **Netcode lag compensation.** Zandronum's autoaim helper wraps its aim check in client-position
+  reconciliation ("unlagged") bookkeeping so a live-player autoaim result accounts for network
+  latency in multiplayer; UZDoom's equivalent helper has no analogous mechanism, consistent with
+  it being coop/single-player-focused rather than a competitive-multiplayer-oriented fork.
+
+None of this affects the non-player branch (step 3, reading `->target` directly) or the
+core resolution/return-value contract described above and below — both of those are identical
+between the two engines.
+
+## Wiki/engine divergence: "no target" does *not* fall back to the actor itself
 
 The wiki's final bullet claims: *"If the actor has no target, the activator is the actor
-itself."* **This is not what this fork's code does.** Re-reading `p_acs.cpp:5963-5982`: when the
-resolved `actor->target` (or, for a live player, the autoaim result) comes back `NULL`, execution
-falls straight through the `if (actor != NULL)` guard to `return 0` — `activator` is never
-assigned the original targetless actor as a fallback. The net effect is that the activator that
-was active *before* the call remains active; the function does not "pin" it to the actor you
+itself."* **This is not what the Zandronum engine's code does.** Re-reading `p_acs.cpp:5963-5982`:
+when the resolved `actor->target` (or, for a live player, the autoaim result) comes back `NULL`,
+execution falls straight through the `if (actor != NULL)` guard to `return 0` — `activator` is
+never assigned the original targetless actor as a fallback. The net effect is that the activator
+that was active *before* the call remains active; the function does not "pin" it to the actor you
 asked about. Anything written against the wiki's stated fallback (e.g. assuming a targetless
 monster still becomes the new activator) will silently keep operating on the old activator
 instead. Always check the boolean return value rather than assuming a fallback.
+
+The UZDoom engine's `ACSF_SetActivatorToTarget` case (`src/playsim/p_acs.cpp:5459-5480`) has the
+identical shape — the same nested non-null guard, with no fallback-to-self branch — so this same
+divergence from the wiki's stated behavior holds on UZDoom too, not just on Zandronum.
 
 ## Return value
 

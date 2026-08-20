@@ -1,5 +1,22 @@
 # `int RequestScriptPuke(int script [, int arg0, int arg1, int arg2, int arg3])`
 
+**Tier:** A.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Provenance:** wiki page `RequestScriptPuke - Zandronum Wiki.html` (`_intake/`, retrieved
+2026-07-28, `https://wiki.zandronum.com/w/index.php?title=RequestScriptPuke&oldid=1312`) + source-verified (`p_acs.cpp:1338-1340,1378-1386,1705-1748,5487,5491,
+7348-7356,13701-13717`, `p_acs.h:358`, `cl_commands.cpp:757-783`,
+`sv_main.cpp:966,5210,5783-5810,7461-7500,7488-7495`, `network.cpp:867`).
+The wiki's NET-flag requirement, client-only restriction, unreliable delivery, and
+puker-is-activator claims all hold; the corrected (fully-optional) signature, the missing
+`sv_cheats` bypass, the demo-playback no-op, the exact transport mechanism, the unchecked NULL
+deref on an unresolvable script name, the missing flood-check on valid `NET` pukes, and the
+NULL-activator all-players fan-out on `Give`/`TakeInventory` are this doc's source-verified
+additions (the last three found and added 2026-07-28 while building a clientside input-queueing
+feature in a real project).
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
+**Bucket:** extension function.
+
 Asks the server to run a `NET` script with the given args, from a `CLIENTSIDE` script — the
 client→server counterpart of `ExecuteClientScript`/`SendNetworkString`.
 `NamedRequestScriptPuke(str script [, int arg0, int arg1, int arg2, int arg3])` is the same by
@@ -7,14 +24,12 @@ script name. Extension functions (`ACSF_RequestScriptPuke`/`ACSF_NamedRequestScr
 -122/-126 in `zcommon.bcs`), both dispatching (the Zandronum source's `src/p_acs.cpp:7348-7356`) into
 one shared helper, `RequestScriptPuke` (`p_acs.cpp:1705-1748`).
 
-**Bucket:** extension function.
-
 - **Signature correction vs. the wiki:** `zcommon.bcs:1755,1759` (`RequestScriptPuke(int;int,int,int,int):int`,
   `NamedRequestScriptPuke(str;int,int,int,int):int`) puts the `;` (required/optional split)
   immediately after the script param — **only `script`/the name string is required; all four
   `arg0..arg3` are optional**. The wiki page itself shows two conflicting overload lines (one with
   `arg0, arg1, arg2` required and `arg3` optional, one with all four optional) — the fully-optional
-  form is the one that matches this fork's actual declared signature.
+  form is the one that matches Zandronum's actual declared signature.
 - **Target script must be `NET`-flagged, checked unconditionally client-side before anything is
   sent** (`p_acs.cpp:1718-1723`, `scriptdata->Flags & SCRIPTF_Net`, flag defined `p_acs.h:358`,
   "Safe to 'puke' in multiplayer"): fails → prints a message, returns `0`. **No `sv_cheats`
@@ -85,7 +100,7 @@ one shared helper, `RequestScriptPuke` (`p_acs.cpp:1705-1748`).
 
 **Example** (from the wiki):
 
-```
+```text
 Script 1 (int numcookies) NET
 {
     Print(n: 0, s: " gives the server host ", d: numcookies, s: " cookies");
@@ -101,15 +116,20 @@ Script 2 (int numcookies) CLIENTSIDE
 offline), `0` if called on the server or the target script isn't `NET`. `1` does not guarantee
 the server actually received or ran the script.
 
-**Provenance:** wiki page `RequestScriptPuke - Zandronum Wiki.html` (`_intake/`, retrieved
-2026-07-28, `oldid=1312`) + source-verified (`p_acs.cpp:1338-1340,1378-1386,1705-1748,5487,5491,
-7348-7356,13701-13717`, `p_acs.h:358`, `cl_commands.cpp:757-783`,
-`sv_main.cpp:966,5210,5783-5810,7461-7500,7488-7495`, `network.cpp:867`).
-The wiki's NET-flag requirement, client-only restriction, unreliable delivery, and
-puker-is-activator claims all hold; the corrected (fully-optional) signature, the missing
-`sv_cheats` bypass, the demo-playback no-op, the exact transport mechanism, the unchecked NULL
-deref on an unresolvable script name, the missing flood-check on valid `NET` pukes, and the
-NULL-activator all-players fan-out on `Give`/`TakeInventory` are this doc's source-verified
-additions (the last three found and added 2026-07-28 while building a clientside input-queueing
-feature in a real project). **Engine:** Zandronum 3.2.1 (verified
-against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.
+## Engine-family divergence
+
+`RequestScriptPuke` is bound as ACSF (CALLFUNC) index 122 — inside the 100–199 range UZDoom
+reserves for Zandronum's extensions and implements none of. Under UZDoom, `PCD_CALLFUNC` never
+reaches any of the client-side logic described above (the `NET`-flag check, the netstate check,
+the `CLIENTCOMMANDS_Puke` send): UZDoom's dispatcher falls through its `default: break;` case and
+hands back `0` immediately, with no error or log line. See
+[Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md) for the general mechanism
+— this function is one of the confirmed instances it names directly.
+
+The dangerous part is that `0` is exactly the return value this function's own documented failure
+paths already produce (called server-side, or the target script isn't `NET`-flagged), so a caller
+checking the return value for error handling reads "wrong engine" as "NET-flag/server-side
+failure" — there's no way to tell the two apart from inside the script. Because the send never
+happens, no `CLC_PUKE` packet is ever queued, so a `CLIENTSIDE`-driven automation or test harness
+that pukes a `NET` script to trigger server-side state changes stops working the moment it's
+loaded on UZDoom, with nothing in the log pointing at why.

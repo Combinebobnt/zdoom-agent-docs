@@ -1,8 +1,10 @@
 # `void A_PlaySoundEx(sound whattoplay, coerce name slot [, bool looping [, int attenuation]])`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_PlaySoundEx` (retrieved 2026-08-01, oldid=47286) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:536` and `wadsrc/static/actors/actor.txt:202`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_PlaySoundEx` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_PlaySoundEx&oldid=47286) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:536` and `wadsrc/static/actors/actor.txt:202`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS` on `AActor` (`src/thingdef/thingdef_codeptr.cpp:536`).
 
 Plays a sound from the calling actor on a named channel. This is an older interface; **use `A_PlaySound` for new code**, which offers a volume parameter and clearer attenuation semantics. A_PlaySoundEx is not deprecated in Zandronum (unlike GZDoom/ZDoom upstream, which prefer `A_StartSound` — not available in Zandronum).
@@ -48,6 +50,18 @@ Same as A_PlaySound: two distinct code paths based on the `looping` parameter. I
 ## Implementation note
 
 A potential issue: in the `!looping` branch, the code tests `channel & CHAN_LOOP` (bit 8) on a name-table index clamped to `[NAME_Auto, NAME_SoundSlot7]` — meaningless as a loop flag. This appears to be unadapted copy-paste from `A_PlaySound` where `channel` is an int bitmask. Behavior matches intention (sound does not loop), but the bitwise test is vestigial — **this aspect is flagged for future tracing, not fully verified**.
+
+## Engine-family divergence: deprecated in favor of A_StartSound
+
+UZDoom's declaration (`wadsrc/static/zscript/actors/actor.zs:1315`) carries a formal `deprecated("2.3", "Use A_StartSound() instead")` attribute — a stronger claim than the intro prose's "prefer" framing above, which describes upstream style guidance rather than UZDoom's own declaration site. In practice the warning is narrower than the attribute alone suggests: `FxVMFunctionCall::CheckAccessibility` (`src/common/scripting/backend/codegen.cpp:9761-9790`) only emits the "Accessing deprecated function" warning when the *calling* code's compiled `VersionInfo` is `>= 2.3`; DECORATE action-function calls compile at a fixed `MakeVersion(0,0)` (`src/scripting/decorate/thingdef_exp.cpp:70`), which is below that threshold, so a DECORATE state table calling `A_PlaySoundEx` gets no warning at all — only ZScript code compiled at version 2.3+ sees it. Also note `A_PlaySound` itself is deprecated on UZDoom too, since version 4.3 in favor of `A_StartSound` (same file, line 1306) — so on UZDoom the "use `A_PlaySound` for new code" advice in the intro above is itself superseded; `A_StartSound` (line 1307, no deprecation attribute) is the actual current replacement.
+
+## Engine-family divergence: no vestigial bitwise loop test
+
+UZDoom's `A_PlaySoundEx` (`src/playsim/p_actionfunctions.cpp:680`) does not carry the vestigial `channel & CHAN_LOOP` test described in the Implementation note above — `looping` is a genuine `PARAM_BOOL` read directly, and loop state is passed explicitly as the `CHANF_LOOP` flag argument to `S_Sound`, not tested from channel bits. This resolves that note's "flagged for future tracing" question for UZDoom specifically: there is no equivalent artifact to trace on this engine, though observable behavior (looping controlled correctly by the `looping` parameter) is the same on both.
+
+## Engine-family divergence: no client/server authority split
+
+UZDoom's `S_Sound(AActor*, ...)` (`src/sound/s_doomsound.cpp:537`) has no server/client gate at all — it calls straight through to the local sound engine (`soundEngine->StartSound`/`S_SoundPitchActor`) with no `NETWORK_InClientMode`/`SERVERCOMMANDS_*`-style check and no per-actor looping-channel replication state. The "Server-side only in multiplayer, with replication to clients" mechanism described above, including the join-sync of looping-channel state, does not exist on UZDoom — the sound plays locally on whichever instance runs the action, every time. `CLIENTSIDEONLY` is registered in UZDoom's actor-flag table only as `DEFINE_DUMMY_FLAG(CLIENTSIDEONLY, false)` (`src/scripting/thingdef_data.cpp:458`) — the flag is accepted for DECORATE compatibility but has no effect, consistent with there being no client/server distinction for it to gate.
 
 ## See also
 

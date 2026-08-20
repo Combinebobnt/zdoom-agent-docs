@@ -1,5 +1,14 @@
 # `Print`
 
+**Tier:** A.
+**Applies to:** N/A — zt-bcc-declared, neither engine implements it
+**Verified against:** none
+**Provenance:** `Print - ZDoom Wiki.html`
+(`https://zdoom.org/w/index.php?title=Print&oldid=51050`), verified against
+the Zandronum source's `src/p_acs.cpp` (`PCD_BEGINPRINT`/`PCD_PRINTNAME`/`PCD_ENDPRINT`, lines
+10730-10944), the Zandronum source's `src/p_mobj.cpp` (`AActor::CheckLocalView`, lines 1257-1271), and
+the zt-bcc source's `lib/zcommon.bcs` (lines 1044-1048, the `PRINTNAME_*` enum) on 2026-07-29.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin — like [`HudMessage`](hudmessage.md)/[`StrParam`](strparam.md)/`Log`/
 `PrintBold`/`HudMessageBold`, this is one of the five names in `zt-bcc/src/builtin.c`'s dedicated
 "Format functions" block (`builtin.c:169`: `{ "print", "" }`), not a `zcommon.bcs` `special`-table
@@ -12,18 +21,9 @@ appending to it, then `PCD_ENDPRINT` to flush — the exact same accumulation ma
 `Log`/`PrintBold`/`HudMessage` share, differing only in what the terminating opcode does with the
 finished buffer (`p_acs.cpp:10730-10944`).
 
-**Tier:** A. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see
-"Engine scope" in `../../shared/AUTHORING.md`).
-
-**Provenance:** `Print - ZDoom Wiki.html`
-(`https://zdoom.org/w/index.php?title=Print&oldid=51050`), verified against
-the Zandronum source's `src/p_acs.cpp` (`PCD_BEGINPRINT`/`PCD_PRINTNAME`/`PCD_ENDPRINT`, lines
-10730-10944), the Zandronum source's `src/p_mobj.cpp` (`AActor::CheckLocalView`, lines 1257-1271), and
-the zt-bcc source's `lib/zcommon.bcs` (lines 1044-1048, the `PRINTNAME_*` enum) on 2026-07-29.
-
 ## Syntax
 
-```
+```text
 Print( <format-item-list> );
 ```
 
@@ -38,13 +38,13 @@ fork/wiki divergence in the cast table itself.
 ## `n:` name lookup — real fork divergence from the wiki
 
 The wiki lists five `PRINTNAME_*` values: `PRINTNAME_LEVELNAME`(-1), `PRINTNAME_LEVEL`(-2),
-`PRINTNAME_SKILL`(-3), `PRINTNAME_NEXTLEVEL`(-4), `PRINTNAME_NEXTSECRET`(-5). **This fork's enum
+`PRINTNAME_SKILL`(-3), `PRINTNAME_NEXTLEVEL`(-4), `PRINTNAME_NEXTSECRET`(-5). **Zandronum's enum
 only defines the first three** (`p_acs.cpp:9066-9071`, mirrored in `zt-bcc/lib/zcommon.bcs:1044-1048`
 — both stop at `PRINTNAME_SKILL = -3`). `PCD_PRINTNAME`'s switch (`p_acs.cpp:10797-10812`) has no
 `case` for `-4`/`-5` either — any negative value other than -1/-2/-3 (including the wiki's -4/-5,
 which don't even have BCS constants to spell them) falls into `default: work += ' ';`, silently
 appending a single space instead of the next map's name. If you need the next map/secret-map lump
-name in this fork, resolve it another way (e.g. reading the map-rotation functions) rather than
+name in Zandronum, resolve it another way (e.g. reading the map-rotation functions) rather than
 `n:-4`/`n:-5`.
 
 For non-negative values, `n:` behavior matches the wiki with two undocumented edge cases visible in
@@ -106,7 +106,7 @@ The octal/hex/`\n`/`\c`-color escape handling described by the wiki is applied t
 `FString` by shared engine text-rendering code (`cmdlib.cpp`'s `strbin`-style unescaping and the
 font/console color-code renderer), the same machinery every other printed/logged/HUD string goes
 through — not logic specific to `Print`'s own opcodes, and not re-traced line-by-line here (same
-treatment as `HudMessage`'s `x`/`y` params: core ZDoom text rendering untouched by this fork).
+treatment as `HudMessage`'s `x`/`y` params: core ZDoom text rendering untouched by the Zandronum fork).
 
 ## See also
 

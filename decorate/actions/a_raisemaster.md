@@ -1,8 +1,10 @@
 # `void A_RaiseMaster()`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_RaiseMaster` (retrieved 2026-08-01, oldid=53235) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4835-4848`, `src/p_things.cpp:555-591` (P_Thing_Raise implementation), `src/p_mobj.cpp:7849-7868` (AActor::GetRaiseState), and `wadsrc/static/actors/actor.txt:245`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_RaiseMaster` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RaiseMaster&oldid=53235) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4835-4848`, `src/p_things.cpp:555-591` (P_Thing_Raise implementation), `src/p_mobj.cpp:7849-7868` (AActor::GetRaiseState), and `wadsrc/static/actors/actor.txt:245`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:4835` (`DEFINE_ACTION_FUNCTION(AActor, A_RaiseMaster)`).
 
 Resurrects the calling actor's master (spawner) from a corpse, provided the corpse has a `Raise` state and meets the engine's resurrection requirements. **Zandronum only: this is server-authoritative and takes no parameters, unlike the ZDoom Wiki's description of GZDoom/UZDoom versions which support optional flags.**
@@ -26,10 +28,17 @@ When called, the action:
 1. **Fetch the Raise state.** Calls `target->GetRaiseState()` to find the actor's `Raise` state. If none exists, returns `true` (silently succeeds with no-op).
 2. **Check resurrection requirements.** An actor is resurrectable only if:
    - It has the `MF_CORPSE` flag set (is a dead monster, not a living actor or missile).
-   - Its `tics` field is `-1` (it has been lying still; any non-negative `tics` value means it is still in an animation and cannot be raised yet).
-   - The current state has the `CanRaise` property set (most death/death.fall states have this; some do not).
    - It is **not** a player (`APlayerPawn` subclass) — players cannot be resurrected by this function.
-   - If any of these conditions fail, the function returns `true` (treats as success, does nothing).
+   - **At least one of** its `tics` field being `-1` (lying still) **or** its current state having the
+     `CanRaise` property set is true — these two are not both required. The actual engine guard is
+     `if (tics != -1 && !state->GetCanRaise()) return NULL;`, which rejects only when *both* the
+     actor is still mid-animation (`tics != -1`) *and* the current state lacks `CanRaise`. This is
+     why an ordinary Doom monster's plain `Death`/`XDeath` states — not flagged `CanRaise` at all —
+     are still raisable by an Archvile: once `tics` settles to `-1` (animation finished), the guard
+     passes regardless of `CanRaise`. `CanRaise` exists specifically to permit raising *mid-animation*
+     (`tics != -1`), overriding the "must be lying still" requirement, not to add a second
+     requirement on top of it.
+   - If any of the above conditions fail, the function returns `true` (treats as success, does nothing).
 
 3. **Prepare spatial properties.** Temporarily saves the actor's current height and radius, then sets them to their defaults via the actor's default-state copy (retrieved via `GetDefault()`). This ensures the spatial check uses the "full" actor size, not any reduced size from the corpse state.
 
@@ -37,7 +46,7 @@ When called, the action:
 
 5. **Play sound and revive.** If the position check passes (or is bypassed for clients):
    - Plays the "vile/raise" sound at the actor's location (organ music).
-   - Calls `target->Revive()`, which resets all actor flags, fields, and properties to their defaults, clears the `target` and `lastenemy` pointers, restores health, and increments the kill counter.
+   - Calls `target->Revive()`, which resets all actor flags, fields, and properties to their defaults, clears the `target` and `lastenemy` pointers, restores health, and increments `level.total_monsters`. **This grows the kill-percentage denominator, not the kill counter itself** (`killed_monsters` is untouched) — the raised actor must be killed again for the level's kill count to reflect it.
    - On the server, sends a `SERVERCOMMANDS_SetThingState(target, STATE_RAISE)` command to all clients (see "Network behavior" below).
    - Sets the actor to the `Raise` state.
 
@@ -76,11 +85,13 @@ An actor cannot be resurrected by `A_RaiseMaster` unless all of the following ar
 
 - The actor is a monster with the `MF_CORPSE` flag (set by death state transitions or explicit flag changes).
 - The actor's `Raise` state is defined in its state table.
-- The actor's current state has `CanRaise` set (most doom monster death/death.fall states do; confirm in the actor definition).
-- The actor's `tics` field is exactly `-1` (it is lying still; tics >= 0 means it is still animating and cannot be raised yet).
 - The actor is not a player.
+- **Either** the actor's `tics` field is exactly `-1` (lying still) **or** its current state has
+  `CanRaise` set — only one of these two needs to hold, not both (see "Core resurrection mechanics"
+  above for the exact guard and why an ordinary, non-`CanRaise` death state is still raisable once
+  `tics` reaches `-1`).
 
-Monsters that don't meet these requirements will simply be skipped (function returns `true`, no-op). **Exceptions:** The wiki states "Raise and damage functions only work with monsters. Kill functions can be used on monsters and missiles." For this fork, the parenthetical is accurate — `A_RaiseMaster` only works on corpses with a `Raise` state and only resurrects, never kills.
+Monsters that don't meet these requirements will simply be skipped (function returns `true`, no-op). **Exceptions:** The wiki states "Raise and damage functions only work with monsters. Kill functions can be used on monsters and missiles." For Zandronum, the parenthetical is accurate — `A_RaiseMaster` only works on corpses with a `Raise` state and only resurrects, never kills.
 
 ## Zandronum-specific: no-parameter vs. wiki flags
 
@@ -91,13 +102,29 @@ Monsters that don't meet these requirements will simply be skipped (function ret
 
 **Neither flag exists in Zandronum.** The function signature is:
 
-```
+```text
 action native A_RaiseMaster();
 ```
 
 If you attempt to call `A_RaiseMaster(RF_NOCHECKPOSITION)` or `A_RaiseMaster(RF_TRANSFERFRIENDLINESS)` in Zandronum DECORATE, the compiler will emit a parse error ("too many arguments to function"). There is no way to disable the position check or override the resurrected actor's allegiance in Zandronum.
 
 Additionally, the wiki's claim that "the only function that sets the necessary information is `A_SpawnItemEx`" is outdated — `A_RearrangePointers` and `A_TransferPointer` can also assign the `master` pointer, establishing a spawner relationship post-spawn.
+
+## Engine-family divergence: flags parameter, resurrection hooks, and no network authority
+
+**The "Behavior" and "Network behavior" sections above describe Zandronum only** — UZDoom's implementation differs substantively enough that none of the client/server framing carries over.
+
+On UZDoom, `A_RaiseMaster` is declared `native void A_RaiseMaster(int flags = 0)` (`wadsrc/static/zscript/actors/actor.zs`) — the ZDoom Wiki's documented signature is accurate for UZDoom, unlike the "Zandronum-specific" section above describes for Zandronum. Both `RF_TRANSFERFRIENDLINESS` (value `1`) and `RF_NOCHECKPOSITION` (value `2`) exist, defined in `wadsrc/static/zscript/constants.zs`, and behave as the wiki describes: `RF_TRANSFERFRIENDLINESS` calls `CopyFriendliness()` on the raised actor after `Revive()`; `RF_NOCHECKPOSITION` skips the `P_CheckPosition` call entirely (not just bypasses it for clients, since there is no client/server distinction).
+
+`A_RaiseMaster`, `A_RaiseChildren`, `A_RaiseSiblings`, and `A_RaiseSelf` are all thin wrappers around one shared helper, `P_Thing_Raise(AActor *thing, AActor *raiser, int flags)` (`src/playsim/p_things.cpp`) — the same shared-helper pattern the `A_KillMaster`/`A_KillChildren`/`A_KillSiblings` family uses on UZDoom, confirmed independently here. Unlike that family's `DoKill` helper, though, `P_Thing_Raise` does not gain a wiki-documented `KILS_*`-style filter/species/damagetype/inflictor parameter set — its payload is only the two `RF_*` flags above.
+
+**No network authority split.** UZDoom's `A_RaiseMaster`/`P_Thing_Raise` runs identically for every peer — there is no `NETWORK_InClientMode`-equivalent check anywhere in the UZDoom source tree, no `SERVERCOMMANDS_SetThingState`-style broadcast, and no `byClient` parameter. Zandronum's two-argument `P_Thing_Raise(thing, byClient)` is replaced by a three-argument `P_Thing_Raise(thing, raiser, flags)`, where `raiser` is the calling actor (`self`, per the `A_RaiseMaster`/`A_RaiseChildren`/`A_RaiseSiblings` call sites) rather than a client/server routing flag.
+
+**New scriptable resurrection gate.** After the position check, `P_Thing_Raise` calls `P_CanResurrect(raiser, thing)`, which invokes a `virtual bool CanResurrect(Actor other, bool passive)` method (default implementation always returns `true`) on both the raiser and the actor being resurrected — letting a ZScript actor veto its own resurrection, or veto resurrecting a specific corpse, via script override. Zandronum's `P_Thing_Raise` has no equivalent hook or parameter. Edge case: `P_Thing_Raise` sets `MF_SOLID` and applies the target's full (non-corpse) `Height`/`radius` unconditionally before both the position check and the `CanResurrect` check, but only restores the saved values on a position-check failure — if a script's `CanResurrect` override returns `false`, the corpse is left with `MF_SOLID` set and full-size `Height`/`radius`, since that path returns without restoring. This only happens when a mod actually overrides `CanResurrect` to return false; the default override never triggers it.
+
+**New post-resurrection hook.** Since version `4.15.1`, `AActor::Revive()` also fires a scriptable `virtual void OnRevive()` after all other resurrection state (flags, health, pointers) is restored, giving a ZScript actor a hook to run custom logic right after being revived. No equivalent exists in Zandronum's `Revive()`.
+
+Everything else in "Resurrectable actors (requirements)" — the `MF_CORPSE` check, the `Raise`-state lookup, the not-a-player check, and the `tics`/`CanRaise` gate — comes from `AActor::GetRaiseState()`, which is semantically identical between the two engines' source (`src/playsim/p_mobj.cpp` on UZDoom, `src/p_mobj.cpp` on Zandronum, differing only in the not-a-player test's spelling — `IsKindOf(NAME_PlayerPawn)` vs. `IsKindOf(RUNTIME_CLASS(APlayerPawn))`); none of it diverges in effect.
 
 ## Related functions
 

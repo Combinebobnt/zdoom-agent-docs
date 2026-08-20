@@ -1,12 +1,14 @@
 # TeleportOther
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** ZDoom Wiki (verified against Zandronum fork implementation, 2026-07-29, https://zdoom.org/w/index.php?title=TeleportOther&oldid=44556)
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 ## Signature
 
-```
+```text
 int TeleportOther(int other_tid, int dest_tid, int fog)
 ```
 
@@ -45,3 +47,11 @@ No inherent `tid=0` activator fallback — `other_tid=0` simply does nothing.
 Teleporting spectators disables both source and destination fog effects (intended behavior, not documented on wiki).
 
 In multiplayer, teleportation is server-authoritative; clients receive `SERVERCOMMANDS_TeleportThing` updates.
+
+## Engine-family divergence: spectators and network authority
+
+The spectator-fog rule and the server-authoritative network model described above are Zandronum-specific and do not exist in UZDoom. UZDoom's teleport path (the UZDoom source's `src/playsim/p_teleport.cpp:81-255`, `EV_TeleportOther`/`P_Teleport`) has no `bSpectating`-equivalent player flag anywhere in the file, so there is no spectator case that suppresses fog. UZDoom also has no `SERVERCOMMANDS_TeleportThing`/`NETWORK_GetState()`-style client-server authority split (the Zandronum source's `src/p_teleport.cpp:187-192, 631-640` gates fog on `bSpectating` and pushes a `SERVERCOMMANDS_TeleportThing` update when acting as a server) — GZDoom-family netcode has no equivalent construct in this file.
+
+UZDoom does gate fog spawning on a different, unrelated condition: a `predicting` flag (`thing->player && (thing->player->cheats & CF_PREDICTING)`, the UZDoom source's `src/playsim/p_teleport.cpp:83, 202-208`) suppresses fog spawning during client-side prediction of an unlagged move, not for spectators specifically. This is a distinct client-prediction mechanism, not a UZDoom analogue of the spectator rule.
+
+Everything else in this file (the destination-class fallback chain, the velocity/fog/angle interaction driven by `TELF_KEEPORIENTATION`/`TELF_DESTFOG`/`TELF_SOURCEFOG`, and the `TeleportDest2`-vs-`ONFLOORZ` height rule) was confirmed identical in UZDoom's `EV_TeleportOther`/`P_Teleport`/`SelectTeleDest` (the UZDoom source's `src/playsim/p_teleport.cpp:274-343, 651-668`).

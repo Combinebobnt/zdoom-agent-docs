@@ -1,8 +1,10 @@
 # `fixed GetActorCeilingZ(int tid)`
 
 **Tier:** A.
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master`/`3.3-alpha` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`).
-**Provenance:** wiki page `GetActorCeilingZ - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `oldid=35971`) + source-verified against `p_acs.cpp:12025-12030, 4445-4456`, `p_map.cpp:228-252` (3D-floor clamping in `P_FindFloorCeiling`), `p_map.cpp:6013-6044` (`P_AdjustFloorCeil` refresh behavior), and `actor.h:989` (ceilingz member comment). The 3D-floor-awareness and cached-value-refresh behavior were verified from source (not mentioned on the wiki but present in the fork). No wiki/fork divergence found.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `GetActorCeilingZ - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=GetActorCeilingZ&oldid=35971`) + source-verified against `p_acs.cpp:12025-12030, 4445-4456`, `p_map.cpp:228-252` (3D-floor clamping in `P_FindFloorCeiling`), `p_map.cpp:6013-6044` (`P_AdjustFloorCeil` refresh behavior), and `actor.h:989` (ceilingz member comment). The 3D-floor-awareness and cached-value-refresh behavior were verified from source (not mentioned on the wiki but present in the fork). No wiki/fork divergence found.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 
 Gets the lowest ceiling point above an actor by TID. Compiler builtin (`PCD_GETACTORCEILINGZ`,
@@ -36,7 +38,7 @@ and then extracts its `ceilingz` member.
 
 ## Example (adapted from the wiki)
 
-```c
+```acs
 script 124 ENTER
 {
     while (TRUE)

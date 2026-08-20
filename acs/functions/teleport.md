@@ -1,13 +1,15 @@
 # Teleport
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** `Teleport - ZDoom Wiki` (oldid=52693), verified 2026-07-29 against the Zandronum source (`p_lnspec.cpp` LS_Teleport, `p_teleport.cpp` EV_Teleport/SelectTeleDest/P_Teleport)
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** `Teleport - ZDoom Wiki` (https://zdoom.org/w/index.php?title=Teleport&oldid=52693), verified 2026-07-29 against the Zandronum source (`p_lnspec.cpp` LS_Teleport, `p_teleport.cpp` EV_Teleport/SelectTeleDest/P_Teleport)
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Action special, index 70
 
 ## Signature
 
-```c
+```acs
 Teleport(int tid, int tag, int nosourcefog)
 ```
 
@@ -61,13 +63,19 @@ The function returns `false` without moving the activator if any of the followin
 - **No matching destination:** no `TeleportDest`/`TeleportDest2` actor matches the requested TID and tag combination. Fallback logic checks `MapSpot` actors and then any non-solid actor, but if none exist, returns `false`.
 - **Destination blocked:** the destination's position is solid geometry (walls, closed doors, etc.) and the teleport would overlap the activator. The `P_TeleportMove` placement check fails, returning `false`. **This is also indistinguishable from a missing destination.**
 
-## Zandronum Netcode (Server-Side)
+## Zandronum-specific: netcode (server-side)
 
 If called server-side, the teleport is replicated to all clients via `SERVERCOMMANDS_TeleportThing`, passing the fog and halt-velocity flags. The server also adjusts the client-side reaction-time (frozen-frame effect) to compensate for network latency. This is a **Zandronum addition not covered by the ZDoom wiki.**
 
-## Known Divergence from ZDoom Wiki
+## Wiki/engine divergence: TeleportSpecial alias
 
-The ZDoom wiki mentions a ZScript alias `TeleportSpecial`, added upstream to resolve a name conflict with a ZScript actor function. **This fork has no ZScript, so `TeleportSpecial` does not exist** — call `Teleport` only. The alias is a ZDoom-only feature.
+The ZDoom wiki mentions a ZScript alias `TeleportSpecial`, added upstream to resolve a name conflict with a ZScript actor function. **Zandronum has no ZScript, so `TeleportSpecial` does not exist there** — call `Teleport` only. The alias is a ZDoom-family feature; see the divergence section below for its status on UZDoom.
+
+## Engine-family divergence: TeleportSpecial alias and PreTeleport/PostTeleport hooks
+
+Unlike Zandronum, UZDoom has ZScript, and the wiki's description of `TeleportSpecial` holds true there. `P_FindLineSpecial` resolves the name `TeleportSpecial` to the same line-special number as `Teleport` (line special 70) as a fallback after the normal binary-search lookup over `LineSpecialNames` fails, specifically so ZScript code can invoke the line special without colliding with `Actor`'s own `Teleport()` method name (`p_lnspec.cpp:3930-3935`). From ACS/BCS, `TeleportSpecial(tid, tag, nosourcefog)` and `Teleport(tid, tag, nosourcefog)` are interchangeable on UZDoom.
+
+UZDoom's `Actor` base class also exposes two virtual hooks around every teleport: `PreTeleport(Vector3 destpos, double destangle, int flags)` and `PostTeleport(Vector3 destpos, double destangle, int flags)`, declared at `actors/actor.zs:800-802` and called from the shared `P_Teleport` implementation before (`p_teleport.cpp:165`) and after (`p_teleport.cpp:248`) the position change. A ZScript actor override of `PreTeleport` that returns `false` cancels the teleport before the destination-blocked check even runs — an additional failure path that collapses into the same `false` return as every other failure, with no Zandronum equivalent (Zandronum has no ZScript, so no actor class can hook into or veto a teleport this way).
 
 ## See Also
 

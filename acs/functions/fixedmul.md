@@ -1,5 +1,18 @@
 # `fixed FixedMul(fixed a, fixed b)`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Provenance:** wiki page `FixedMul - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28,
+`https://zdoom.org/w/index.php?title=FixedMul&oldid=37312`) + source-verified against the Zandronum source's `src/p_acs.cpp:11600-11601`,
+`m_fixed.h:79`, `basicinlines.h:43`, and the zt-bcc source's `src/builtin.c:79/227`. No wiki/fork
+discrepancy found — this ZDoom-wiki page describes a compiler builtin that Zandronum/`zt-bcc`
+implements identically; the only gap is the wiki not mentioning the 64-bit-intermediate overflow
+protection.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** compiler builtin.
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+
 Multiplies two 16.16 fixed-point numbers and returns a fixed-point result. Compiler builtin
 (`PCD_FIXEDMUL`, the zt-bcc source's `src/builtin.c:79`/`:227`), implementation in
 `DLevelScript::RunScript`'s main switch:
@@ -17,8 +30,6 @@ static __forceinline SDWORD MulScale16 (SDWORD a, SDWORD b) { return (SDWORD)(((
 ```
 
 (the Zandronum source's `src/basicinlines.h:43`).
-
-**Bucket:** compiler builtin.
 
 - **Why this exists instead of just using `*`:** ACS/BCS's `*` operator does *integer*
   multiplication with no knowledge of fixed-point scaling. Multiplying two fixed-point values
@@ -50,13 +61,3 @@ static __forceinline SDWORD MulScale16 (SDWORD a, SDWORD b) { return (SDWORD)(((
   `IntToFixed`/left-shift by 16) — passing a raw integer count (e.g. `FixedMul(3, 0.5)` intending
   "3 times") does not do what it looks like; it multiplies `3` (i.e. `0x00030000` scaled) by `0.5`,
   not the integer `3`.
-
-**Provenance:** wiki page `FixedMul - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28,
-`oldid=37312`) + source-verified against the Zandronum source's `src/p_acs.cpp:11600-11601`,
-`m_fixed.h:79`, `basicinlines.h:43`, and the zt-bcc source's `src/builtin.c:79/227`. No wiki/fork
-discrepancy found — this ZDoom-wiki page describes a compiler builtin that Zandronum/`zt-bcc`
-implements identically; the only gap is the wiki not mentioning the 64-bit-intermediate overflow
-protection.
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.
-
-**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.

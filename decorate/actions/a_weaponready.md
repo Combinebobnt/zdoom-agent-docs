@@ -1,11 +1,13 @@
 # `action void A_WeaponReady(int flags = 0)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_WeaponReady` (retrieved 2026-07-31, oldid=52259) + verified against
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_WeaponReady` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_WeaponReady&oldid=52259) + verified against
 the Zandronum source's `src/p_pspr.cpp:907-919` (`DEFINE_ACTION_FUNCTION_PARAMS(AInventory,
 A_WeaponReady)`), flag definitions at `src/p_pspr.cpp:895-905` (`enum EWRF_Options`), and
 supporting functions at `src/p_pspr.cpp:785-893`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/p_pspr.cpp:907` (`DEFINE_ACTION_FUNCTION_PARAMS(AInventory, A_WeaponReady)`) —
 note that the owning class is `AInventory`, not `Weapon` as the wiki states.
 
@@ -43,6 +45,17 @@ once set, the enabled flags persist until the current state ends and the next st
   immediately and all flag-setting is skipped. This is typical for weapon actions but worth knowing
   if testing in isolation.
 
+## Engine-family divergence: implementation and owning class
+
+In UZDoom, `A_WeaponReady` is implemented entirely in ZScript as an `action` method directly on
+the `Weapon` class itself (`wadsrc/static/zscript/actors/inventory/weapons.zs`), not as a native
+C++ function on `AInventory` as in Zandronum. This means the wiki's claim that the owning class is
+`Weapon` — which this file's `Bucket:` field calls out as incorrect for Zandronum — is actually
+correct for UZDoom. The documented flag/parameter behavior above (default state, flag persistence
+across a state's duration via `P_SetPsprite`/`DPSprite::SetState`, `WRF_NoFire` semantics, the
+misleading "cleared every tic" comment) holds identically on UZDoom; only the underlying
+implementation language and owning class differ.
+
 ## Zandronum-specific: no User# weapon states
 
 The wiki page documents `WRF_ALLOWUSER#` flags (for `User1`, `User2`, `User3`, `User4` weapon
@@ -55,7 +68,7 @@ flags and not expect such states to exist.
 
 A typical weapon `Ready` state loop:
 
-```
+```text
 Ready:
   WEAP A 1 A_WeaponReady;
   Loop;
@@ -63,7 +76,7 @@ Ready:
 
 To allow firing without bobbing (e.g., during a cooldown):
 
-```
+```text
 Cooldown:
   WEAP A 5 A_WeaponReady(WRF_NoBob);
   Goto Ready;
@@ -71,7 +84,7 @@ Cooldown:
 
 To prevent player weapon-switching mid-attack sequence:
 
-```
+```text
 Fire:
   WEPF A 4;
   WEPF B 4 A_FireProjectile('Rocket');

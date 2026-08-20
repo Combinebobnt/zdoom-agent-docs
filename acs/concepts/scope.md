@@ -1,11 +1,13 @@
 # Variable scope: script, map, world, global — plus BCS's own extensions
 
 **Tier:** A (engine limits and reset call sites traced directly to source; BCS extensions traced to `zt-bcc`'s own wiki, not inferred).
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD, a `3.3-alpha` development snapshot ahead of the 3.2.1 target — these are core variable-storage/reset mechanics, stable across that gap).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `_intake/Scope - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=Scope&oldid=40398`), verified against the Zandronum source's `src/p_acs.h` (`NUM_MAPVARS`/`NUM_WORLDVARS`/`NUM_GLOBALVARS`), `p_acs.cpp` (`P_ClearACSVars`, `ACS_WorldVars`/`ACS_GlobalVars` storage), `g_level.cpp`/`g_game.cpp` (hub/new-game clear call sites, including the Zandronum client-mode carve-out), and the zt-bcc wiki's `Declarations.md` (`static` locals, `let` block scoping, in-script `world`/`global` declarations) on 2026-07-29.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 The ZDoom wiki's "Scope" page describes base ACS's four variable scopes. All four are real and
-verified against this fork's engine limits below, but the page is silent on BCS-specific scoping
+verified against both engines' engine limits below, but the page is silent on BCS-specific scoping
 (`zt-bcc` block scoping via `let`/`strict namespace`, `static` locals, namespaces), and it doesn't
 mention a real Zandronum multiplayer netcode carve-out for
 when world/global vars actually get cleared.
@@ -20,8 +22,9 @@ when world/global vars actually get cleared.
 | Global | `global int <index>:<name>;` | any map/library in the whole game | `NUM_GLOBALVARS = 64` | new game / full game exit |
 
 The wiki's index ranges ("1 through 256" for world, "64" for global) and the map-variable cap of
-128 match this fork's constants exactly — confirmed by reading `p_acs.h:50` (`NUM_MAPVARS 128`)
+128 match Zandronum's constants exactly — confirmed by reading `p_acs.h:50` (`NUM_MAPVARS 128`)
 and `p_acs.h:58-59` (`NUM_WORLDVARS = 256, NUM_GLOBALVARS = 64`), not just the wiki's word for it.
+UZDoom's constants are identical across its `src/playsim/p_acs.h`.
 World and global storage are separate arrays (`ACS_WorldVars`/`ACS_GlobalVars`,
 `p_acs.cpp:343-348`), so — as the wiki notes — a world var and a global var can reuse the same
 index number without colliding.
@@ -49,6 +52,12 @@ single-player ZDoom and isn't mentioned on the wiki page at all; it matters if y
 reasoning about client-side script state immediately after a map change in a networked game (see
 [Client-side scripting](clientside-scripting.md) for the broader client/server variable-state
 split).
+
+**UZDoom-specific:** UZDoom's `g_level.cpp` unconditionally calls `P_ClearACSVars(true)` in its
+`G_InitNew` function (`src/g_level.cpp:626`) without the multiplayer client-mode check. This means
+UZDoom clients in a networked game will independently reset their world and global ACS vars on a
+new game or level change, regardless of connection state — a behavior that diverges from Zandronum's
+server-side-driven approach.
 
 ## BCS extensions not on the ZDoom page at all
 

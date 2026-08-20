@@ -1,5 +1,24 @@
 # Named script execution family
 
+**Tier:** A for all four.
+**Applies to:** UZDoom=yes, Zandronum=yes — `Acs_NamedExecuteWait` resolves to `compiler-only` by
+bare name (it's a `zt-bcc` macro with no opcode of its own, see Bucket below), but both of its
+expansion components (`Acs_NamedExecute`, an ACSF present on both engines; `PCD_SCRIPTWAITNAMED`,
+a base PCD present on both engines) are fully portable, so the macro is too
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Provenance:** wiki pages `ACS_NamedExecute - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=ACS_NamedExecute&oldid=35683`),
+`ACS_NamedExecuteAlways - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=ACS_NamedExecuteAlways&oldid=40212`), `ACS_NamedExecuteWait - ZDoom Wiki.html`
+(`https://zdoom.org/w/index.php?title=ACS_NamedExecuteWait&oldid=36649`), `ACS_NamedExecuteWithResult - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=ACS_NamedExecuteWithResult&oldid=46388`) (all `_intake/`,
+retrieved 2026-07-28) + source-verified against `p_acs.cpp:5400-5406,6339-6360,9120-13050,
+9190-13288`, `p_lnspec.cpp:86-95,1753-1851`, `zcommon.bcs:1565,1667,1672-1673`,
+`zt-bcc/src/builtin.c:178,331-332`, `zt-bcc/src/codegen/expr.c:1991-2033`; see each function's own
+section below for its full source citations.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** `Acs_NamedExecute`/`Acs_NamedExecuteAlways`/`Acs_NamedExecuteWithResult` are extension
+functions (negative index in `zcommon.bcs`: -39, -45, -44 respectively). `Acs_NamedExecuteWait` is
+different in kind — a `zt-bcc` compiler-internal macro (`src/builtin.c:178`, no engine opcode of
+its own) that expands at the call site into `Acs_NamedExecute` + `PCD_SCRIPTWAITNAMED`.
+
 `Acs_NamedExecute`, `Acs_NamedExecuteAlways`, `Acs_NamedExecuteWait`, `Acs_NamedExecuteWithResult`
 — the named-by-string counterparts of the numbered `Acs_Execute`/`Acs_ExecuteAlways`/
 `Acs_ExecuteWait`/`Acs_ExecuteWithResult` family. Grouped into one file because none of them have
@@ -10,14 +29,6 @@ forwards to the matching *numbered* action special via `NamedACSToNormalACS[]`
 (`p_lnspec.cpp:86-95`) — reading any one of these in isolation from `p_acs.cpp` alone is
 misleading, since the real behavior lives in the numbered special's code, not in a `case
 ACSF_...:` block of its own.
-
-**Bucket:** `Acs_NamedExecute`/`Acs_NamedExecuteAlways`/`Acs_NamedExecuteWithResult` are extension
-functions (negative index in `zcommon.bcs`: -39, -45, -44 respectively). `Acs_NamedExecuteWait` is
-different in kind — a `zt-bcc` compiler-internal macro (`src/builtin.c:178`, no engine opcode of
-its own) that expands at the call site into `Acs_NamedExecute` + `PCD_SCRIPTWAITNAMED`.
-
-**Tier:** A for all four. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source
-`master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`).
 
 All four are documented below regardless of real-world usage — see the family-coverage rule in
 `../../shared/AUTHORING.md`'s Authoring rule section (a family's less-used members are exactly the ones nobody
@@ -35,6 +46,26 @@ has figured out yet).
   across the family and has bitten at least one doc draft already.
 - None of the fork-specific caveats below are documented on the ZDoom wiki, which predates or
   doesn't model Zandronum's client/server split.
+
+## Engine-family divergence: CLIENTSIDE carve-out is dead code on UZDoom
+
+The Zandronum-specific clientside/netcode carve-out described above (and per function below, for
+`Acs_NamedExecute`, `Acs_NamedExecuteAlways`, and `Acs_NamedExecuteWithResult`) has no live
+counterpart on UZDoom. UZDoom's script-launch path (`P_GetScriptGoing`/the `DLevelScript`
+constructor in `p_acs.cpp`) does carry a `bClientSide` flag and a second, separate
+`ClientSideACSThinker` script table alongside the normal one, but which table a given script lands
+in is decided by a small helper that currently returns false unconditionally for every script,
+regardless of that script's own `CLIENTSIDE` flag — a proper flag-driven replacement for that
+helper hasn't been wired up yet. UZDoom also has no server-broadcasts-to-clients mechanism
+comparable to Zandronum's `SERVERCOMMANDS_ACSScriptExecute` at all. Net effect: on UZDoom, a
+`CLIENTSIDE`-flagged script launched through any of these three functions is dispatched exactly
+like an ordinary script — the ordinary same-map/cross-map/deferred/not-found logic, no
+special-casing, no return-value override — so the
+per-function polarity differences documented below (unconditional `true` for
+`Acs_NamedExecute`/`Acs_NamedExecuteAlways`, unconditional `false`/`0` for
+`Acs_NamedExecuteWithResult`) describe Zandronum-only behavior that UZDoom's dispatch path never
+actually reaches. `Acs_NamedExecuteWait` needs no mention of its own here, since it already discards
+`Acs_NamedExecute`'s return value before this carve-out could matter either way.
 
 ---
 
@@ -63,8 +94,10 @@ the name pre-resolved to a number first.
 - **Clientside carve-out:** server-side call for a `CLIENTSIDE`-flagged script unconditionally
   returns **`true`** — success is reported regardless of whether any client actually
   has/loads the script.
+  - Zandronum only; this carve-out is dead code on UZDoom — see "Engine-family divergence:
+    CLIENTSIDE carve-out is dead code on UZDoom" above.
 
-**Provenance:** wiki page `ACS_NamedExecute - ZDoom Wiki.html` (`_intake/`, `oldid=35683`) +
+**Provenance:** wiki page `ACS_NamedExecute - ZDoom Wiki.html` (`_intake/`, `https://zdoom.org/w/index.php?title=ACS_NamedExecute&oldid=35683`) +
 source-verified against `zt-bcc/lib/zcommon.bcs:1667`, `p_acs.cpp:5400,6339-6353,13234-13284`,
 `p_lnspec.cpp:86-92,1753-1778`, `g_mapinfo.cpp:128-134`.
 
@@ -92,13 +125,15 @@ unlike plain `Acs_NamedExecute`. Target special: `LS_ACS_ExecuteAlways` (`p_lnsp
   ran once that map loads.
 - **Clientside carve-out:** server-side call for a `CLIENTSIDE`-flagged script returns **`true`**
   unconditionally (`p_lnspec.cpp:1792-1798`) — same polarity as `Acs_NamedExecute`.
+  - Zandronum only; this carve-out is dead code on UZDoom — see "Engine-family divergence:
+    CLIENTSIDE carve-out is dead code on UZDoom" above.
 - `s_arg1`/`s_arg2`/`s_arg3` map straight to the target script's parameters, untyped `raw`
   (`p_lnspec.cpp:1789`) — no unit/fixed-point conversion happens anywhere in this path.
 
 **Example** (from the wiki, unmodified — a `CustomInventory` item that arms buddha mode and
 polls for near-death to auto-heal once):
 
-```
+```text
 Actor AvoidDeath : CustomInventory
 {
   Inventory.MaxAmount 0
@@ -111,7 +146,7 @@ Actor AvoidDeath : CustomInventory
   }
 }
 ```
-```
+```text
 script "AvoidDeathScript" (void)
 {
   SetPlayerProperty(0, 1, PROP_BUDDHA);
@@ -129,7 +164,7 @@ script "AvoidDeathScript" (void)
 ```
 
 **Provenance:** wiki page `ACS_NamedExecuteAlways - ZDoom Wiki.html` (`_intake/`, retrieved
-2026-07-28, `oldid=40212`) + source-verified (`p_acs.cpp:5406,6339-6356,13234-13288`,
+2026-07-28, `https://zdoom.org/w/index.php?title=ACS_NamedExecuteAlways&oldid=40212`) + source-verified (`p_acs.cpp:5406,6339-6356,13234-13288`,
 `p_lnspec.cpp:86-95,1784-1813`, `zcommon.bcs:1565,1673`).
 
 ---
@@ -151,7 +186,7 @@ implemented — the real behavior lives in two *other* places: the `ACSF_ACS_Nam
 the wait half.
 
 - **The wiki's "you must specify 0 here" for the `unused` map argument is stronger than reality
-  in this fork.** The compiler doesn't just ask you to pass 0 — it silently discards whatever
+  in zt-bcc.** The compiler doesn't just ask you to pass 0 — it silently discards whatever
   value you pass for that argument and hardcodes a literal `PCD_PUSHNUMBER, 0` instead
   (`expr.c:2022`). Passing a nonzero value there is a no-op, not a bug.
 - **All of `unused`/`arg1`/`arg2`/`arg3` are optional here**, contrary to the wiki's signature
@@ -177,8 +212,8 @@ the wait half.
 - Unlike its two siblings above, this one has **no clientside/netcode carve-out of its own** to
   document — it's a thin macro over `Acs_NamedExecute` (which does have one) plus a wait opcode.
 
-**Wiki's worked example** (unmodified, matches this fork's actual expansion):
-```
+**Wiki's worked example** (unmodified, matches zt-bcc's actual expansion):
+```text
 script "WaitOnMonsters" (int tid)
 {
     while (ThingCount(T_NONE, tid))
@@ -197,7 +232,7 @@ script "MonsterChallengeA" (int tid, int tag, int speed)
 named script actually ran.
 
 **Provenance:** wiki page `ACS_NamedExecuteWait - ZDoom Wiki.html` (`_intake/`, retrieved
-2026-07-28, `oldid=36649`) + source-verified against `zt-bcc` codegen
+2026-07-28, `https://zdoom.org/w/index.php?title=ACS_NamedExecuteWait&oldid=36649`) + source-verified against `zt-bcc` codegen
 (`src/builtin.c:178,331-332`, `src/codegen/expr.c:1991-2033`, `src/parse/token/info.c:166`) and
 the Zandronum source's `src/p_acs.cpp:6339-6360,9190-9200,10672-10674`.
 
@@ -241,12 +276,14 @@ start/fail `bool` like `Acs_NamedExecute`/`Acs_NamedExecuteAlways` do. Target sp
   the script actually computed. This failure mode is silent and ambiguous in a way the
   `bool`-returning siblings aren't, since `0` is exactly the value a legitimate
   `SetResultValue(0)` would also produce.
+  - Zandronum only; this carve-out is dead code on UZDoom — see "Engine-family divergence:
+    CLIENTSIDE carve-out is dead code on UZDoom" above.
 - `s_arg1`-`s_arg4` map straight to the target script's parameters, untyped `raw`
   (`p_lnspec.cpp:1839`) — no unit/fixed-point conversion happens anywhere in this path.
 
 **Example** (from the wiki, unmodified — an item that branches on player class via a result):
 
-```
+```text
 script "CheckPlayerClass" (void)
 {
   if(CheckActorClass(0, "DoomPlayer"))
@@ -261,16 +298,16 @@ script "CheckPlayerClass" (void)
   }
 }
 ```
-```
+```text
 TNT1 A 0 A_JumpIf(CallACS("CheckPlayerClass", 0, 0, 0) == 0, "NormalPlayer")
 ```
 
 **Returns:** `int` — whatever the target script passed to `SetResultValue`, **or `1` if it never
 called `SetResultValue` before terminating/blocking**, or `0` if the script name doesn't resolve,
-or `0` unconditionally if the server had to hand the call off to clients because the target script
-is `CLIENTSIDE`. The `0` cases are indistinguishable from each other and from a real
-`SetResultValue(0)`.
+or (Zandronum only — dead on UZDoom, see the divergence note above) `0` unconditionally if the
+server had to hand the call off to clients because the target script is `CLIENTSIDE`. The `0` cases
+are indistinguishable from each other and from a real `SetResultValue(0)`.
 
 **Provenance:** wiki page `ACS_NamedExecuteWithResult - ZDoom Wiki.html` (`_intake/`, retrieved
-2026-07-28, `oldid=46388`) + source-verified (`p_acs.cpp:5405,6339-6356,9120-13050,13234-13288`,
+2026-07-28, `https://zdoom.org/w/index.php?title=ACS_NamedExecuteWithResult&oldid=46388`) + source-verified (`p_acs.cpp:5405,6339-6356,9120-13050,13234-13288`,
 `p_lnspec.cpp:86-95,1833-1851`, `zcommon.bcs:1672`).

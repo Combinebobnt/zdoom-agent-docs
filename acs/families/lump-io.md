@@ -1,9 +1,17 @@
 # Lump I/O family
 
-`LumpOpen`, `LumpRead`, `LumpReadString`, `LumpReadArray`, `LumpGetInfo`, `LumpClose` — a
-mandatory-sequence API. A "handle" from `LumpOpen` is required by every other function; none of
-them are meaningful in isolation, hence one family file instead of six per-function files.
-
+**Tier:** A for all six — `LumpOpen`/`LumpRead`/`LumpGetInfo`/`LumpClose`/`LumpReadString`/
+`LumpReadArray` are all now wiki-derived and source-verified (2026-08-06); `LumpReadArray`'s
+"tier A" fact is specifically "verified uncallable from this toolchain," not a usage guide.
+**Applies to:** UZDoom=no, Zandronum=yes — for the five real, callable members; `LumpReadArray`
+is a compiler-toolchain-level dead end unreachable from `zt-bcc` source on *either* engine (see
+its own section below), not part of this engine-family claim
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-06)
+**Provenance:** six Zandronum Wiki pages, all retrieved 2026-08-06 — `LumpOpen` (https://wiki.zandronum.com/w/index.php?title=LumpOpen&oldid=2255),
+`LumpRead` (https://wiki.zandronum.com/w/index.php?title=LumpRead&oldid=2256), `LumpReadArray` (https://wiki.zandronum.com/w/index.php?title=LumpReadArray&oldid=2257), `LumpReadString` (https://wiki.zandronum.com/w/index.php?title=LumpReadString&oldid=2258), `LumpClose`
+(https://wiki.zandronum.com/w/index.php?title=LumpClose&oldid=2260), `LumpGetInfo` (https://wiki.zandronum.com/w/index.php?title=LumpGetInfo&oldid=2515) — each re-verified against the Zandronum source `master`
+HEAD; see each function's own section below for its source citations.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** all six are extension functions (negative index in `zcommon.bcs`), semantics in
 the Zandronum source's `src/p_acs.cpp`, `case ACSF_Lump*:`. Indices: `LumpOpen` -159, `LumpRead`
 -160, `LumpReadString` -161, `LumpGetInfo` -166, `LumpClose` -167 (`zcommon.bcs:1789-1795`).
@@ -12,11 +20,9 @@ the Zandronum source's `src/p_acs.cpp`, `case ACSF_Lump*:`. Indices: `LumpOpen` 
 -162 to -165, but `zt-bcc` has no front-end syntax to call them — confirmed uncallable by actual
 compile attempts (see its section below).
 
-**Tier:** A for all six — `LumpOpen`/`LumpRead`/`LumpGetInfo`/`LumpClose`/`LumpReadString`/
-`LumpReadArray` are all now wiki-derived and source-verified (2026-07-28); `LumpReadArray`'s
-"tier A" fact is specifically "verified uncallable from this toolchain," not a usage guide.
-
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md` for the version-gap caveat).
+`LumpOpen`, `LumpRead`, `LumpReadString`, `LumpReadArray`, `LumpGetInfo`, `LumpClose` — a
+mandatory-sequence API. A "handle" from `LumpOpen` is required by every other function; none of
+them are meaningful in isolation, hence one family file instead of six per-function files.
 
 ---
 
@@ -57,7 +63,7 @@ the same lump twice bumps refCount to 2 (each `LumpClose` only decrements by 1),
 `LumpOpen` call must be paired with exactly one `LumpClose` call** — don't assume the engine
 dedups repeated opens of the same name for you.
 
-**Provenance:** wiki page `LumpOpen - Zandronum Wiki.html` (2026-07-28) + source-verified +
+**Provenance:** wiki page `LumpOpen - Zandronum Wiki.html` (`https://wiki.zandronum.com/w/index.php?title=LumpOpen&oldid=2255`, 2026-08-06) + source-verified +
 compile-tested (`startIndex` mandatory-arg finding). **Tier:** A.
 
 ---
@@ -87,7 +93,15 @@ constants.
 `(handle, pos, type)`. **Do not copy the wiki example's argument order** — use
 `LumpRead(handle, pos, type)`.
 
-**Provenance:** wiki page `LumpRead - Zandronum Wiki.html` (2026-07-28) + source-verified.
+**⚠ Source drift: `LUMP_READ_FLOAT` implementation.** The wiki claims "32-bit float converted to
+a fixed-point." The implementation at `p_acs.cpp:8351-8363` reads raw bytes into an `int32_t buf`,
+then returns `FLOAT2FIXED((float)buf)` — which casts the integer *value* to float, not
+reinterpreting the bytes as a float. Reading IEEE 754 bytes (e.g. `0x3F 0x80 0x00 0x00` for 1.0)
+will produce an incorrect result: the bytes are read as `int32 = 1065353216` (on little-endian),
+then cast to `float` which becomes ~1 billion, then fixed-point multiplied by 65536. This is a
+genuine engine bug, not a documentation gap.
+
+**Provenance:** wiki page `LumpRead - Zandronum Wiki.html` (`https://wiki.zandronum.com/w/index.php?title=LumpRead&oldid=2256`, 2026-08-06) + source-verified.
 **Tier:** A.
 
 ---
@@ -111,7 +125,7 @@ invalid, or if `pos` is at/past the end of the lump (`p_acs.cpp:8367-8377`).
 which is what truncates at the first embedded `\0`. If the lump bytes in range contain no NUL,
 you get all `len` bytes back even past what looks like "the string."
 
-**Provenance:** wiki page `LumpReadString - Zandronum Wiki.html` (2026-07-28) + source-verified.
+**Provenance:** wiki page `LumpReadString - Zandronum Wiki.html` (`https://wiki.zandronum.com/w/index.php?title=LumpReadString&oldid=2258`, 2026-08-06) + source-verified.
 **Tier:** A.
 
 ---
@@ -123,18 +137,19 @@ Queries metadata about an opened (or even un-opened — see below) lump.
 - `handle` — the lump number (from `LumpOpen`, or apparently any raw lump number).
 - `infoType` — one of:
   - `LUMP_INFO_SIZE` (0) — lump size in bytes (`Wads.LumpLength`). **Named constant exists**
-    (`zcommon.bcs:1295`).
+    (`zcommon.bcs:1295`). ✓ Available in Zandronum 3.2.1.
   - `LUMP_INFO_NAME` (1) — full lump name as a string, or `""` if `handle` is out of range.
-    **Named constant exists** (`zcommon.bcs:1296`).
-  - `LUMP_INFO_NAMESPACE` (2) — the lump's namespace ID (`Wads.GetLumpNamespace`). **No named
-    constant in `zcommon.bcs`** — only `LUMP_INFO_SIZE`/`NAME` are defined there; use the literal
-    `2`. Same goes for every `LUMP_NAMESPACE_*` return-value constant the wiki lists (`_GLOBAL`,
-    `_SPRITES`, `_FLATS`, ... ) — real engine behavior, no BCS-side names to `#include`.
+    **Named constant exists** (`zcommon.bcs:1296`). ✓ Available in Zandronum 3.2.1.
+  - `LUMP_INFO_NAMESPACE` (2) — the lump's namespace ID (`Wads.GetLumpNamespace`). **Available
+    in Zandronum 3.3-alpha only, not in 3.2.1.** No named constant in `zcommon.bcs` — use the
+    literal `2`. Same goes for every `LUMP_NAMESPACE_*` return-value constant the wiki lists
+    (`_GLOBAL`, `_SPRITES`, `_FLATS`, ... ) — real engine behavior in 3.3-alpha, no BCS-side
+    names to `#include`.
   - `LUMP_INFO_WAD` (3) — index of the WAD/PK3 the lump came from (`Wads.GetWadnumFromLumpnum`).
-    Same caveat: literal `3`, no named constant. The wiki suggests pairing this with
-    `GetWadInfo`, but that function is **not reachable from this toolchain either** — it's a real
-    engine ACSF (`p_acs.cpp:8945`, `ACSF_GetWadInfo`) but, like `LumpReadArray` below, has no
-    entry in `zcommon.bcs`, so `bcc` has no name to call it by.
+    **Available in Zandronum 3.3-alpha only, not in 3.2.1.** No named constant. The wiki suggests
+    pairing this with `GetWadInfo`, but that function is **not reachable from this toolchain
+    either** — it's a real engine ACSF (`p_acs.cpp:8945`, `ACSF_GetWadInfo`) but, like
+    `LumpReadArray` below, has no entry in `zcommon.bcs`, so `bcc` has no name to call it by.
 
 **Returns:** varies by `infoType` (see above). Prints `"LumpGetInfo: unknown info type %u\n"` and
 returns 0 for anything else.
@@ -145,9 +160,9 @@ for `NAME`. In practice this means you can call `LumpGetInfo` with a lump number
 through `LumpOpen`. **The wiki's "an index higher than the total number of lumps can crash the
 game" warning is corroborated by source**, not just repeated: `SIZE`/`NAMESPACE`/`WAD` all pass
 `lumpNum` straight into `Wads.LumpLength`/`GetLumpNamespace`/`GetWadnumFromLumpnum` with no range
-check (`p_acs.cpp:8489-8517`) — only the `NAME` branch bounds-checks first.
+check (`p_acs.cpp:8504-8519`) — only the `NAME` branch bounds-checks first.
 
-**Provenance:** wiki page `LumpGetInfo - Zandronum Wiki.html` (2026-07-28) + source-verified.
+**Provenance:** wiki page `LumpGetInfo - Zandronum Wiki.html` (`https://wiki.zandronum.com/w/index.php?title=LumpGetInfo&oldid=2515`, 2026-08-06) + source-verified.
 **Tier:** A.
 
 ---
@@ -164,7 +179,7 @@ never opened.
 **Reminder:** because of the `LumpOpen` refcount gotcha above, each `LumpOpen` needs exactly one
 matching `LumpClose` — don't assume repeated opens of the same lump share one refcount slot.
 
-**Provenance:** wiki page `LumpClose - Zandronum Wiki.html` (2026-07-28) + source-verified.
+**Provenance:** wiki page `LumpClose - Zandronum Wiki.html` (`https://wiki.zandronum.com/w/index.php?title=LumpClose&oldid=2260`, 2026-08-06) + source-verified.
 **Tier:** A.
 
 ---
@@ -204,7 +219,7 @@ Engine-side semantics (`p_acs.cpp:8402-8487`), recorded for completeness / in ca
 - **Returns** the number of bytes actually written (`len` after clipping) — matches the wiki's
   "returns the number of bytes read."
 
-**Provenance:** wiki page `LumpReadArray - Zandronum Wiki.html` (2026-07-28) + source-verified +
+**Provenance:** wiki page `LumpReadArray - Zandronum Wiki.html` (`https://wiki.zandronum.com/w/index.php?title=LumpReadArray&oldid=2257`, 2026-08-06) + source-verified +
 compile-tested against `bcc`. **Tier:** A (verified-unreachable is still a
 verified fact).
 
@@ -214,3 +229,21 @@ verified fact).
 
 `LumpRead` · `LumpReadArray` · `LumpReadString` · `LumpGetInfo` · `LumpClose` — i.e. this exact
 family, confirming there's no sixth sibling function being missed.
+
+## Engine-family divergence
+
+`LumpOpen`/`LumpRead`/`LumpReadString`/`LumpGetInfo`/`LumpClose` are all bound at ACSF (CALLFUNC)
+indices inside the 100–199 range UZDoom's own ACSF enum reserves for Zandronum's extensions and
+implements none of (see [Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md)).
+A Zandronum-compiled object calling any of them under UZDoom hits UZDoom's `CallFunction`
+dispatcher's `default: break;` case: no error, no log line, execution continues with a plain `0`.
+
+That `0` breaks the handle-based protocol this family documents at its root: `LumpOpen` never
+returns a real handle under UZDoom, so every subsequent `LumpRead`/`LumpReadString`/`LumpGetInfo`/
+`LumpClose` call chained off it operates on a handle that was never valid — the same
+never-issued-vs-freed mismatch documented on the [Database family](database.md)'s result-handle
+pair. `LumpRead`/`LumpGetInfo` (raw-typed) and `LumpReadString` (str-typed) both get a `0`
+indistinguishable from this family's own documented failure returns for those types.
+`LumpReadArray` (see its own section above) is unaffected by this claim in either direction — it
+is unreachable from `zt-bcc` source on both engines, a compiler-toolchain limitation, not an
+engine one.

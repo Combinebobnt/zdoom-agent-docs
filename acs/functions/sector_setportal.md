@@ -1,12 +1,25 @@
 # `Sector_SetPortal(int tag, int type, int plane, int misc, int opacity)`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `Sector_SetPortal - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
+`https://zdoom.org/w/index.php?title=Sector_SetPortal&oldid=51874`) + source-verified against `p_lnspec.cpp:3657` (runtime `LS_NOP`), `p_spec.cpp:1320-1380`
+(`P_SpawnPortal`), `p_spec.cpp:1604-1802` (`P_SpawnSpecials`'s per-line scan, confirming this runs
+once at map load, independent of ACS/the action-special dispatcher), `g_shared/a_skies.cpp:91-141`
+(`ASkyCamCompat`, the type-2 companion actor), `zcommon.bcs:1417` (declared as special 57). Corrects
+an earlier pass on this file that only checked the `LS_NOP` runtime path and wrongly concluded the
+special was "not implemented in Zandronum" outright.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+
 Linedef action for a **map-editor-placed, static-at-load-time** floor/ceiling "stacked sector"
 portal — the pre-GZDoom ZDoom mechanism for making one sector's floor/ceiling visually continue
 into another sector (skybox/3D-bridge-style). This is a completely different feature from the
-modern GZDoom linked-portal system the ZDoom wiki page actually documents (see "Wiki/fork
-divergence" below) — most of the wiki's parameter values and portal types **do not apply here**.
+modern GZDoom linked-portal system the ZDoom wiki page actually documents (see "Wiki/engine
+divergence" below) — most of the wiki's parameter values and portal types **do not apply on
+Zandronum** (see "Engine-family divergence" further below for what UZDoom actually builds).
 
-**This special has two entirely separate, independently-verified code paths in this fork — do not
+**This special has two entirely separate, independently-verified code paths on Zandronum — do not
 conflate them:**
 
 1. **ACS-callable / runtime-triggered path: non-functional.** `p_lnspec.cpp:3657` maps action
@@ -74,31 +87,66 @@ wiki's bool-result framing, but the value carries no meaning here — it's not a
 signal). The static map-load path has no return value concept at all; it either builds the portal
 or silently skips the line if the args don't match one of the two handled shapes above.
 
-## Wiki/fork divergence
+## Wiki/engine divergence
 
 The ZDoom wiki page describes the modern (2013+) GZDoom linked-portal system: 7 portal types
 including horizon/plane/interactive/copy-to-line variants, a `misc` parameter, and general
-actor-crossing support. **None of that system exists in this fork.** What Zandronum actually has
+actor-crossing support. **None of that system exists on Zandronum.** What Zandronum actually has
 under this same special number is the much older, narrower "stacked sector" mechanism (predates
 the wiki's documented feature by years) — floor/ceiling-only, anchor/reference-line-pair or
-companion-actor setup, no actor passage. Only use this doc's parameter tables above; the wiki
-page's parameter semantics do not apply to this fork at all.
+companion-actor setup, no actor passage. Only use this doc's parameter tables above for Zandronum;
+the wiki page's parameter semantics do not apply to Zandronum at all (see "Engine-family
+divergence" below — UZDoom is a different story).
+
+## Engine-family divergence: linked portals are actor-passable on UZDoom
+
+UZDoom's static map-load handling of this special (`src/maploader/specials.cpp`, `case
+Sector_SetPortal:` around line 728 — its own per-line scan at map load, structurally the same
+anchor/reference-line convention described above) recognizes the same seven `type` values the wiki
+page describes, not Zandronum's narrower handful:
+
+- `type` 0 (normal) and `type` 6 (linked) both feed the same anchor/reference-line search
+  (`SpawnPortal`, `specials.cpp:356`) and differ only in which kind of portal gets built: `type` 0
+  builds the same non-interactive stacked-sector portal Zandronum has (`PORTS_PORTAL`); `type` 6
+  builds UZDoom's "linked" portal kind (`PORTS_LINKEDPORTAL`), which the engine's own portal-type
+  enum (`src/playsim/portal.h:244-249`) comments as "interactive".
+- `type` 1 (copy) behaves the same as documented above for Zandronum.
+- `type` 2 (EE-style skybox) is still handled by a companion camera-object actor that scans its own
+  sector's lines at spawn time, matching this doc's existing description of that mechanism.
+- `type`s 3 and 4 (EE-style "plane" and "horizon" portals) are additionally recognized on UZDoom —
+  neither exists on Zandronum at all. Both are hardware-renderer-only; UZDoom's own software
+  renderer does not implement them.
+- `type` 5 (copy portal to line) is also new on UZDoom: it attaches an already-built portal to a
+  target linedef instead of a sector, feeding into the separate line-portal system mentioned below.
+
+**The headline behavioral difference: a `type`-6 linked portal is genuinely actor-passable, unlike
+every portal kind Zandronum builds (and unlike UZDoom's own `type` 0/1/2/3/4 portals).** UZDoom's
+actor movement/collision code (`src/playsim/p_map.cpp`, dozens of call sites) and its
+portal-traversal code (`src/playsim/portal.cpp`) both gate floor/ceiling-plane crossing on
+`sector_t::PortalBlocksMovement()` (`src/g_levellocals.h:934`), which only reports "not blocked"
+for a sector plane whose portal is the linked kind. Practically: once a mapper builds a `type`-6
+portal pair, monsters, players, and projectiles can walk, fall, or fly straight through from one
+linked sector's floor/ceiling into the destination sector — not just see it, the way every other
+portal kind here (including `type` 0's otherwise-identical-looking stacked-sector portal) only ever
+affects rendering. This overturns the "no actor passage" claim above specifically for the
+`type`-6 case on UZDoom; that claim still holds for `type` 0/1/2/3/4 on UZDoom, and for everything
+Zandronum builds.
+
+Relatedly, `Line_SetPortal` (special #156, `case Line_SetPortal:`/`case Line_QuickPortal:` in the
+same source file around `specials.cpp:753-754`) is a real, separate line/wall portal implementation
+on UZDoom — the "Related" note below that it has zero implementation describes Zandronum only.
+
+Runtime behavior is unaffected: `Sector_SetPortal` (special #57) still maps to `LS_NOP` in UZDoom's
+action-special runtime dispatch table (`src/playsim/p_lnspec.cpp:3604`), so calling it from ACS/BCS
+or triggering a live line with the special assigned remains a no-op on UZDoom too, exactly as
+documented above for Zandronum.
 
 ## Related
 
 - [Line_SetPortal](line_setportal.md) (special #156) — the wiki's line/wall portal special; unlike
-  this one, has **zero** implementation in this fork (neither the runtime `LS_NOP` path nor any
-  static/`P_SpawnSpecials` equivalent — confirmed by grep across the whole source tree).
+  this one, has **zero** implementation on Zandronum (neither the runtime `LS_NOP` path nor any
+  static/`P_SpawnSpecials` equivalent — confirmed by grep across the whole source tree). UZDoom
+  does implement it — see "Engine-family divergence" above.
 - `Sector_Set3DFloor`, `ExtraFloor_LightOnly` — genuinely unimplemented (`LS_NOP` with no static
   counterpart) 3D-geometry specials; do not assume they share `Sector_SetPortal`'s
   static/map-editor escape hatch.
-
-**Provenance:** wiki page `Sector_SetPortal - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
-`oldid=51874`) + source-verified against `p_lnspec.cpp:3657` (runtime `LS_NOP`), `p_spec.cpp:1320-1380`
-(`P_SpawnPortal`), `p_spec.cpp:1604-1802` (`P_SpawnSpecials`'s per-line scan, confirming this runs
-once at map load, independent of ACS/the action-special dispatcher), `g_shared/a_skies.cpp:91-141`
-(`ASkyCamCompat`, the type-2 companion actor), `zcommon.bcs:1417` (declared as special 57). Corrects
-an earlier pass on this file that only checked the `LS_NOP` runtime path and wrongly concluded the
-special was "not implemented in this fork" outright. **Engine:** Zandronum 3.2.1 (verified against
-the Zandronum source `master` HEAD, which is `3.3-alpha` — see "Engine scope" in `../../shared/AUTHORING.md`).
-**Tier:** A.

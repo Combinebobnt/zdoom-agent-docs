@@ -1,15 +1,8 @@
 # `void NamedScriptWait(str script)`
 
-**Bucket:** compiler builtin (`zt-bcc/src/builtin.c:166`, `{ "namedscriptwait", ";s" }` — one
-required string arg, matches the wiki's signature exactly; table-flagged
-`PCD_SCRIPTWAITNAMED | F_LATENT` at `builtin.c:314`, marking it latent/script-suspending).
-Implemented as `PCD_SCRIPTWAITNAMED` in `p_acs.cpp` (`10672-10675`), which shares its state
-machine entirely with `PCD_SCRIPTWAIT`/`PCD_SCRIPTWAITDIRECT` (the numbered-script variant) via a
-shared `scriptwait:` label.
-
-**Tier:** A. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD —
-see "Engine scope" in `../../shared/AUTHORING.md`).
-
+**Tier:** A.
+**Applies to:** N/A — zt-bcc-declared, neither engine implements it
+**Verified against:** none
 **Provenance:** `NamedScriptWait - ZDoom Wiki.html`
 (`https://zdoom.org/w/index.php?title=NamedScriptWait&oldid=36650`), verified against
 the Zandronum source's `src/p_acs.cpp` on 2026-07-29. The wiki page is thin (one usage line, no
@@ -19,6 +12,13 @@ immediately"?) but is in fact accurate once you read the implementation: everyth
 from tracing `PCD_SCRIPTWAITNAMED` and the `SCRIPT_ScriptWaitPre`/`SCRIPT_ScriptWait` state
 handlers, plus `P_GetScriptGoing`/`DLevelScript`'s constructor for the `ACS_ALWAYS` caveat, none
 of which the wiki page mentions at all.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** compiler builtin (`zt-bcc/src/builtin.c:166`, `{ "namedscriptwait", ";s" }` — one
+required string arg, matches the wiki's signature exactly; table-flagged
+`PCD_SCRIPTWAITNAMED | F_LATENT` at `builtin.c:314`, marking it latent/script-suspending).
+Implemented as `PCD_SCRIPTWAITNAMED` in `p_acs.cpp` (`10672-10675`), which shares its state
+machine entirely with `PCD_SCRIPTWAIT`/`PCD_SCRIPTWAITDIRECT` (the numbered-script variant) via a
+shared `scriptwait:` label.
 
 Delays the calling script until an instance of the *named* script has both started and finished
 running, as tracked by the level's `RunningScripts` map. For numbered scripts, the equivalent is

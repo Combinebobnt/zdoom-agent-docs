@@ -1,11 +1,22 @@
 # `int GameType()`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `GameType - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29,
+`https://wiki.zandronum.com/w/index.php?title=GameType&oldid=1282`) + source-verified (`p_acs.h:658,977`, `p_acs.cpp:11159-11169`, `team.cpp:1748-1875`,
+`deathmatch.cpp:118-289`, `wadsrc/static/gamemode.txt`). The wiki's four base values and its
+team-game inclusion/exclusion list both check out; the cascading-cvar-callback mechanism behind
+the team-game list, the zcommon.bcs gap for `GAME_NET_TEAMGAME`, and the
+Cooperative/Survival/Invasion collapse are this doc's source-verified additions.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
+**Bucket:** compiler builtin.
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+
 Reads the server's current game-mode selection back as one of five `GAME_*` enum values.
 Compiler builtin (`PCD_GAMETYPE`, the Zandronum source's `src/p_acs.h:658`), implemented inline in
 `case PCD_GAMETYPE:` (the Zandronum source's `src/p_acs.cpp:11159-11169`) — no separate helper
 function, unlike `PlayerCount`/`CountPlayers`.
-
-**Bucket:** compiler builtin.
 
 ```cpp
 case PCD_GAMETYPE:
@@ -73,13 +84,29 @@ source"), confirmed via `git merge-base --is-ancestor` to predate the `28f736fb3
 version-bump commit by the entire project history — this is original Skulltag-era functionality,
 not a recent addition, so the 3.2.1 engine stamp below is solid.
 
-**Provenance:** wiki page `GameType - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29,
-`oldid=1282`) + source-verified (`p_acs.h:658,977`, `p_acs.cpp:11159-11169`, `team.cpp:1748-1875`,
-`deathmatch.cpp:118-289`, `wadsrc/static/gamemode.txt`). The wiki's four base values and its
-team-game inclusion/exclusion list both check out; the cascading-cvar-callback mechanism behind
-the team-game list, the zcommon.bcs gap for `GAME_NET_TEAMGAME`, and the
-Cooperative/Survival/Invasion collapse are this doc's source-verified additions. **Engine:**
-Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in
-`../../shared/AUTHORING.md`; see Version note above for why this predates the 3.2.1 target comfortably). **Tier:** A.
+## Engine-family divergence: no team-game branch, no `GAME_NET_TEAMGAME` value at all
 
-**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+UZDoom implements the same opcode (`PCD_GAMETYPE`, `src/playsim/p_acs.cpp:8927-8936`) with a
+shorter if/else-if chain that drops the team-game branch entirely: title map, then `deathmatch`,
+then `multiplayer`, else single-player. There is no `teamgame` check — confirmed by grep, the
+`teamgame` cvar/global that drives Zandronum's third branch does not exist anywhere in UZDoom's
+`p_acs.cpp`. Consequently `GAME_NET_TEAMGAME` is not just unexposed to BCS here the way it is in
+zt-bcc's `zcommon.bcs` — the enum member itself does not exist in UZDoom's source at all (the local
+`enum` at `p_acs.cpp:483-486` declares only the four values `GAME_SINGLE_PLAYER`,
+`GAME_NET_COOPERATIVE`, `GAME_NET_DEATHMATCH`, `GAME_TITLE_MAP`; confirmed by grep across
+`~/source/UZDoom/src`). None of this doc's Zandronum-specific team-game notes above (the
+`ctf`/`domination`/`skulltag` vs. `teamplay`/`teamlms`/`teampossession` cvar-cascade split, and
+the reason `GAME_NET_TEAMGAME` is reachable at all) have any UZDoom counterpart — GZDoom-family
+has no engine-level team-mode cvar system feeding this opcode.
+
+The coop branch's networked-game test also differs mechanically: UZDoom checks the single global
+`bool multiplayer` (set by session setup/demo playback, reset at level load/demo teardown) instead
+of Zandronum's live `NETWORK_GetState() != NETSTATE_SINGLE` computation — functionally the same
+"is this a networked session" question, just a cached flag rather than a live state check (see
+`ismultiplayer.md`'s divergence section for the same `netgame`-flag-vs-live-state pattern on a
+different opcode).
+
+This doc's Cooperative/Survival/Invasion-collapse note also doesn't carry over: UZDoom's source has
+no `invasion` or `survival` cvar/mode at all (confirmed by grep), so there is no analogous
+sub-mode distinction for `GAME_NET_COOPERATIVE` to collapse in the first place — UZDoom's
+`multiplayer` branch simply means "any non-deathmatch networked game."

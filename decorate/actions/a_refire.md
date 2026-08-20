@@ -1,8 +1,10 @@
 # `void A_ReFire(statelabel flash = null)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_ReFire` (retrieved 2026-07-31, oldid=54720) + verified against the Zandronum source's `src/p_pspr.cpp:1046-1082` and `src/g_shared/a_weapons.cpp:864-886`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_ReFire` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_ReFire&oldid=54720) + verified against the Zandronum source's `src/p_pspr.cpp:1046-1082` and `src/g_shared/a_weapons.cpp:864-886`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AInventory, A_ReFire)` at `src/p_pspr.cpp:1046`. Defined on the `AInventory` class; only available in weapon/inventory states, not on arbitrary actors.
 
 Checks whether the fire key is still held after an attack. If held, automatically jumps to a follow-up state (usually `Hold` for sustained fire or repeated attacks). If released, resets the refire counter and performs an ammo check that may switch the player to a different weapon if the current one is out of ammunition.
@@ -85,6 +87,14 @@ Hold:
 ```
 
 On the first shot (when `player.refire == 0`), the Fire sequence plays. If the button is held through the `A_ReFire` on frame B, the automatic fallback (since there is a Hold state) jumps to Hold. The Hold sequence repeats at a faster rate, creating a sustained full-auto effect. Releasing the button during Hold returns to Ready via the ammo-check path.
+
+## Engine-family divergence: full wiki autoSwitch parameter
+
+UZDoom's `A_ReFire` (`wadsrc/static/zscript/actors/inventory/stateprovider.zs`) is the full ZDoom-wiki ZScript version referenced in the intro paragraph above, not Zandronum's unconditional variant: it takes the wiki's `autoSwitch` parameter (default `true`) and forwards it to `Weapon::CheckAmmo(fireMode, autoSwitch)` (`wadsrc/static/zscript/actors/inventory/weapons.zs`). When `autoSwitch` is `false`, `CheckAmmo` still reports whether the weapon has enough ammo but skips the `PlayerPawn.PickNewWeapon` call it would otherwise make on an out-of-ammo refire — so nothing forces a weapon switch. The "no way to suppress it from DECORATE" limitation described above for Zandronum does not apply to UZDoom.
+
+## Engine-family divergence: no client/server split
+
+UZDoom has no client/server authority split anywhere in its source tree (no `NETWORK_InClientMode`/`SERVERCOMMANDS_*`-style construct exists at all) — the "Network behavior" section above (server-side refire decision, synchronized ammo-based weapon switch) is Zandronum-only. On UZDoom, `A_ReFire`'s refire check and its `CheckAmmo` call execute identically regardless of network role.
 
 ## See also
 

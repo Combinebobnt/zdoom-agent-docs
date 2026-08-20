@@ -1,8 +1,10 @@
 # `A_Jump`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_Jump` (retrieved 2026-07-31, oldid=46792) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:765-785`, `src/m_random.h`/`src/m_random.cpp` (the `FRandom` PRNG), and `src/d_net.cpp`/`src/d_main.cpp`/`src/sdl/i_system.cpp` (RNG-seed lifecycle across the server/client connection).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_Jump` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_Jump&oldid=46792) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:765-785`, `src/m_random.h`/`src/m_random.cpp` (the `FRandom` PRNG), and `src/d_net.cpp`/`src/d_main.cpp`/`src/sdl/i_system.cpp` (RNG-seed lifecycle across the server/client connection).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Action function on `AActor` (`DEFINE_ACTION_FUNCTION_PARAMS` in `src/thingdef/thingdef_codeptr.cpp`).
 **Source excerpt:** Quotes Zandronum engine source; see [LICENSE](../../LICENSE) §3 for Zandronum's license terms.
 
@@ -65,6 +67,14 @@ For `+CLIENTSIDEONLY` actors, both server and client do execute the jump logic �
 - The one mechanism that *would* transmit a `rngseed` between peers — the legacy `NCMD_SETUP` handshake's game-info packet (`src/d_net.cpp`, `D_ArbitrateNetStart`) — is dead code in Zandronum: its only call site, in `D_CheckNetGame` (`src/d_net.cpp`), is commented out (`//		D_ArbitrateNetStart ();`). No other file writes or reads `rngseed` as part of the live server/client connection or in-game protocol (`sv_main.cpp`, `cl_main.cpp`, `sv_commands.cpp`, and `cl_commands.cpp` contain no reference to it at all); the remaining `rngseed` read/write sites are demo record/playback (`cl_demo.cpp`, `g_game.cpp`) and per-level increment (`g_level.cpp`, `rngseed = rngseed + 1`), neither of which crosses the network.
 
 So `+CLIENTSIDEONLY` actors' `A_Jump` rolls are **not** expected to align between machines — each one free-runs its own independent sequence. This is inconsequential rather than a bug: `NETFL_CLIENTSIDEONLY` is documented at its declaration (`src/actor.h`) as "only spawned by the clients... don't affect the game in any way (visuals aside)" — i.e. every machine already owns and simulates its own private copy of the actor, with no cross-machine consistency requirement to begin with. There is accordingly no synchronization gap to close for `A_Jump` in either code path.
+
+## Engine-family divergence: no client/server authority split
+
+UZDoom's `A_Jump` (`src/playsim/p_actionfunctions.cpp:798-809`) has no client-mode gate at all: the entire native function body is `if (maxchance >= 256 || pr_cajump() < maxchance) return jumpto; else return NULL;` — no `NETWORK_InClientMode()`/`CLIENTUPDATE_FRAME`/`SERVERCOMMANDS_*`-style construct exists anywhere in the UZDoom source tree (confirmed by a tree-wide search: zero occurrences). There is no `NETFL_CLIENTSIDEONLY`-style split between "network-authoritative" and "client-side-only" actors for this action — every actor's `A_Jump` call rolls and jumps identically wherever it runs. The entire "## Network considerations" section above — the client-mode early return, the `rngseed`-synchronization analysis, the `NCMD_SETUP` dead-code finding — is Zandronum-specific and does not apply to UZDoom: there is no split to reconcile because none exists in the engine.
+
+## Engine-family divergence: multi-target selection happens in the compiler, not the native function
+
+In Zandronum, target selection among multiple provided states lives inside the single native function shown above, and its `pr_cajump()` roll for picking a target only happens *after* the chance check succeeds (`ACTION_PARAM_STATE` reads the chosen target only inside the `if` block). UZDoom takes a structurally different path: the native `A_Jump` (`src/playsim/p_actionfunctions.cpp:798`) takes only `(int maxchance, statelabel jumpto)` — a single already-resolved target, no variadic list. When a call site passes more than one target, the compiler rewrites it before the native function ever sees it: `UnravelVarArgAJump`/`AJumpProcessing` (`src/scripting/backend/codegen_doom.cpp:360-413`) replaces the extra target arguments with a single `RandomPick[cajump](a, b, c, ...)` expression, evaluated as an ordinary function argument on *every* execution of that state — unconditionally, not gated on the chance check — drawing from the same `pr_cajump` `FRandom` stream (shared between `p_actionfunctions.cpp` and `codegen_doom.cpp` via `extern FRandom pr_cajump;`) to pick uniformly among the targets. The already-resolved single target is what actually reaches the native `A_Jump`, which then only performs the chance check. The observable outcome — probability of jumping, and a uniform distribution among targets when it does jump — is unchanged from Zandronum, but the RNG draw for target selection happens earlier and unconditionally (once per call regardless of whether the jump succeeds) rather than only after a successful chance roll — a difference in `pr_cajump` draw-sequence/count that matters for anyone relying on exact RNG-stream consumption (e.g. deterministic-replay or seeded-generation contexts), even though it has no effect on the probabilities documented above.
 
 ## Virtual vs. static jumps
 

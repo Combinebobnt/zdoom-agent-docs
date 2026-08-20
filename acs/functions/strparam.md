@@ -1,5 +1,13 @@
 # `StrParam` / `strparam`
 
+**Tier:** A.
+**Applies to:** N/A — zt-bcc-declared, neither engine implements it
+**Verified against:** none
+**Provenance:** `StrParam - ZDoom Wiki.html`
+(`https://zdoom.org/w/index.php?title=StrParam&oldid=45949`), verified against
+the Zandronum source's `src/p_acs.cpp` (`PCD_SAVESTRING`, line 12884, and the `ACSStringPool`
+implementation, lines 396-560+) and the zt-bcc source's `src` on 2026-07-29.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** none of the three — like [`strcpy`](strcpy.md), this is a **compiler builtin
 keyword**, not a `zcommon.bcs`-declared function or action special. `strparam` never appears in
 `zcommon.bcs`'s `special` table (positive or negative index) and it is not a normal
@@ -16,18 +24,11 @@ every call expression checks for before falling back to ordinary comma-separated
 is why the auto-generated scaffolder saw "zero args" for a function whose whole point is taking
 arguments: it read `g_funcs[]`'s post-return-type parameter string, which is genuinely empty for
 `strparam`, and had no way to see the format-item grammar bolted on separately.
-
-**Tier:** A. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD —
-see "Engine scope" in `../../shared/AUTHORING.md`).
-
-**Provenance:** `StrParam - ZDoom Wiki.html`
-(`https://zdoom.org/w/index.php?title=StrParam&oldid=45949`), verified against
-the Zandronum source's `src/p_acs.cpp` (`PCD_SAVESTRING`, line 12884, and the `ACSStringPool`
-implementation, lines 396-560+) and the zt-bcc source's `src` on 2026-07-29.
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
 ## Syntax
 
-```
+```text
 str s = StrParam( <format-item-list> );
 ```
 
@@ -67,11 +68,11 @@ case PCD_SAVESTRING:
   checks for an existing identical entry (`FindString`) before inserting a new one — **identical
   content always returns the identical string ID**, it does not allocate a fresh slot per call.
   Calling `StrParam(s:"hangar", s:"key")` twice yields the same integer both times.
-- **Lifetime — this is where the wiki's caveat is stale for this fork.** The wiki page (as
+- **Lifetime — this is where the wiki's caveat is stale for Zandronum.** The wiki page (as
   written, oldid 45949) frames the 1-tic-lifetime behavior as the historical default and treats
   the "lasts indefinitely" fix as a footnote ("As of revision r4295..."). The Zandronum source's
   own in-source comment block directly above `ACSStringPool` (`p_acs.cpp:396-434`) states plainly
-  that this fork **already has the post-r4295 persistent-string pool**: *"Strings returned by
+  that Zandronum **already has the post-r4295 persistent-string pool**: *"Strings returned by
   strparam last indefinitely. No longer do they disappear at the end of the tic they were
   generated."* Garbage collection is reference-counted against the ACS stack, all running
   scripts' locals, map/world/global variables, and an explicit lock count — a `StrParam` result
@@ -80,11 +81,11 @@ case PCD_SAVESTRING:
   Zandronum 3.2.1 the wiki's "only exists for 1 tic, a delay will nullify it" opening sentence and
   the accompanying example's pre-r4295 comments (`"but its contents are only valid until this
   tick ends..."`, `"no keyObject here on pre-r4295"`) do **not** apply — treat the whole example
-  as demonstrating syntax only, not this fork's actual string lifetime.
+  as demonstrating syntax only, not Zandronum's actual string lifetime.
 - **Multiplayer/demo-sync warning is real and still applies.** The wiki's warning about
   indeterminate results (e.g. a format item whose value can differ between clients feeding into
-  something that affects the playsim) is a general ACS determinism concern, not something this
-  fork's persistent string pool changes — `l:`/`k:`/`n:` casts in particular can format
+  something that affects the playsim) is a general ACS determinism concern, not something
+  Zandronum's persistent string pool changes — `l:`/`k:`/`n:` casts in particular can format
   differently per client (localization, keybind name, actor class display name), so a
   `StrParam` result built from one of those casts is still unsafe to feed into anything that
   must stay in sync (RNG seeding, spawning, geometry changes). Safe uses (HUD display, chat text)
@@ -104,4 +105,14 @@ case PCD_SAVESTRING:
 grammar and opcode sequence up to the terminator opcode — a future doc for any of them should
 cross-reference this one rather than re-deriving the cast-type table.
 
-**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+**Comparing a `StrParam` result against a literal:** don't use `==`/`!=` — a pool-origin string
+like this one can never numerically equal a compiled literal even with identical content, by
+construction of the string-index space. See
+[String literal vs. pool equality](../concepts/string-literal-vs-pool-equality.md) for the full
+mechanism; use [`StrCmp`/`StrIcmp`](strcmp.md) instead.
+
+**Building a string from multiple pieces:** prefer `StrParam`'s format-item list
+(`StrParam(s:a, s:b, s:c, ...)`) over chained `str + str`. The `+` operator only reliably
+concatenates when every operand is a literal constant — with a variable on either side it silently
+compiles to raw integer addition of the pool indices instead, a confirmed `zt-bcc` compiler bug.
+See [String `+` operator variable bug](../concepts/string-concat-operator-variable-bug.md).

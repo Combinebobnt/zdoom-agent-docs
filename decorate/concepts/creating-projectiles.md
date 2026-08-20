@@ -1,8 +1,10 @@
 # Creating projectiles
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki "Creating new projectiles" (retrieved 2026-07-31, oldid=52213), cross-checked against the Zandronum source's `Projectile` property definition (`src/thingdef/thingdef_properties.cpp:1351-1357`), missile explosion logic (`src/p_mobj.cpp:1536-1562`), missile damage calculation (`src/p_mobj.cpp:3715-3733`), and action function implementations (`src/g_strife/a_spectral.cpp:101` for `A_Tracer2`; `src/g_doom/a_doomweaps.cpp:982` for `A_BFGSpray`).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki "Creating new projectiles" (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=Creating_new_projectiles&oldid=52213), cross-checked against the Zandronum source's `Projectile` property definition (`src/thingdef/thingdef_properties.cpp:1351-1357`), missile explosion logic (`src/p_mobj.cpp:1536-1562`), missile damage calculation (`src/p_mobj.cpp:3715-3733`), and action function implementations (`src/g_strife/a_spectral.cpp:101` for `A_Tracer2`; `src/g_doom/a_doomweaps.cpp:982` for `A_BFGSpray`).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 This page covers the essential properties and state setup for creating a basic projectile (including homing variants), and the state selection logic when a projectile impacts its target. It does not cover action-function semantics in depth — see the `actions/` directory for those — or advanced behaviors like explosion trails or multi-damage-type handling.
 
@@ -60,12 +62,12 @@ If none of these states are defined, the projectile is removed with no visible a
 
 A projectile's `Damage` property is not the literal damage dealt on impact. Instead, the engine uses the `GetMissileDamage` function (`src/p_mobj.cpp:3715-3733`), which applies random variation to the damage:
 
-```
+```text
 damage = ((random & mask) + add) * Damage
 ```
 
 For normal projectiles (without the `MF4_STRIFEDAMAGE` flag), the function calculates:
-```
+```text
 damage = ((random() & 7) + 1) * Damage
 ```
 
@@ -92,7 +94,7 @@ More advanced projectiles can:
 
 ## Simple projectile example (generic)
 
-```
+```text
 actor GenericShot
 {
   Projectile
@@ -117,7 +119,7 @@ actor GenericShot
 
 ## Homing projectile example (generic)
 
-```
+```text
 actor GenericTracker
 {
   Projectile
@@ -140,9 +142,11 @@ actor GenericTracker
 }
 ```
 
+This example uses `A_Tracer2`, which is a Zandronum-specific seeking function. UZDoom projects should replace the action function call with `A_SeekerMissile` with appropriate flags (see "Engine-family divergence" above for details).
+
 ## Limited-lifespan projectile example (generic)
 
-```
+```text
 actor GenericBurst
 {
   Projectile
@@ -167,6 +171,16 @@ actor GenericBurst
 
 In this example, the `Spawn:` state lasts 100 tics with no loop statement. When the duration expires, the projectile automatically transitions to the `Death:` state without requiring a physical impact, and the `Death:` sequence executes the explosion animation.
 
+## Engine-family divergence: seeking behavior
+
+**A_Tracer2 and seeking action functions differ between engines.**
+
+Zandronum provides `A_Tracer2`, a Strife-specific seeking action function that has no direct equivalent in UZDoom. The homing projectile example above (using `A_Tracer2`) is Zandronum-only. UZDoom projects should use `A_SeekerMissile` instead, which both engines support and which offers additional flags (precise seeking, target lookup, speed options) not available in Zandronum's `A_Tracer2`. Both engines support the `SEEKERMISSILE` flag and the `tracer` field that seeking functions require.
+
+**Seeking missile trajectory math differs in non-precise mode.**
+
+When calculating vertical velocity for a seeking missile (to adjust pitch toward a target above or below), Zandronum's non-precise seeking mode uses the octagonal-distance approximation function `P_AproxDistance`, which uses max(dx, dy, (dx+dy)>>1) and can produce less-accurate aim in diagonal directions. UZDoom uses true Euclidean distance (`Distance2D`, based on sqrt(dx² + dy²)) for the same calculation. Both engines offer precise-mode seeking (enabled by the `SMF_PRECISE` flag in `A_SeekerMissile`) which uses proper Euclidean distance on both. For gameplay purposes, this divergence is minor — the difference is most visible in extreme diagonal ranges — but mods targeting both engines should be aware that non-precise seeking slightly favors axis-aligned directions in Zandronum.
+
 ## See also
 
 - `state-machine.md` — detailed state-machine rules, reserved-state-name fallbacks, and label scoping.
@@ -175,4 +189,4 @@ In this example, the `Spawn:` state lasts 100 tics with no loop statement. When 
 
 ## Open questions (unverified in this checkout — don't guess past these)
 
-None at this time. All major claims have been traced against the Zandronum source.
+None at this time. All major claims have been traced against both UZDoom and Zandronum source.

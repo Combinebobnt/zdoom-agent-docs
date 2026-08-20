@@ -1,8 +1,10 @@
 # `void SetActorPitch(int tid, fixed pitch)`
 
 **Tier:** A.
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`).
-**Provenance:** wiki page `SetActorPitch - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `oldid=22666`) + source-verified against `p_acs.cpp:5869-5895,12039-12044,12599-12601`, `p_mobj.cpp:3929-3937`, `p_user.cpp:3336-4014`, `zt-bcc/src/builtin.c:150`. Wiki's `int pitch` typing corrected to `fixed` per the actual builtin signature; wiki's implied "there is a valid range" note confirmed true in *convention* but not enforced by this function (no clamp in source).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `SetActorPitch - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=SetActorPitch&oldid=22666`) + source-verified against `p_acs.cpp:5869-5895,12039-12044,12599-12601`, `p_mobj.cpp:3929-3937`, `p_user.cpp:3336-4014`, `zt-bcc/src/builtin.c:150`. Wiki's `int pitch` typing corrected to `fixed` per the actual builtin signature; wiki's implied "there is a valid range" note confirmed true in *convention* but not enforced by this function (no clamp in source).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
@@ -66,6 +68,31 @@ that clamp lives in the mlook input path, not in `SetPitch`/`SetActorPitch`. Cal
 function — it will set an out-of-normal-range pitch verbatim, which can flip the view/aim past
 straight up or down.
 
+## Engine-family divergence: player-actor pitch is clamped, unlike Zandronum
+
+UZDoom's version of the underlying helper (`DLevelScript::SetActorPitch`, UZDoom's
+`src/playsim/p_acs.cpp`) forwards into `AActor::SetPitch`, which is not the unconditional field
+assignment Zandronum uses. When the actor being written to is a player pawn, `SetPitch` first
+clamps the requested angle to that player's own current look-up/look-down limits — the same
+bounds that constrain their ordinary mouselook input — before storing it. A non-player actor is
+only clamped if the caller opts in via a dedicated "force clamp" flag on the call, and the
+ACS-facing `PCD_SETACTORPITCH` case never sets that flag, so monsters and other non-player
+actors remain unclamped exactly as described above for Zandronum.
+
+Net effect: `SetActorPitch(tid, pitch)` behaves the same as the Zandronum description above when
+`tid` resolves only to non-player actors. But when it resolves to a player (`tid == 0` against a
+player activator, or an explicit TID that happens to be a player), UZDoom silently pulls an
+out-of-range pitch back within that player's configured look limits instead of storing it
+verbatim — a script that relies on "no clamping at all" to snap a player's view straight up,
+straight down, or past either extreme gets the literal requested pitch on Zandronum but a
+clamped one on UZDoom. This engine's per-player look-limit bounds are themselves configurable
+and networked per-client, not a single fixed constant, so the exact clamp range isn't a fixed
+number to document here.
+
+Separately, the "Netcode" section above is Zandronum-specific: it describes that engine's
+client-server replication step, which has no equivalent in UZDoom's single-process networking
+model — nothing comparable fires there.
+
 ## Interpolation is hardcoded off from ACS
 
 The static `SetActorPitch` helper takes an `interpolate` flag (used to set `player->cheats |=
@@ -84,7 +111,7 @@ Zandronum clientside caveat (state stays local, doesn't propagate).
 
 **Example — reset the activator's pitch to level (from the wiki):**
 
-```
+```text
 script 1 (void)
 {
     SetActorPitch(0, 0);

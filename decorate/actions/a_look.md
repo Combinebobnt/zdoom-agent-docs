@@ -1,9 +1,11 @@
 # `void A_Look()`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki A_Look (retrieved 2026-07-31, oldid=53797) + verified against the
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki A_Look (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_Look&oldid=53797) + verified against the
 Zandronum source's `src/p_enemy.cpp:1931-2058` (`DEFINE_ACTION_FUNCTION(AActor, A_Look)`).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/p_enemy.cpp:1931` (`DEFINE_ACTION_FUNCTION(AActor, A_Look)`).
 
 The default `Spawn`-state action for most monsters: idles until it detects a target (a player, or
@@ -37,12 +39,35 @@ would miss that stealth-monster facing state is intentionally still touched on c
 - **`Thing_SetGoal`-on-spawn special case.** If the actor's map `special` is `Thing_SetGoal` with
   `args[0] == 0`, `A_Look` consumes the special on its first call (`self->special = 0`) and sets up
   a patrol goal from `args[1]`/`args[2]`/`args[3]` — a mapper-facing linedef-special convention
-  that only fires from this one action function, not documented anywhere else in this fork's
+  that only fires from this one action function, not documented anywhere else in Zandronum's
   action-function set.
 - **Friendly-monster path calls `P_LookForPlayers`, not the hostile path.** `self->IsFriend(targ)`
   branches to player-seeking (with `MF4_LOOKALLAROUND` respected) before falling back to
   `A_Wander` — a friendly monster with no `SeeState` at all silently calls `A_Wander` as a
   substitute rather than erroring or staying idle.
+
+## Engine-family divergence: CF_NOTARGET early-out also requires the FRIENDLY flag
+
+Zandronum's heard-target early-out (the `CF_NOTARGET` bullet above) checks only
+`targ->player->cheats & CF_NOTARGET`. UZDoom's `A_Look` (`src/playsim/p_enemy.cpp:1949`) checks
+`(targ->player->cheats & CF_NOTARGET) || !(targ->flags & MF_FRIENDLY)` — an extra condition
+requiring the candidate player to carry the `FRIENDLY` flag, added by an upstream GZDoom commit
+("Monsters no longer search for players who are unfriendly.", 2017) and, after a 2024 attempt to
+replace it with an `IsHostile()`-based check was reverted, still present in this raw-flag form.
+
+In ordinary play this extra condition is a no-op: both engines' `PlayerPawn` base class carries
+`+FRIENDLY` by default (Zandronum's `wadsrc/static/actors/shared/player.txt:14`; UZDoom's
+`wadsrc/static/zscript/actors/player/player.zs:134`), so a normal player always satisfies it. It
+only matters when something has stripped a player pawn's `FRIENDLY` flag (a DECORATE/ZScript flag
+change, or a replacement `PlayerPawn` definition that omits it) — in that case UZDoom's `A_Look`
+silently declines to react to that player via the `LastHeard`/`SoundTarget` path (returns without a
+`See`-state transition that tic), where Zandronum's would still acquire them, gated only by
+`CF_NOTARGET`.
+
+This divergence is specific to `A_Look`'s own heard-target check — `P_LookForPlayers`'s
+player-filtering (`isTargetablePlayer` on UZDoom; the inline loop body on Zandronum) already uses
+an `IsFriend()`-based check on both engines that requires *both* the looking actor and the
+candidate player to carry `MF_FRIENDLY` before excluding them, so that path is unaffected.
 
 ## Target acquisition gates based on actor flags
 

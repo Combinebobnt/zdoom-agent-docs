@@ -1,8 +1,10 @@
 # EVENT scripts
 
 **Tier:** B (wiki-sourced concept page; the load-bearing/version-sensitive claims were traced to source and to git history, but result-value ordering across multiple scripts, network-traffic performance claims, and the leave-reason enum values were not independently traced — see notes above for exactly which parts are untraced).
-**Engine:** Zandronum 3.2.1 — this page specifically had to account for the checkout's `3.3-alpha` gap (see Version-gap warning above); every event *not* called out there is confirmed present at the 3.2.1 target via git ancestry, not just "present in the checkout."
-**Provenance:** wiki page `EVENT scripts - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-28, `oldid=2562`) + verified against the Zandronum source (`gamemode.h`, `gamemode.cpp`, `gi.cpp`, `actor.h`, `p_acs.h`) and the zt-bcc source's `lib/zcommon.bcs`, including a git-ancestry check against the 3.2.1→3.3-alpha version-bump commits (2026-07-28).
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Provenance:** wiki page `EVENT scripts - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-28, `https://wiki.zandronum.com/w/index.php?title=EVENT_scripts&oldid=2562`) + verified against the Zandronum source (`gamemode.h`, `gamemode.cpp`, `gi.cpp`, `actor.h`, `p_acs.h`) and the zt-bcc source's `lib/zcommon.bcs`, including a git-ancestry check against the 3.2.1→3.3-alpha version-bump commits (2026-07-28).
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 
 Zandronum's own script type (`SCRIPT_Event = 16`, tagged `[BB]` in `p_acs.h` — not part of the
 ZDoom script-type set, see [Script types](script-types.md)) for hooking game events:
@@ -11,9 +13,11 @@ ZDoom script-type set, see [Script types](script-types.md)) for hooking game eve
 
 ## Version-gap warning (why this page needed extra care)
 
-Zandronum 3.2.1 is the assumed primary engine target here (per `../../shared/AUTHORING.md`), but the only local checkout is a
-`master` HEAD that reports `3.3-alpha` in `version.h`. Two `GAMEEVENT_*` events on the wiki page
-are recent enough that this gap actually matters here — resolved by checking topological ancestry
+This entry targets Zandronum 3.2.1 (per `../../shared/AUTHORING.md`'s "Engine scope" — Zandronum
+stays co-equal and fully verified even though UZDoom is the tree's primary engine), but the only
+local checkout is a `master` HEAD that reports `3.3-alpha` in `version.h`. Two `GAMEEVENT_*`
+events on the wiki page are recent enough that this gap actually matters here — resolved by
+checking topological ancestry
 in the Zandronum source's git history against the commit that set `version.h` to the `3.2.1`
 release string (`28f736fb3`, immediately followed by the bump to `3.3-alpha` at `7279c8bc1`;
 note the commit *dates* in this history are unreliable/synthetic — e.g. both bumps are dated
@@ -80,3 +84,49 @@ Not independently re-verified value-by-value in this pass (`LEAVEREASON_LEFT`/`_
 `_ERROR`/`_TIMEOUT`/`_RECONNECT` = 0-4) — spot-checking every disconnect code path was out of
 scope; flagged here as wiki-sourced, not fork-verified, in case a future session needs to trust
 or distrust a specific `arg2` value.
+
+## Engine-family divergence
+
+The script-type enum value survives (`SCRIPT_Event = 16`, still carrying the `[BB]` tag) in
+UZDoom's `src/playsim/p_acs.h`, inherited from shared codebase ancestry, but nothing behind it
+does: there is no `gamemode.cpp`/`gamemode.h` file anywhere in the UZDoom source tree, no
+`GAMEEVENT_*` constant of any kind, and no `HandleEvent`-style dispatch path. The declaration is
+the *only* occurrence of `SCRIPT_Event` in the entire checkout — nothing ever calls
+`StartTypedScripts`/`StaticStartTypedScripts` for that type. This is the same shape as the
+`SCRIPTF_ClientSide`/`SCRIPTF_Ignored` divergence documented in
+[Zandronum/UZDoom compatibility](zandronum-uzdoom-compat.md): a Zandronum-compiled `EVENT` script
+loads cleanly under UZDoom, but silently never runs, since nothing ever triggers a script of that
+type. The `AAPTR_DAMAGE_SOURCE`/`_INFLICTOR`/`_TARGET` pointers this mechanism exists to populate
+(see [Actor pointer selectors](actor-pointers.md)) are correspondingly also absent from UZDoom: its
+`AAPTR_` enum carries the shared ZDoom-lineage selectors (including an unrelated `AAPTR_TARGET`,
+which is the actor's own target pointer, not a damage-event one) but has no `AAPTR_DAMAGE_SOURCE`,
+`AAPTR_DAMAGE_INFLICTOR`, or `AAPTR_DAMAGE_TARGET` — those three are Zandronum additions.
+
+**Correction (2026-08-15 re-verification pass), `GetEventResult` vs. `SetResultValue`:** an earlier
+pass of this section said "`GetEventResult`/`SetResultValue` have nothing to read or write to on
+that engine," which reads as though neither function works under UZDoom. Only the first half holds.
+`GetEventResult` genuinely has no UZDoom counterpart — no extension function, no VM opcode, no
+name of that form anywhere in the checkout. `SetResultValue` is a different case: it is a plain
+ACS bytecode instruction (`PCD_SETRESULTVALUE`) that UZDoom implements and executes normally, and
+is the ordinary way a script called as a line special reports success/failure — the engine's own
+bundled `strifehelp.acs` uses it throughout. What is absent on UZDoom is specifically the *event*
+result it would override in the Zandronum mechanism above; `SetResultValue` in any other context
+behaves exactly as it does on any ZDoom-family engine.
+
+**UZDoom's equivalent mechanism is not ACS at all.** Hooking game events on UZDoom is done through
+the ZScript event-handler system (`StaticEventHandler`/`EventHandler`, native dispatch in
+`src/events.cpp`, stdlib declarations in `wadsrc/static/zscript/events.zs`), not through a script
+type — see [Event handlers](../../zscript/classes/eventhandler.md) for the full hook list. Several
+`GAMEEVENT_*` events documented above have a close ZScript counterpart: `GAMEEVENT_ACTOR_SPAWNED`
+maps onto `WorldThingSpawned`, `GAMEEVENT_ACTOR_DAMAGED`/`_PREMOD` onto `WorldThingDamaged`
+(whose `WorldEvent` carries `Thing`/`Inflictor`/`DamageSource`/`Damage`/`DamageType` as fields,
+which is how the missing `AAPTR_DAMAGE_*` pointers are replaced), `GAMEEVENT_PLAYERJOINS` onto
+`PlayerEntered`, and `GAMEEVENT_PLAYERLEAVESSERVER` onto `PlayerDisconnected` (with no leave-reason
+field — the `LEAVEREASON_*` distinction below has no UZDoom analogue). The correspondence is
+functional, not structural: dispatch is per-registered-handler virtual calls in a configurable
+order rather than one script type keyed on an event-ID argument, there is no
+`forcespawneventscripts`-style global gate and no per-actor opt-in/opt-out flag (a registered
+handler's `WorldThingSpawned` fires for every actor that survives its own spawn), and the
+result-override contract is per-hook and short-circuiting rather than a shared result value — e.g.
+`PlayerRespawning` defaults to returning `true`, and the dispatch loop in `src/events.cpp` aborts
+and reports "no respawn" as soon as any one handler returns `false`.

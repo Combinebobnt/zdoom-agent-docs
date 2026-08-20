@@ -2,10 +2,10 @@
 
 A hand/agent-maintained documentation tree for the ZDoom-family Doom-engine modding surface —
 ACS/BCS, DECORATE, ZScript, and lump formats like MAPINFO/GLDEFS/SBARINFO/CVARINFO — targeting
-**Zandronum** (primary) and **UZDoom/GZDoom-family** engines (where Zandronum doesn't apply, most
-notably ZScript, which doesn't exist in Zandronum at all). It exists to answer one recurring
-question cheaply, generalized past its original ACS-only scope: *given a function, flag,
-property, key, or cvar name, what does it actually do, and on which engine?*
+**UZDoom/GZDoom-family** (primary) and **Zandronum** engines, co-equal and fully verified rather
+than grandfathered (most notably ZScript, which doesn't exist in Zandronum at all). It exists to
+answer one recurring question cheaply, generalized past its original ACS-only scope: *given a
+function, flag, property, key, or cvar name, what does it actually do, and on which engine?*
 
 Names and signatures are trivially greppable from compiler tables or engine source. What's
 expensive is *semantics* — parameter meaning, valid enum values, units, failure/error-return
@@ -30,20 +30,22 @@ See `CLAUDE.md`'s routing table for the full scope.
   UZDoom/GZDoom/ZScript source), and the Authoring rule for when an entry earns its own file.
 - **`shared/ARCHETYPES.md`** — the three doc schemas every section is built from (Callable /
   Table-of-entries / Concept), with the exact header-block format for each.
-- **`agents/`** — ready-made Agent-tool subagent definitions (`zdoom-docs-lookup` for retrieval,
-  `zdoom-docs-intake` for wiki-page processing) any consuming project can register. See
+- **`agents/`** — ready-made Agent-tool subagent definitions any consuming project can register.
+  Only `zdoom-docs-lookup` (retrieval) lives here; `zdoom-docs-intake` (wiki-page processing)
+  lives at `maintainer/agents/` instead, since it's inert without that gitignored directory. See
   `CLAUDE.md`'s "Subagents" section for how.
 
 ## Layout
 
-```
+```text
 acs/       decorate/   zscript/            -- major sections (Callable + Concept archetypes)
 mapinfo/   gldefs/     sbarinfo/  cvarinfo/ -- lump formats  (Table-of-entries + Concept)
 console/   sprites/                        -- runtime & assets
 shared/    -- AUTHORING.md, ARCHETYPES.md, concepts/ (cross-section only)
 tools/     -- sections.py, lint_docs.py, gen_inventory.py, lookup.py
-agents/    -- zdoom-docs-lookup.md, zdoom-docs-intake.md (Agent-tool subagent defs)
-maintainer/ -- gitignored, maintainer-only wiki-intake pipeline (absent in a plain clone)
+agents/    -- zdoom-docs-lookup.md (Agent-tool subagent def)
+maintainer/ -- gitignored, maintainer-only wiki-intake pipeline (absent in a plain clone);
+              its own agents/zdoom-docs-intake.md lives there too
 ```
 
 Each section has its own `INDEX.md` (router for that section) and `CLAUDE.md` (what's specific to
@@ -66,7 +68,7 @@ the exact steps, and consider that the most useful way to contribute here.
 Quick name/signature lookup without opening a full doc file (renamed from the original `sig.py` —
 no external consumer referenced the old name):
 
-```
+```text
 python3 tools/lookup.py CheckFlag                  # ACS, searches every section
 python3 tools/lookup.py --section decorate SOLID    # scope to one section
 python3 tools/lookup.py GetActorProperty --long     # signature + parameter info
@@ -80,7 +82,7 @@ re-deriving an answer from a compiler/engine table this tree hasn't verified yet
 Doc files cite engine/compiler source by relative path (e.g. `src/p_acs.cpp:123`) and never
 assume a fixed absolute location, since that differs per machine:
 
-```
+```text
 cp sources.example.md sources.local.md
 ```
 
@@ -94,7 +96,7 @@ missing, it'll ask rather than guess.
 
 After hand-editing any doc file, or regenerating an inventory:
 
-```
+```text
 python3 tools/lint_docs.py
 python3 tools/gen_inventory.py --check   # confirms committed inventories match a fresh extraction
 ```
@@ -117,7 +119,9 @@ Mixed — see [LICENSE](LICENSE) for the full terms:
 1. Original prose and tooling (tier-B/C entries with no wiki provenance, a tier-A entry verified
    straight from source with no wiki provenance at all, `tools/`, `CLAUDE.md` files, this file)
    are MIT-licensed.
-2. Tier-A entries are enriched from third-party wikis and carry those wikis' own licenses:
+2. Wiki-derived entries (any file whose `Provenance:` cites a wiki page — every tier-A entry,
+   plus wiki-sourced tier-B ones) are licensed as whole files, this repo's own contributions
+   included, under their source wiki's license:
    - ZDoom-Wiki-derived files are GFDL 1.2 (full text at [licenses/GFDL-1.2.txt](licenses/GFDL-1.2.txt))
    - Zandronum-Wiki-derived files are CC BY-NC-SA 4.0 (**NonCommercial**).
 3. A number of files quote short verbatim excerpts of Zandronum's own engine source (marked with a
@@ -131,5 +135,7 @@ unlike `acc` (no permissive fallback, so still forbidden) there's no excerpt exc
 carved out at all: the rule is paraphrase-only, full stop. See `shared/AUTHORING.md`'s "Quoting
 engine/compiler source verbatim" for the reasoning.
 
-A file can fall into more than one of the four numbered categories at once. Check its `Provenance:` and
+A file can fall into more than one of the four numbered categories at once. The sole exception is
+category 2's two wikis: no file ever derives from both, since GFDL 1.2 and CC BY-NC-SA 4.0 are
+mutually incompatible copyleft (enforced by `tools/lint_docs.py`). Check a file's `Provenance:` and
 `**Source excerpt:**` fields before reusing it outside this repo.

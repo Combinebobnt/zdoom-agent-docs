@@ -1,8 +1,10 @@
 # ACS_NamedTerminate
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (feature predates the fork; verified against the `3.3-alpha` local checkout, no version-gap concern for this one).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `ACS_NamedTerminate - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=ACS_NamedTerminate&oldid=33698`), verified 2026-07-29 against the Zandronum source's `src`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 `bool Acs_NamedTerminate(str script, int map)`
 
@@ -22,7 +24,7 @@ by the time execution reaches `P_TerminateScript`.
 
 - `script` — name of the script to terminate (a BCS string, resolved via `FName`/string-table
   lookup, not a script number).
-- `map` — map containing the script. **Not optional in this fork's signature** (`zcommon.bcs`
+- `map` — map containing the script. **Not optional in the zt-bcc compiler fork's signature** (`zcommon.bcs`
   gives `Acs_NamedTerminate` no `;`-separated default, unlike `Acs_NamedExecute`'s trailing
   `raw,raw,raw`), even though the underlying C++ (`p_acs.cpp`) defensively falls back to `0` if
   `argCount <= 1`. `map == 0` means "the current map" (`level.mapname`), not "map number 0" —
@@ -52,6 +54,19 @@ indistinguishable from a successful terminate by return value alone.
   (`addDefered(..., acsdefered_t::defterminate, ...)`) that fires only if/when that target map is
   actually entered later (`P_DoDeferedScripts`) — same deferred-execution mechanism
   `ACS_Execute`/`ACS_Suspend` use for cross-map targets, not a special case unique to Terminate.
+
+## Engine-family divergence: clientside script targets
+
+UZDoom's `SetScriptState` (the same helper `P_TerminateScript` calls for the same-map case) checks
+two script tables where Zandronum's equivalent checks only one: after failing to find the named
+script in `FLevelLocals::ACSThinker`'s `RunningScripts`, it also checks
+`FLevelLocals::ClientSideACSThinker`'s `RunningScripts` before giving up. Zandronum's
+`SetScriptState` only consults the single global `DACSThinker::ActiveThinker`. Practical effect: on
+UZDoom, `Acs_NamedTerminate` can terminate a currently-running clientside instance of the named
+script when no matching non-clientside instance is running; on Zandronum it cannot reach a
+clientside script through this call at all. Both engines still return `true` unconditionally either
+way, so this doesn't change the "return value isn't a success signal" finding above — it only
+widens which running script the call can actually hit on UZDoom.
 
 ## Fork/wiki notes
 

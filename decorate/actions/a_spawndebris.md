@@ -1,15 +1,17 @@
 # `A_SpawnDebris` (spawning debris particles from an actor's health counter)
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_SpawnDebris` (retrieved 2026-08-01, oldid=43415) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3215-3277`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_SpawnDebris` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_SpawnDebris&oldid=43415) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3215-3277`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_SpawnDebris)` in `src/thingdef/thingdef_codeptr.cpp`.
 
 Spawns multiple debris actors around the calling actor, using the debris class's `Health` value as a count. Each spawned piece is assigned one of the debris class's declared states and thrown with randomized velocity.
 
 ## Signature
 
-```
+```text
 void A_SpawnDebris(class<Actor> type [, bool translation [, fixed mult_h [, fixed mult_v]]])
 ```
 
@@ -54,7 +56,7 @@ Each spawned piece receives randomized velocity:
 
 If `translation` is true, the debris actor's `Translation` is set to match the calling actor's translation **before** the piece's initial state is assigned.
 
-## Zandronum multiplayer behavior — velocity replication bug
+## Zandronum-specific: velocity replication bug
 
 **In Zandronum multiplayer, debris velocity is never replicated to clients.** Each debris actor is spawned on the server and sent to all clients via `SERVERCOMMANDS_SpawnThing`, which does not include velocity information (only class, position, and netID). The velocities are then set on the server's actor instance (lines 3268–3270 of the source), but the sync command that follows (`SERVERCOMMANDS_MoveThing` at line 3274) targets the **calling actor** (`self`), not the spawned debris actor (`mo`).
 
@@ -62,9 +64,17 @@ If `translation` is true, the debris actor's `Translation` is set to match the c
 
 Related discussion: `decorate/concepts/crash-and-bug-checklist.md` may cover multiplayer-specific action-function gotchas.
 
+## Engine-family divergence: no client/server split; native double-typed signature
+
+UZDoom has no client/server authority split anywhere in its source tree (no `NETWORK_InClientMode`/`SERVERCOMMANDS_*`-style construct exists at all). `A_SpawnDebris`'s UZDoom implementation (`src/playsim/p_actionfunctions.cpp`) spawns each debris actor and sets its position and velocity directly on that single actor instance, with no separate broadcast/sync step afterward — the "Zandronum-specific: velocity replication bug" above (a desync caused by the sync command targeting the wrong actor) has no counterpart on UZDoom because there is no client/server split for it to desync across.
+
+The native declaration also differs from the DECORATE-era signature shown above: UZDoom declares `A_SpawnDebris` in `wadsrc/static/zscript/actors/actor.zs` as `native void A_SpawnDebris(class<Actor> spawntype, bool transfer_translation = false, double mult_h = 1, double mult_v = 1);` — the actor-class parameter is named `spawntype` (not `type`), and `mult_h`/`mult_v` are `double` rather than Zandronum's fixed-point `fixed`, with default values expressed directly in the ZScript signature rather than via DECORATE's positional-argument defaulting. This matches the ZDoom Wiki's `float`-typed multipliers more closely than Zandronum's `fixed` ones (though the wiki's `string type` wording doesn't match either engine, both of which take `class<Actor>`).
+
+Aside from these two points, the spawn-count/state-assignment, position-offset, and velocity-randomization logic (including the `mult_h`/`mult_v` minimum-clamp behavior) is the same on both engines — `src/playsim/p_actionfunctions.cpp:1550-1589` mirrors the Zandronum source's structure and RNG usage (`pr_spawndebris`/`Random2()`) call for call.
+
 ## Example
 
-```
+```text
 ACTOR SentinelDebris
 {
   Health 15

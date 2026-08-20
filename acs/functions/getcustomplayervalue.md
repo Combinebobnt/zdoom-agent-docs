@@ -1,11 +1,13 @@
 # GetCustomPlayerValue
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 — the whole custom-column/custom-player-value feature (originally added as `GetCustomColumnValue` in commit `b3d065026`, later renamed to `GetCustomPlayerValue` in `1115642c3`) was checked via `git merge-base --is-ancestor <commit> 28f736fb3` (the 3.2.1 version-bump commit) and both predate it, so this is confirmed present in 3.2.1, not a post-3.2.1 addition.
-**Provenance:** `GetCustomPlayerValue - Zandronum Wiki.html` (wiki `oldid=2282`, a stub page), verified against the Zandronum source's `src/p_acs.cpp` 2026-07-29.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** `GetCustomPlayerValue - Zandronum Wiki.html` (wiki `https://wiki.zandronum.com/w/index.php?title=GetCustomPlayerValue&oldid=2282`, a stub page), verified against the Zandronum source's `src/p_acs.cpp` 2026-07-29.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Extension function (index -157; `SetCustomPlayerValue` at -156, `ResetCustomDataToDefault` at -158)
 
-```
+```text
 raw GetCustomPlayerValue(str data, int player)
 ```
 
@@ -52,3 +54,30 @@ None of this — the fixed-point float case or the two string-handle cases — i
   declared type).
 - `ResetCustomDataToDefault` (-158) — resets one player's (or, with `player < 0`, all players')
   value for a given `data` key back to the column's declared default.
+
+## Engine-family divergence
+
+`GetCustomPlayerValue` is bound as ACSF (CALLFUNC) index 157 — inside the 100–199 range UZDoom's
+own ACSF enum reserves for Zandronum's extensions and implements none of (confirmed via
+`tools/engine_matrix.py GetCustomPlayerValue`, bin `zandronum-only-silent`). UZDoom's
+`CallFunction` dispatcher is a plain `switch` over the ACSF index with `default: break;` falling
+through to `return 0` — no error, no log line, execution just continues. A Zandronum-compiled
+object calling `GetCustomPlayerValue` under UZDoom silently gets `0` back in place of whatever the
+looked-up column would actually decode to. See
+[Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md) for the general mechanism
+— this function is one of the confirmed instances it names directly.
+
+That fallback `0` collides with several of this function's own legitimate outcomes, so a UZDoom
+caller can't tell "wrong engine" apart from a real answer. Per "What it actually does" above, `0`
+is already the shared return for "key not found" and "player invalid" on Zandronum itself, and for
+a `DATATYPE_BOOL`/`DATATYPE_INT` column it's also an entirely ordinary stored value — there is no
+way to distinguish "this field was never set (or never declared via `addcustomdata`)" from "the
+value genuinely is 0" from "this build doesn't implement the call at all". It's worse for the two
+string-handle types: per "Return value depends on the column's declared data type" above,
+`DATATYPE_STRING`/`DATATYPE_TEXTURE` columns return a global ACS string-table handle, not a raw
+int, and `0` is not a valid handle produced by that path — a script that hands the fallback
+straight to a string-consuming opcode gets whatever unrelated string an untagged lookup at index 0
+resolves to, not the empty string Zandronum's own "key not found" case would produce. The paired
+setter, `SetCustomPlayerValue` (CALLFUNC index 156), sits in the same reserved range and fails the
+same way: the write silently never happens under UZDoom, so a round-trip set-then-get through this
+pair looks like "read back 0" either way, with nothing to flag that neither call actually ran.

@@ -1,10 +1,20 @@
 # `int PlayerIsSpectator(int player)`
 
+**Tier:** A.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Provenance:** wiki page `PlayerIsSpectator - Zandronum Wiki.html` (`_intake/`, retrieved
+2026-07-28, `https://wiki.zandronum.com/w/index.php?title=PlayerIsSpectator&oldid=1320`) + source-verified (`p_acs.cpp:7148-7161`, `d_player.h:736-740`,
+`gamemode_enums.h:72`, `p_interaction.cpp:2441-2453,3006-3014`). The wiki's 0/1/2 mapping holds
+exactly; the mode-gating on `2` and the invalid-index-vs-non-spectator ambiguity are this doc's
+source-verified additions.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
+**Bucket:** extension function.
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+
 Checks whether a player is a spectator, and distinguishes "true" spectators from players waiting
 to respawn after dying. Extension function (`ACSF_PlayerIsSpectator`, index -101 in
 `zcommon.bcs`), implementation at the Zandronum source's `src/p_acs.cpp:7148-7161`.
-
-**Bucket:** extension function.
 
 ```cpp
 case ACSF_PlayerIsSpectator:
@@ -43,7 +53,7 @@ case ACSF_PlayerIsSpectator:
 **Example** (from the wiki, a `DISCONNECT` script distinguishing a true disconnect from becoming
 a spectator):
 
-```
+```text
 Script 1 (int player) DISCONNECT
 {
     if (!PlayerIsSpectator(player))
@@ -56,11 +66,20 @@ Script 1 (int player) DISCONNECT
 **Returns:** `int` — `0` not a spectator (or invalid player), `1` true spectator, `2` dead
 spectator (mode-dependent, see above).
 
-**Provenance:** wiki page `PlayerIsSpectator - Zandronum Wiki.html` (`_intake/`, retrieved
-2026-07-28, `oldid=1320`) + source-verified (`p_acs.cpp:7148-7161`, `d_player.h:736-740`,
-`gamemode_enums.h:72`, `p_interaction.cpp:2441-2453,3006-3014`). The wiki's 0/1/2 mapping holds
-exactly; the mode-gating on `2` and the invalid-index-vs-non-spectator ambiguity are this doc's
-source-verified additions. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source
-`master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.
+## Engine-family divergence
 
-**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+`PlayerIsSpectator` is bound at ACSF index 101 — inside the 100–199 range UZDoom's own ACSF enum
+skips entirely, reserved for Zandronum's extensions and never implemented. A Zandronum-compiled
+object calling it under UZDoom always gets `0` back, unconditionally, regardless of the target
+player's actual spectator state — no error, no log line.
+
+This collapses this function's three-way return above into a single, wrong constant: a script
+testing for `1` (true spectator) or `2` (dead spectator) will never observe either value under
+UZDoom, only ever the `0` case — indistinguishable, per this file's own "Return `0`" bullet, from
+"genuinely not a spectator" or "invalid player index." The `DISCONNECT` example above would
+misreport every real spectator as a disconnect.
+
+Worth noting the trap is easy to miss in testing: a singleplayer session has no spectators anyway,
+so `PlayerIsSpectator` returning `0` there looks coincidentally correct on both engines. See
+[Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md) for the general
+reserved-ACSF-range mechanism and its other affected functions.

@@ -1,8 +1,10 @@
 # `void A_PlaySound(sound whattoplay [, int slot [, float volume [, bool looping [, float attenuation]]]])`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_PlaySound` (retrieved 2026-07-31, oldid=54524) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:445` and `wadsrc/static/actors/actor.txt:197`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_PlaySound` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_PlaySound&oldid=54524) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:445` and `wadsrc/static/actors/actor.txt:197`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS` on `AActor` (`src/thingdef/thingdef_codeptr.cpp:445`).
 
 Plays a sound from the calling actor with parameters controlling channel, volume, looping behavior, and attenuation (distance fading).
@@ -36,6 +38,34 @@ In both paths, if not looping, the sound can be interrupted by calling `A_PlaySo
 ## Network behavior
 
 **Server-side only in multiplayer, with replication to clients.** If the calling actor's `+CLIENTSIDEONLY` flag is not set, the function returns immediately on the client side; the server alone is responsible for playing the sound and broadcasting it to all clients via `SERVERCOMMANDS_SoundActor`. For actors flagged `+CLIENTSIDEONLY`, the function runs on each client's local copy of that actor (cosmetic-only sounds). The server maintains a per-actor list of active looping channels (per `SERVER_UpdateLoopingChannels`) so that looping sounds re-synchronize to clients that join mid-game.
+
+## Zandronum-specific: network-authoritative sound replication
+
+The server-side-only/replication model described in "Network behavior" above does not exist on
+UZDoom. UZDoom's `A_PlaySound` (`src/sound/s_doomsound.cpp:643`) is a thin parameter-remapping
+wrapper: it folds `looping` into the `CHANF_LOOP|CHANF_NOSTOP` channel flags and `local` into
+`CHANF_LOCAL`, then calls straight into `A_StartSound` → `S_PlaySoundPitch`
+(`src/sound/s_doomsound.cpp:608`), which plays (or, if `CHANF_LOCAL` is set, conditionally plays
+only for the calling client via `AActor::CheckLocalView`) without any server/client branch, any
+equivalent of `SERVERCOMMANDS_SoundActor`, or a `SERVER_UpdateLoopingChannels`-style resync list.
+The `+CLIENTSIDEONLY` flag itself is a no-op on UZDoom — `src/scripting/thingdef_data.cpp:458`
+registers it as `DEFINE_DUMMY_FLAG(CLIENTSIDEONLY, false)`, parsed for DECORATE compatibility but
+without effect. This matches a pattern seen across most of this cohort: UZDoom has no
+client/server network-authority split anywhere in its source tree.
+
+## Engine-family divergence: parameter count, deprecation, and channel constant
+
+UZDoom's native declaration (`wadsrc/static/zscript/actors/actor.zs:1306`) carries the full
+7-parameter signature the ZDoom wiki describes (`whattoplay`, `slot`, `volume`, `looping`,
+`attenuation`, `local`, `pitch`) — confirming, on the primary engine itself rather than by wiki
+inference, that the "Note: Engine-family divergence" paragraph above describes a real UZDoom/
+Zandronum split rather than just a wiki-vs-Zandronum one. UZDoom's declaration is also marked
+`deprecated("4.3", "Use A_StartSound() instead")`, and unlike Zandronum, `A_StartSound` genuinely
+exists on UZDoom (`wadsrc/static/zscript/actors/actor.zs:1307`) as the current recommended
+interface — `A_PlaySound` is a legacy call-through, not the production interface, on this engine.
+Separately, UZDoom exposes `CHAN_LOOP` (256) as a named constant in the global `ESoundFlags` enum
+(`wadsrc/static/zscript/engine/base.zs:41`), usable directly in DECORATE/ZScript source, unlike
+Zandronum where the same numeric value has no named constant.
 
 ## See also
 

@@ -1,5 +1,19 @@
 # `void ChangeCeiling(int tag, str flatname)`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `ChangeCeiling - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
+`https://zdoom.org/w/index.php?title=ChangeCeiling&oldid=27562`) + source-verified against the Zandronum source (`p_acs.cpp:3990-4013,10575-10583`,
+`textures/texturemanager.cpp:308-328`) and `zt-bcc/src/builtin.c:42`. The wiki's signature,
+tag/flatname semantics, and any-texture-namespace claim all hold exactly against Zandronum's
+source; the unknown-name fallback-texture behavior, the string-index-`NULL` silent no-op, the
+`TEXMAN_TryAny`-is-forced-by-`GetTexture`-not-by-the-call-site mechanism, the Zandronum netcode
+sync (and its floor+ceiling coupling), and the `bFlatChange` bookkeeping flag are this doc's
+source-verified additions, not mentioned on the ZDoom wiki page.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** compiler builtin.
+
 Changes the ceiling texture of every sector matching `tag` to `flatname`. Compiler builtin
 (`PCD_CHANGECEILING`, `zt-bcc/src/builtin.c` `g_funcs[]` entry `"changeceiling"`), semantics in
 the Zandronum source's `src/p_acs.cpp` (`case PCD_CHANGECEILING:`, line 10575, calling
@@ -8,8 +22,6 @@ both compile to the exact same `ChangeFlat(tag, name, floorOrCeiling)` engine fu
 only in the `floorOrCeiling` argument (`1` for `ChangeCeiling` vs `0` for `ChangeFloor`,
 `p_acs.cpp:10566` vs `10576`). Everything below was independently re-verified against source
 rather than assumed from that symmetry, per instructions.
-
-**Bucket:** compiler builtin.
 
 - `tag` — a normal sector tag; every sector currently matching it (via `P_FindSectorFromTag`,
   looped until no more matches) gets its ceiling changed. Zero or more sectors, no error if none
@@ -20,7 +32,7 @@ rather than assumed from that symmetry, per instructions.
   unconditionally ORs `TEXMAN_TryAny` into the flags it forwards to `CheckForTexture`
   (`textures/texturemanager.cpp:318`, `i = CheckForTexture(name, usetype, flags | TEXMAN_TryAny)`)
   regardless of what the caller passed. So the wiki's "you may also use any texture, pname,
-  sprite, or internal graphic (e.g. TITLEPIC)" claim still holds in this fork, but the mechanism
+  sprite, or internal graphic (e.g. TITLEPIC)" claim still holds in the Zandronum engine fork, but the mechanism
   is `GetTexture`'s own unconditional behavior, not an explicit `TEXMAN_TryAny` at the
   `ChangeFlat` call site.
 - **Unknown/unresolvable name does not silently no-op and does not abort the script** — if
@@ -56,25 +68,28 @@ rather than assumed from that symmetry, per instructions.
   something ACS/BCS code can read back.
 - The wiki's power-of-2-dimensions caveat ("only graphics whose dimensions are powers of 2 ...
   will display correctly") is a general classic-renderer flat-wrapping quirk, not something
-  specific to this function's own code path — not independently re-verified here against this
-  fork's renderer, so treat it as plausible but unconfirmed for Zandronum's software/hardware
+  specific to this function's own code path — not independently re-verified here against
+  Zandronum's renderer, so treat it as plausible but unconfirmed for Zandronum's software/hardware
   renderers specifically.
+
+## Engine-family divergence: `bFlatChange` bookkeeping flag
+
+UZDoom's equivalent code path (`DLevelScript::ChangeFlat`, `src/playsim/p_acs.cpp`, calling
+`sector_t::SetTexture`, `src/gamedata/r_defs.h`) has no equivalent of Zandronum's
+`sectors[secnum].bFlatChange` flag — `SetTexture` only stores the new `FTextureID` (and, for the
+floor plane specifically, adjusts floor clipping); it sets no dirty/change-tracking bit at all.
+Since ACS/BCS code can't read `bFlatChange` back either way, this has no script-visible effect —
+it only matters if you're cross-referencing engine internals, e.g. save-game serialization, where
+UZDoom's `FSerializer`-based sector serialization does not depend on a per-field dirty flag the
+way Zandronum's does. The Zandronum-specific netcode paragraph above (`SERVERCOMMANDS_SetSectorFlat`)
+is a separate, already-labeled Zandronum-only mechanism — UZDoom's GZDoom-family networking model
+has no equivalent client-server sync command to trigger here at all.
 
 **Example (wiki's, unchanged — argument order and behavior both check out):**
 
-```
+```text
 script "Example" (void)
 {
     ChangeCeiling(4, "RROCK13");
 }
 ```
-
-**Provenance:** wiki page `ChangeCeiling - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
-`oldid=27562`) + source-verified against the Zandronum source (`p_acs.cpp:3990-4013,10575-10583`,
-`textures/texturemanager.cpp:308-328`) and `zt-bcc/src/builtin.c:42`. The wiki's signature,
-tag/flatname semantics, and any-texture-namespace claim all hold exactly against this fork's
-source; the unknown-name fallback-texture behavior, the string-index-`NULL` silent no-op, the
-`TEXMAN_TryAny`-is-forced-by-`GetTexture`-not-by-the-call-site mechanism, the Zandronum netcode
-sync (and its floor+ceiling coupling), and the `bFlatChange` bookkeeping flag are this doc's
-source-verified additions, not mentioned on the ZDoom wiki page.
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.

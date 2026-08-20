@@ -1,6 +1,6 @@
 # GLDEFS doc index
 
-Router only. See `CLAUDE.md` for where GLDEFS parsing lives in engine source,
+Router only. See `AGENTS.md` for where GLDEFS parsing lives in engine source,
 `../shared/AUTHORING.md` for tiers/engine-scope/licensing.
 
 ## Concepts

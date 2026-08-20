@@ -1,8 +1,10 @@
 # `action state A_CheckSpecies(statelabel label, name species = 'none', int ptr = AAPTR_DEFAULT)`
 
 **Tier:** A
-**Engine:** UZDoom 4.15pre / GZDoom-family — does not exist in Zandronum
-**Provenance:** ZDoom Wiki `A_CheckSpecies` (retrieved 2026-08-01, oldid=44308) + verified against UZDoom source's `wadsrc/static/zscript/actors/checks.zs:195-199`.
+**Applies to:** UZDoom=yes, Zandronum=no
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15) — re-confirmed 2026-08-15; the function has since moved to checks.zs:214 (Provenance's cited 195-199 is stale, left untouched per this pass's rules)
+**Provenance:** ZDoom Wiki `A_CheckSpecies` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_CheckSpecies&oldid=44308) + verified against UZDoom source's `wadsrc/static/zscript/actors/checks.zs:195-199`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 Checks whether a target actor has a specified species and jumps to a given state if the check passes.
 

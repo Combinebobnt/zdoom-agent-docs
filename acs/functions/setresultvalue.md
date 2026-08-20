@@ -1,11 +1,16 @@
 # `void SetResultValue(int value)`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Provenance:** wiki page `SetResultValue - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28,
+`https://zdoom.org/w/index.php?title=SetResultValue&oldid=48425`) + source-verified against `zt-bcc/src/builtin.c:119` and the Zandronum source
+(`p_acs.cpp:9120-9158,10461-10470,13050,13662-13671`, `gamemode.cpp:1369-1379`,
+`gamemode.h:249-250`).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin (`zt-bcc/src/builtin.c:119`, `{ "setresultvalue", ";i" }` — one
 required int arg, no optional args; matches the wiki's signature exactly). Implemented as
 `PCD_SETRESULTVALUE` in `p_acs.cpp`.
-
-**Tier:** A. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD —
-see "Engine scope" in `../../shared/AUTHORING.md`).
 
 Sets the calling script's own "result value" — the `int` that a synchronous
 `Acs_ExecuteWithResult`/`Acs_NamedExecuteWithResult` caller receives back, or that a switch-line
@@ -64,7 +69,7 @@ the *reading* side (`Acs_NamedExecuteWithResult`) — this page only covers `Set
 
 **Example** (from the wiki, unmodified):
 
-```
+```text
 script 1 (void)
 {
     Print(d:ACS_ExecuteWithResult(2, 0, 0, 0)); //prints 667
@@ -75,8 +80,3 @@ script 2 (void)
     SetResultValue(667);
 }
 ```
-
-**Provenance:** wiki page `SetResultValue - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28,
-`oldid=48425`) + source-verified against `zt-bcc/src/builtin.c:119` and the Zandronum source
-(`p_acs.cpp:9120-9158,10461-10470,13050,13662-13671`, `gamemode.cpp:1369-1379`,
-`gamemode.h:249-250`).

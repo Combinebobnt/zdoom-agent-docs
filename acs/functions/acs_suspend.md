@@ -1,8 +1,10 @@
 # ACS_Suspend
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (feature predates the fork; verified against the `3.3-alpha` local checkout, no version-gap concern for this one).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `ACS_Suspend - ZDoom Wiki.html` (https://zdoom.org/w/index.php?title=ACS_Suspend&oldid=35857), verified 2026-07-29 against the Zandronum source's `src`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 `int Acs_Suspend(int script, int map)`
 
@@ -17,10 +19,10 @@ a script name to a number and forwards through the same `LS_ACS_Suspend` action 
 ## Parameters
 
 - `script` — numeric ID of the script to suspend.
-- `map` — numeric MAPINFO `levelnum` of the map containing the script. **Not optional in this
-  fork** (`zcommon.bcs:1441` declares it as mandatory), even though the underlying C++ would
-  tolerate omitting it. `map == 0` means "the current map" (`level.mapname`), not "map number 0"
-  — matches the older numbered `ACS_Execute`/`ACS_Terminate` convention.
+- `map` — numeric MAPINFO `levelnum` of the map containing the script. **Not optional in the
+  zt-bcc compiler fork** (`zcommon.bcs:1441` declares it as mandatory), even though the underlying
+  C++ would tolerate omitting it. `map == 0` means "the current map" (`level.mapname`), not "map
+  number 0" — matches the older numbered `ACS_Execute`/`ACS_Terminate` convention.
 
 ## Return value
 
@@ -38,7 +40,7 @@ as [ACS_NamedTerminate](acs_namedterminate.md) and for the same reason:
 So a script number typo, a script that already finished, or a bad map number are all
 indistinguishable from a successful suspend by return value alone. **This is a major fork/wiki
 divergence:** the wiki states "If the specified script is not currently running, then it will be
-immediately suspended the next time it is run" — but this fork has no "on next run" behavior.
+immediately suspended the next time it is run" — but the Zandronum engine fork has no "on next run" behavior.
 `SetScriptState` only acts on currently-running instances; there is no latched "suspend on next
 start" flag or deferred state.
 
@@ -78,9 +80,25 @@ Unlike `ACS_Execute` (which has a `CLIENTSIDE`-script carve-out in `p_lnspec.cpp
 script does not reach clients — the script continues running on clients even though suspended on
 the server.
 
-## Fork/wiki notes
+## Engine-family divergence: Clientside behavior
 
-**Wiki's "on next run" claim is false in this fork** (detailed above under "Return value"). The
-source of confusion may be that the wiki was written for an earlier ZDoom version with different
-semantics, or the author misread the deferred-suspend queueing as implying a "will suspend once
-started" guarantee. Here, deferred-suspend still requires the script to already be running.
+The "no server→client broadcast" gap above is specific to Zandronum's authoritative-server/
+thin-client netcode split and does not carry over to UZDoom, which (per this checkout) has no
+comparable client/server division yet — the UZDoom source's `src/playsim/p_acs.cpp` explicitly
+notes it treats singleplayer and multiplayer consistently "should client/server ever get in,"
+i.e. every peer currently runs the full simulation, clientside scripts included.
+
+Mechanically, UZDoom's `SetScriptState` (the function `LS_ACS_Suspend` bottoms out in, via
+`P_SuspendScript`) checks the level's regular script controller and its clientside script
+controller unconditionally in the same call, suspending whichever one has a running instance of
+the target script number. So on UZDoom, calling `ACS_Suspend` against a `CLIENTSIDE`-flagged
+script number *does* reach that script's own locally-running instance — there is no broadcast gap
+to speak of, because there is no separate authoritative-server role for the call to fail to cross.
+
+## Wiki/engine divergence
+
+**Wiki's "on next run" claim is false in the Zandronum engine fork** (detailed above under "Return
+value"). The source of confusion may be that the wiki was written for an earlier ZDoom version with
+different semantics, or the author misread the deferred-suspend queueing as implying a "will
+suspend once started" guarantee. Here, deferred-suspend still requires the script to already be
+running.

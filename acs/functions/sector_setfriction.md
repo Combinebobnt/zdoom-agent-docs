@@ -1,8 +1,10 @@
 # Sector_SetFriction
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2025-07-29)
 **Provenance:** Sector_SetFriction - ZDoom Wiki (https://zdoom.org/w/index.php?title=Sector_SetFriction&oldid=44656), verified against Zandronum source 2025-07-29.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 **Signature:** `int Sector_SetFriction(int tag, int amount)`
 
@@ -27,9 +29,9 @@ Zandronum-specific: On a server, script calls that change friction trigger `SERV
 
 Always returns `true`, unconditionally. A tag matching zero sectors or a server-side rejection (impossible for this function) is indistinguishable from success.
 
-## Fork divergence
+## Wiki/engine divergence: `amount == 0` behavior
 
-The ZDoom wiki describes `Sector_SetFriction(tag, 0)` as equivalent to setting friction from the triggering linedef's length, following Boom linedef type 223. **This is only true at map-initialization time** (static linedef property). When called from a script at runtime, `amount == 0` has no special handling — the BOOM formula applies normally, producing `friction = 0xD001` (maximum sludge). If you want friction to depend on a line's length, you must do that computation yourself in the script and pass the result.
+The ZDoom wiki describes `Sector_SetFriction(tag, 0)` as equivalent to setting friction from the triggering linedef's length, following Boom linedef type 223. **This is only true at map-initialization time** (static linedef property). When called from a script at runtime, `amount == 0` has no special handling — the BOOM formula applies normally, producing `friction = 0xD001` (maximum sludge). If you want friction to depend on a line's length, you must do that computation yourself in the script and pass the result. This holds identically on both engine families — neither branches the script-callable action special's `amount == 0` case back to a line-length lookup; only the separate static map-init path (which the script call never goes through) does that.
 
 ## Related
 

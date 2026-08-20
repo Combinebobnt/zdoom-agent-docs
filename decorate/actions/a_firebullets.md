@@ -1,8 +1,10 @@
 # `void A_FireBullets(angle spread_xy, angle spread_z, int numbullets, int damageperbullet, class<Actor> pufftype, int flags, fixed range)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_FireBullets` (retrieved 2026-07-31, oldid=53826) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1680-1694` and helper implementations.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_FireBullets` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_FireBullets&oldid=53826) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1680-1694` and helper implementations.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_FireBullets)` at `src/thingdef/thingdef_codeptr.cpp:1680`.
 
 Defines a custom hitscan weapon attack, firing one or more bullets with optional spread and spawning an impact puff at the point of hit. The weapon's `AttackSound` is played on the weapon channel if the weapon exists.
@@ -40,7 +42,7 @@ Defines a custom hitscan weapon attack, firing one or more bullets with optional
 
 ## Examples
 
-```
+```text
 Fire:
     TRIF A 5 Bright A_FireBullets(0, 0, 1, 45, "RiflePuff", FBF_USEAMMO|FBF_NORANDOM);
     TRIF B 5 Bright;
@@ -50,3 +52,11 @@ Fire:
 ```
 
 This fires a single bullet with no spread, 45 damage (no random multiplier), a rifle puff at impact, consuming ammo on each shot.
+
+## Engine-family divergence: full wiki parameter set, extra flags, and floating-point spread math
+
+UZDoom's `A_FireBullets` (`wadsrc/static/zscript/actors/inventory/stateprovider.zs`) is the full ZDoom-wiki ZScript version referenced in the intro paragraph above, not Zandronum's reduced 7-parameter variant: it takes the wiki's full 10-parameter signature, including `missile`, `Spawnheight`, and `Spawnofs_xy` for spawning a simultaneous projectile alongside the hitscan bullets (via `SpawnPlayerMissile`/`AimBulletMissile`). All nine `FBF_*` flags exist in UZDoom's `EFireBulletsFlags` enum (`wadsrc/static/zscript/constants.zs`), including the three Zandronum lacks: `FBF_PUFFTARGET`, `FBF_PUFFMASTER`, `FBF_PUFFTRACER`. Spread math also diverges from what's documented for Zandronum above: UZDoom computes `spread_xy * Random2[cabullet]() / 255.` using floating-point division — exactly the "ZScript floating-point formula" contrasted against Zandronum's integer-division formula in the "Spread math divergence from ZScript" bullet above, confirming that comparison directly from UZDoom source rather than the wiki page alone. Negative `numbullets` handling also diverges: UZDoom treats any negative value the same as `-1` (`if (numbullets < 0) numbullets = 1;`, then always applies spread) — it does not reproduce Zandronum's bug where negative values other than exactly `-1` fire zero bullets.
+
+## Engine-family divergence: no client/server split, no bot notifications, no spread cheat
+
+UZDoom has no client/server authority split anywhere in its source tree (no `NETWORK_InClientMode`/`SERVERCOMMANDS_*`-style construct exists at all) — the "Server-authoritative in networked play" behavior note above is Zandronum-only; on UZDoom the bullet traces are computed identically regardless of network role. UZDoom's implementation also has no hardcoded bot-notification system (`BOTS_PostWeaponFiredEvent`) — the "Bot notifications" behavior note above is Zandronum-only. It likewise has no `CF2_SPREAD` cheat-flag handling anywhere in its source — the "Cheat spread fan" behavior note above is Zandronum-only, so exactly the requested number of bullets fires per call regardless of player cheats. One point of agreement: UZDoom's ammo depletion, like Zandronum's, is only applied when the call originates from an actual weapon psprite state (`stateinfo.mStateType == STATE_Psprite`), not merely from a ready weapon existing.

@@ -1,5 +1,15 @@
 # `int SetGameplaySetting(str cvar, int value)`
 
+**Tier:** A.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `SetGameplaySetting - Zandronum Wiki.html` (`_intake/`, retrieved
+2026-07-29, `https://wiki.zandronum.com/w/index.php?title=SetGameplaySetting&oldid=2522`) + source-verified (`p_acs.cpp:8129-8174`, `gamemode.cpp:1619-1657`,
+`c_cvars.h:88,91`) and version-gated against `28f736fb3` per this repo's 3.2.1 check.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
+**Bucket:** extension function (negative index, `ACSF_SetGameplaySetting`).
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+
 Zandronum-specific ACS function that changes the value of an engine CVar at runtime, but
 **only** if that CVar has been marked as a "gameplay setting" (i.e. eligible for the
 `GAMEMODE` lump's game-settings block). Extension function, index `-155` in
@@ -40,8 +50,6 @@ case ACSF_SetGameplaySetting:
     return 0;
 }
 ```
-
-**Bucket:** extension function (negative index, `ACSF_SetGameplaySetting`).
 
 ## Behavior beyond the wiki page
 
@@ -99,9 +107,24 @@ sibling intake task is processing `SetGameModeLimit` independently in the same b
 here in case the coordinating session wants to consolidate into a `families/gamemode-settings.md`
 later.
 
-**Provenance:** wiki page `SetGameplaySetting - Zandronum Wiki.html` (`_intake/`, retrieved
-2026-07-29, `oldid=2522`) + source-verified (`p_acs.cpp:8129-8174`, `gamemode.cpp:1619-1657`,
-`c_cvars.h:88,91`) and version-gated against `28f736fb3` per this repo's 3.2.1 check.
-**Engine:** Zandronum 3.2.1. **Tier:** A.
+## Engine-family divergence
 
-**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+UZDoom does not implement this function. It's ACSF (CALLFUNC) index 155 — Zandronum's own
+extension block starts at -100, so `-155:SetGameplaySetting(str,int):bool` in `zcommon.bcs`
+compiles to absolute index 155 as `PCD_CALLFUNC`'s operand — squarely inside the 100–199 range
+UZDoom's `CallFunction` dispatcher reserves for Zandronum's extensions and implements none of (see
+[Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md)). A Zandronum-compiled
+object calling `SetGameplaySetting` under UZDoom hits that dispatcher's `default: break;` case:
+no error, no log line, and the interpreter's per-call stack rebalancing runs regardless of which
+branch fired, so the script just continues with a `0` result in place of this function's real
+return value.
+
+Concretely, the CVar write never happens — none of the `IGNORE`/`NOSET`/`LATCH` checks, the
+`CVAR_GAMEPLAYSETTING`/`CVAR_GAMEPLAYFLAGSET` gate, the type coercion, or the
+`GAMEMODE_SetGameplaySetting` call documented above ever run, because that whole `case` doesn't
+exist in UZDoom's `CallFunction`. Worse, the resulting `0` is indistinguishable from a legitimate
+on-Zandronum rejection (bad CVar name, a latched CVar, a CVar missing the gameplay-setting flag) —
+a script that checks the return value and branches on failure reports exactly the same "rejected"
+outcome it would for a bad argument, with no signal that the actual cause is running on the wrong
+engine. There's no compiler-side fix available either (`zt-bcc` has no `--target`/`--engine`
+switch), so a script that needs this to work portably has to gate the call itself.

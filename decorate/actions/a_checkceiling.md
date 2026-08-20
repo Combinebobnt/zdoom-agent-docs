@@ -1,8 +1,10 @@
 # `A_CheckCeiling`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_CheckCeiling` (retrieved 2026-07-29, oldid=42394) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3722-3733`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** ZDoom Wiki `A_CheckCeiling` (retrieved 2026-07-29, https://zdoom.org/w/index.php?title=A_CheckCeiling&oldid=42394) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3722-3733`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Action function on `AActor` (`DEFINE_ACTION_FUNCTION_PARAMS` in `src/thingdef/thingdef_codeptr.cpp`).
 
 Jumps to a target state if the calling actor is touching or submerged into the ceiling. The check includes the actor's height in the calculation (comparing `z + height` against `ceilingz`).

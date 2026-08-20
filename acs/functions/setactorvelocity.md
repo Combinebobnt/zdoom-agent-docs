@@ -1,11 +1,22 @@
 # `bool SetActorVelocity(int tid, fixed velx, fixed vely, fixed velz, bool add, bool setbob)`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `SetActorVelocity - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
+`https://zdoom.org/w/index.php?title=SetActorVelocity&oldid=33146`) + source-verified against `p_acs.cpp:6104-6118`, `p_things.cpp:602-622`,
+`sv_main.cpp:5563-5586`, `p_user.cpp:2805-2861`. The wiki's `tid`/`velx`/`vely`/`velz`/`add`
+description checks out; its `setbob` description is correct but incomplete (doesn't mention the
+replace-mode bob-zeroing interaction above), and it says nothing about the always-`0` return
+value or the Zandronum server-side netcode/position-sync behavior — all source-verified additions
+in this file.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** extension function.
+
 Sets or adds to the velocity of the actor(s) matching `tid`. Extension function (`zcommon.bcs`
 index -23), implementation in `DLevelScript::CallFunction`'s `case ACSF_SetActorVelocity`
 (the Zandronum source's `src/p_acs.cpp:6104-6118`), which forwards into `P_Thing_SetVelocity`
 (the Zandronum source's `src/p_things.cpp:602-622`).
-
-**Bucket:** extension function.
 
 - `tid` — **`0` means the activator**, passed straight to `P_Thing_SetVelocity` with no null
   check at the `p_acs.cpp` call site (`args[0] == 0` branch, line 6105-6107). This is
@@ -52,15 +63,6 @@ index -23), implementation in `DLevelScript::CallFunction`'s `case ACSF_SetActor
 
 **Example — launch an actor at a fixed 3D velocity, replacing its current motion:**
 
-```
+```text
 SetActorVelocity(tid, FixedMul(cos(angle), speed), FixedMul(sin(angle), speed), 0, false, false);
 ```
-
-**Provenance:** wiki page `SetActorVelocity - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
-`oldid=33146`) + source-verified against `p_acs.cpp:6104-6118`, `p_things.cpp:602-622`,
-`sv_main.cpp:5563-5586`, `p_user.cpp:2805-2861`. The wiki's `tid`/`velx`/`vely`/`velz`/`add`
-description checks out; its `setbob` description is correct but incomplete (doesn't mention the
-replace-mode bob-zeroing interaction above), and it says nothing about the always-`0` return
-value or the Zandronum server-side netcode/position-sync behavior — all source-verified additions
-in this file. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD —
-see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.

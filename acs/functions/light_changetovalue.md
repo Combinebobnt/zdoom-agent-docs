@@ -1,11 +1,22 @@
 # `int Light_ChangeToValue(int tag, int value)`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `Light_ChangeToValue - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
+`https://zdoom.org/w/index.php?title=Light_ChangeToValue&oldid=44599`) + source-verified (`p_lnspec.cpp:1945-1950`, `p_lights.cpp:503-548`,
+`P_FindSectorFromTag` in `p_spec.cpp:270-277`). The ZDoom wiki page is **incomplete, not wrong** —
+it correctly describes the `value >= 0` path ("Sets the light level in a sector to value") but
+omits the `value < 0` neighbor-max-search behavior entirely. The `tag == 0` fallback documented
+for other sector specials does not apply here. The Zandronum netcode and clamping behavior are
+additions verified against source.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** action special.
+
 Sets the light level in sector(s) matching `tag` to a specified value. Action special (positive
 index 112 in `zcommon.bcs`'s `special` table), semantics in the Zandronum source's `src/p_lnspec.cpp`,
 `FUNC(LS_Light_ChangeToValue)` (line 1945), which forwards into `EV_LightTurnOn`
 (`p_lights.cpp:503`).
-
-**Bucket:** action special.
 
 - `tag` — sector tag to affect. **No special handling for `tag == 0`** — it matches literal tag-0
   sectors only, same as any other tag (verified against `P_FindSectorFromTag`, which always
@@ -34,12 +45,3 @@ scripts and other contexts where an activator is absent or unknown.
 clients via `SERVERCOMMANDS_SetSectorLightLevel`, and the sector is marked `bLightChange = true` so
 clients can sync when they join later. This Zandronum-specific replication is not mentioned by the
 ZDoom wiki page.
-
-**Provenance:** wiki page `Light_ChangeToValue - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
-`oldid=44599`) + source-verified (`p_lnspec.cpp:1945-1950`, `p_lights.cpp:503-548`,
-`P_FindSectorFromTag` in `p_spec.cpp:270-277`). The ZDoom wiki page is **incomplete, not wrong** —
-it correctly describes the `value >= 0` path ("Sets the light level in a sector to value") but
-omits the `value < 0` neighbor-max-search behavior entirely. The `tag == 0` fallback documented
-for other sector specials does not apply here. The Zandronum netcode and clamping behavior are
-additions verified against source. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source
-`master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.

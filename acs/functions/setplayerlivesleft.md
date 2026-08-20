@@ -1,11 +1,13 @@
 # SetPlayerLivesLeft
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 — added together with `GetPlayerLivesLeft` in the same commit `eac46667c` ("Added new ACS commands GetPlayerLivesLeft and SetPlayerLivesLeft..."), confirmed via `git merge-base --is-ancestor eac46667c 28f736fb3` (the 3.2.1 version-bump commit) to predate 3.2.1, so this is present in the 3.2.1 target, not a later addition.
-**Provenance:** `SetPlayerLivesLeft - Zandronum Wiki.html` (wiki `oldid=1333`), verified against the Zandronum source's `src/p_acs.cpp`, `p_interaction.cpp`, and `gamemode.cpp` 2026-07-29.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** `SetPlayerLivesLeft - Zandronum Wiki.html` (wiki `https://wiki.zandronum.com/w/index.php?title=SetPlayerLivesLeft&oldid=1333`), verified against the Zandronum source's `src/p_acs.cpp`, `p_interaction.cpp`, and `gamemode.cpp` 2026-07-29.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Extension function (index -105; `GetPlayerLivesLeft` at -104)
 
-```
+```text
 bool SetPlayerLivesLeft(int player, int amount)
 ```
 
@@ -57,3 +59,11 @@ script authors.
 - `GetPlayerLivesLeft` (-104) — the reader counterpart; see `functions/getplayerlivesleft.md`.
 - `PlayerIsSpectator` — same caveat as the getter: a spectator's lives count can be set/read, so
   don't infer spectator/alive status from a lives value alone.
+
+## Engine-family divergence
+
+`SetPlayerLivesLeft` is bound as ACSF (CALLFUNC) index 105 — inside the 100–199 range UZDoom's own ACSF enum reserves for Zandronum's extensions and implements none of. A Zandronum-compiled object calling `SetPlayerLivesLeft()` under UZDoom hits UZDoom's `default: break;` case in its `CallFunction` dispatcher and gets `0` back, silently — no error, no log line, and no attempt at the `PLAYER_IsValidPlayer()` check the real (Zandronum) implementation runs first.
+
+Since this is a setter, the practical effect is that the write it exists to perform never happens: `player->ulLivesLeft` is left completely untouched under UZDoom, and there's no `informClients` replication either (see "Client sync" above) because `PLAYER_SetLivesLeft()` itself is never called. A script that checks the boolean return value for success reads this identically to the documented "invalid player index" failure case — there is no way, from ACS alone, to distinguish "this build doesn't support `SetPlayerLivesLeft`" from "the player argument was out of range." Because the unconditional-write behavior documented above ("Unlike every other internal writer...") is itself a Zandronum-only code path, a script relying on it to force a lives count regardless of gamemode will silently fail to do so on UZDoom — the value the caller believes it just set stays whatever it was before the call (typically its `0` default, per `GetPlayerLivesLeft`'s notes on `ulLivesLeft`'s initialization), with nothing to indicate the mismatch.
+
+See [Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md) for the general reserved-ACSF-range mechanism this is an instance of.

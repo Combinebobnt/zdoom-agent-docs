@@ -1,8 +1,10 @@
 # `void ActivatorSound(str sound, int volume)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (checked out source reports 3.3-alpha; `PCD_ACTIVATORSOUND` and the `bSoundOnClient` addition are long-standing, not netcode-gated additions postdating 3.2.1, so this is not expected to be version-sensitive).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `ActivatorSound - ZDoom Wiki` (https://zdoom.org/w/index.php?title=ActivatorSound&oldid=37264), verified 2026-07-29 against fork source.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 
 Plays a sound from whoever/whatever activated the script. Compiler builtin (`PCD_ACTIVATORSOUND`,
@@ -10,7 +12,7 @@ the zt-bcc source's `src/builtin.c:57,205`), implementation in `p_acs.cpp:11395-
 
 - `sound` — looked up via `FBehavior::StaticLookupString` (`p_acs.cpp:11396`); a bad/unregistered
   string index makes `lookup` stay `NULL` and the whole block is skipped — a silent no-op, not an
-  error, same pattern as other sound builtins in this fork.
+  error, same pattern as other sound builtins in Zandronum.
 - `volume` — matches the wiki's 0-127 int range; the engine divides by 127 to get the float
   `0.0`-`1.0` scale `S_Sound` expects (`(float)(STACK(1)) / 127.f`, `p_acs.cpp:11403/11409`).
 - **The wiki's one-line description ("plays from whoever activated the script") glosses over a

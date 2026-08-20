@@ -1,6 +1,6 @@
 # Console variables (CVars)
 
-**Generated:** by `python3 tools/gen_inventory.py console-cvars` from every `CVAR`/`CUSTOM_CVAR` declaration tree-wide in the Zandronum source's `src/` (~197 files declare at least one -- see `../CLAUDE.md`), plus a handful of cvars declared via a raw `F*CVar` constructor bypassing those macros (e.g. `skill`/`msg`/`noise` -- the engine-visible name is the constructor's quoted string argument, not the C++ variable name), cross-referenced against the UZDoom source's `src/` tree by name for the `UZD` column. `Flags` is the raw flag-macro expression from the declaration (e.g. `CVAR_ARCHIVE | CVAR_NOSETBYACS`), not yet decoded per-flag -- see `zandronum/docs/commands.txt` for prose meaning. Do not hand-edit rows; use `../notes/<name>.md` instead -- its `Tier`/`Notes` cell is picked up automatically on the next regen. **Engine:** Zandronum 3.2.1 confirmed present for every row; UZDoom presence per the `UZD` column only. **Tier:** per row.
+**Generated:** by `python3 tools/gen_inventory.py console-cvars` from every `CVAR`/`CUSTOM_CVAR` declaration tree-wide in the Zandronum source's `src/` (~197 files declare at least one -- see `../AGENTS.md`), plus a handful of cvars declared via a raw `F*CVar` constructor bypassing those macros (e.g. `skill`/`msg`/`noise` -- the engine-visible name is the constructor's quoted string argument, not the C++ variable name); UZDoom's own equivalent of the bypass is the `CVARD`/`CUSTOM_CVARD` "documented" macro family, whose `_NAMED` variants (`CVARD_NAMED`/`CUSTOM_CVARD_NAMED`) also split the console name from the C++ variable name -- both matched for the `UZD` column, cross-referenced against the UZDoom source's `src/` tree by name for the `UZD` column. `Flags` is the raw flag-macro expression from the declaration (e.g. `CVAR_ARCHIVE | CVAR_NOSETBYACS`), not yet decoded per-flag -- see `zandronum/docs/commands.txt` for prose meaning. Do not hand-edit rows; use `../notes/<name>.md` instead -- its `Tier`/`Notes` cell is picked up automatically on the next regen. Extraction reads the Zandronum source as its base (confirmed present for every row); UZDoom presence is a name cross-reference only (the `UZD` column). **Tier:** per row.
 
 | CVar | Type | Kind | Flags | Zan | UZD | Tier | Notes |
 |---|---|---|---|---|---|---|---|
@@ -311,9 +311,9 @@
 | crosshair | Int | plain | CVAR_ARCHIVE | yes | yes | C |  |
 | crosshaircolor | Color | plain | CVAR_ARCHIVE | yes | yes | C |  |
 | crosshairforce | Bool | plain | CVAR_ARCHIVE | yes | yes | C |  |
-| crosshairgrow | Bool | plain | CVAR_ARCHIVE | yes | — | C |  |
+| crosshairgrow | Bool | plain | CVAR_ARCHIVE | yes | yes | C |  |
 | crosshairhealth | Bool | plain | CVAR_ARCHIVE | yes | — | C |  |
-| crosshairscale | Bool | plain | CVAR_ARCHIVE | yes | — | C |  |
+| crosshairscale | Bool | plain | CVAR_ARCHIVE | yes | yes | C |  |
 | ctf | Bool | custom | CVAR_SERVERINFO \| CVAR_LATCH \| CVAR_CAMPAIGNLOCK | yes | — | C |  |
 | d3d_antilag | Bool | plain | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | — | C |  |
 | d3d_showpacks | Int | plain | 0 | yes | — | C |  |
@@ -396,7 +396,7 @@
 | gl_light_models | Bool | plain | CVAR_ARCHIVE | yes | yes | C |  |
 | gl_light_particles | Bool | plain | CVAR_ARCHIVE \| CVAR_GLOBALCONFIG | yes | yes | C |  |
 | gl_light_sprites | Bool | plain | CVAR_ARCHIVE \| CVAR_GLOBALCONFIG | yes | yes | C |  |
-| gl_lightmode | Int | custom | CVAR_ARCHIVE\|CVAR_NOINITCALL | yes | — | C |  |
+| gl_lightmode | Int | custom | CVAR_ARCHIVE\|CVAR_NOINITCALL | yes | yes | C |  |
 | gl_lights | Bool | custom | CVAR_ARCHIVE \| CVAR_GLOBALCONFIG \| CVAR_NOINITCALL | yes | — | C |  |
 | gl_lights_additive | Bool | custom | CVAR_ARCHIVE \| CVAR_GLOBALCONFIG \| CVAR_NOINITCALL | yes | — | C |  |
 | gl_lights_checkside | Bool | plain | CVAR_ARCHIVE \| CVAR_GLOBALCONFIG | yes | — | C |  |
@@ -431,8 +431,8 @@
 | gl_spritebrightfog | Bool | plain | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | — | C |  |
 | gl_spriteclip | Int | plain | CVAR_ARCHIVE | yes | yes | C |  |
 | gl_texture | Bool | plain | 0 | yes | yes | C |  |
-| gl_texture_filter | Int | custom | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG\|CVAR_NOINITCALL | yes | — | C |  |
-| gl_texture_filter_anisotropic | Float | custom | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG\|CVAR_NOINITCALL | yes | — | C |  |
+| gl_texture_filter | Int | custom | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG\|CVAR_NOINITCALL | yes | yes | C |  |
+| gl_texture_filter_anisotropic | Float | custom | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG\|CVAR_NOINITCALL | yes | yes | C |  |
 | gl_texture_format | Int | custom | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG\|CVAR_NOINITCALL | yes | — | C |  |
 | gl_texture_hqresize | Int | custom | CVAR_ARCHIVE \| CVAR_GLOBALCONFIG \| CVAR_NOINITCALL | yes | — | C |  |
 | gl_texture_hqresize_fonts | Flag | plain | 4 | yes | yes | C |  |
@@ -618,7 +618,7 @@
 | mouse_capturemode | Int | custom | CVAR_GLOBALCONFIG\|CVAR_ARCHIVE | yes | yes | C |  |
 | mouse_sensitivity | Float | plain | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | — | C |  |
 | movebob | Float | plain | CVAR_USERINFO \| CVAR_UNSYNCED_USERINFO \| CVAR_ARCHIVE | yes | yes | C |  |
-| msg | Int | plain | CVAR_ARCHIVE | yes | — | A | [notes](../notes/msg.md) |
+| msg | Int | plain | CVAR_ARCHIVE | yes | yes | A | [notes](../notes/msg.md) |
 | msg0color | Int | custom | CVAR_ARCHIVE | yes | yes | C |  |
 | msg1color | Int | custom | CVAR_ARCHIVE | yes | yes | C |  |
 | msg2color | Int | custom | CVAR_ARCHIVE | yes | yes | C |  |
@@ -723,11 +723,11 @@
 | screenshot_type | String | plain | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | yes | C |  |
 | sdl_nokeyrepeat | Bool | plain | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | — | C |  |
 | secretmessage | String | plain | CVAR_ARCHIVE | yes | — | C |  |
-| show_messages | Bool | plain | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | — | C |  |
+| show_messages | Bool | plain | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | yes | C |  |
 | show_obituaries | Bool | plain | CVAR_ARCHIVE | yes | yes | C |  |
 | showendoom | Int | custom | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | yes | C |  |
 | showloadtimes | Bool | plain | 0 | yes | — | C |  |
-| skill | Int | plain | CVAR_SERVERINFO\|CVAR_LATCH | yes | — | C |  |
+| skill | Int | plain | CVAR_SERVERINFO\|CVAR_LATCH | yes | yes | C |  |
 | skin | String | plain | CVAR_USERINFO \| CVAR_ARCHIVE | yes | yes | C |  |
 | skulltag | Bool | custom | CVAR_SERVERINFO \| CVAR_LATCH \| CVAR_CAMPAIGNLOCK | yes | — | C |  |
 | skyoffset | Float | plain | 0 | yes | yes | C |  |
@@ -746,7 +746,7 @@
 | snd_midipatchset | String | plain | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | — | C |  |
 | snd_midiprecache | Bool | plain | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | yes | C |  |
 | snd_movievolume | Float | custom | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | — | C |  |
-| snd_musicvolume | Float | custom | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | — | A | [notes](../notes/snd_musicvolume.md) |
+| snd_musicvolume | Float | custom | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | yes | A | [notes](../notes/snd_musicvolume.md) |
 | snd_output | String | plain | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | — | C |  |
 | snd_output_format | String | plain | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | — | C |  |
 | snd_pitched | Bool | plain | CVAR_ARCHIVE | yes | yes | C |  |
@@ -997,7 +997,7 @@
 | timidity_stereo | Bool | plain | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | — | C |  |
 | transsouls | Float | custom | CVAR_ARCHIVE | yes | yes | A | [notes](../notes/transsouls.md) |
 | turbo | Float | custom | 0 | yes | yes | C |  |
-| use_joystick | Bool | custom | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG\|CVAR_NOINITCALL | yes | — | C |  |
+| use_joystick | Bool | custom | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG\|CVAR_NOINITCALL | yes | yes | C |  |
 | use_mouse | Bool | plain | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | yes | C |  |
 | var_friction | Bool | plain | CVAR_SERVERINFO | yes | yes | C |  |
 | var_pushers | Bool | plain | CVAR_SERVERINFO | yes | yes | C |  |
@@ -1007,7 +1007,7 @@
 | vid_asyncblit | Bool | plain | CVAR_NOINITCALL\|CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | — | C |  |
 | vid_attachedsurfaces | Bool | plain | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | — | C |  |
 | vid_brightness | Float | custom | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | — | C |  |
-| vid_contrast | Float | custom | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | — | C |  |
+| vid_contrast | Float | custom | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | yes | C |  |
 | vid_cursor | String | custom | CVAR_ARCHIVE \| CVAR_NOINITCALL | yes | yes | C |  |
 | vid_defbits | Int | plain | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | — | C |  |
 | vid_defheight | Int | plain | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | yes | C |  |

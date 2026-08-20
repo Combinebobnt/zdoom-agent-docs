@@ -1,5 +1,17 @@
 # `Log`
 
+**Tier:** A.
+**Applies to:** N/A — zt-bcc-declared, neither engine implements it
+**Verified against:** none
+**Provenance:** `Log - ZDoom Wiki.html`
+(`https://zdoom.org/w/index.php?title=Log&oldid=35648`), verified against
+the Zandronum source's `src/p_acs.cpp` (`PCD_ENDLOG`, lines 10934-10978) and
+the Zandronum source's `src/c_console.cpp` (`PrintString`/`VPrintf`/`Printf`, lines 1021-1192;
+`C_AddNotifyString`/`C_DrawNotifyText`, lines 672-731 and ~1300-1384) on 2026-07-29. The
+"bad string argument prints a blank line" section was added 2026-08-12
+(`p_acs.cpp:10734-10745`), source-verified while root-causing an unrelated project's mystery
+blank-`Log`-line report.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin — like [`HudMessage`](hudmessage.md)/[`StrParam`](strparam.md)/
 `Print`/`PrintBold`/`HudMessageBold`, this is one of the five names in `zt-bcc/src/builtin.c`'s
 dedicated "Format functions" block (`builtin.c:173`: `{ "log", "" }`), not a `zcommon.bcs`
@@ -17,19 +29,11 @@ maps to `PCD_ENDLOG` (`builtin.c:319-325`); the format items themselves build th
 `FString` via the same `PCD_BEGINPRINT`/`PCD_PRINTSTRING`/`PCD_PRINTNUMBER`/etc. instructions
 every format function uses (`p_acs.cpp:10730-10731` starts the buffer; `PCD_ENDLOG` at
 `p_acs.cpp:10937-10942` closes it).
-
-**Tier:** A. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD —
-see "Engine scope" in `../../shared/AUTHORING.md`).
-
-**Provenance:** `Log - ZDoom Wiki.html`
-(`https://zdoom.org/w/index.php?title=Log&oldid=35648`), verified against
-the Zandronum source's `src/p_acs.cpp` (`PCD_ENDLOG`, lines 10934-10978) and
-the Zandronum source's `src/c_console.cpp` (`PrintString`/`VPrintf`/`Printf`, lines 1021-1192;
-`C_AddNotifyString`/`C_DrawNotifyText`, lines 672-731 and ~1300-1384) on 2026-07-29.
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
 ## Syntax
 
-```
+```text
 Log( <format-item-list> );
 ```
 
@@ -101,6 +105,18 @@ doc for `Print`/`HudMessage` prepares you for:
    logging, useless as a player-facing message on a networked game. (A `CLIENTSIDE` script's
    `Log()` runs independently on each client's own machine instead, and *does* show there, since
    each client's local execution is its own `NETSTATE_CLIENT`/`NETSTATE_SINGLE`-context call.)
+
+### A bad string argument prints a blank line, never an error
+
+`PCD_PRINTSTRING` (`p_acs.cpp:10734-10745`, shared by every format function including `Log`) only
+appends to the `work` buffer `if (lookup != NULL)` after `FBehavior::StaticLookupString` resolves
+the string-table index — an invalid/out-of-range/freed index is silently treated as an empty
+contribution, not an error, and `PCD_ENDLOG` (`p_acs.cpp:10937-10942`) then unconditionally
+`Printf`s whatever `work` ended up containing. A `Log(s:someBadStringIndex)` call (e.g. a stale
+index from a source that turned out not to hold what was expected) therefore surfaces as a
+mysterious **blank printed line**, with no error, warning, or crash to point at the actual cause —
+worth ruling out first whenever `Log`/`Print`/`HudMessage` output goes unexpectedly blank instead
+of missing entirely.
 
 ### No activator targeting at all (unlike `Print`/`PrintBold`/`HudMessage`)
 

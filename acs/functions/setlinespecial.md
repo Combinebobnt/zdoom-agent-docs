@@ -1,8 +1,10 @@
 # `SetLineSpecial`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (core builtin predates the fork; the Named-special interop described below — commit `cbf7162e1`, "Allow for using ACS_NamedExecute and friends with SetLineSpecial" — also predates the `28f736fb3` "3.2.1" version-bump commit, so no version-gap concern for any of this file's claims).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `SetLineSpecial - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=SetLineSpecial&oldid=35849`), verified 2026-07-29 against the Zandronum source's `src`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 `void SetLineSpecial(int lineid, int special, raw arg0 = 0, raw arg1 = 0, raw arg2 = 0, raw arg3 = 0, raw arg4 = 0)`
 
@@ -47,7 +49,7 @@ angles/fixed values in some slots.
 ## Named-script interop (`ACS_NamedExecute` and friends) — not on the ZDoom wiki page
 
 Not mentioned by the (ZDoom, single-player-oriented) wiki page at all, but present since before
-this fork's 3.2.1 tag (commit `cbf7162e1`): if `special` is one of the seven `ACSF_ACS_Named*`
+the Zandronum engine fork's 3.2.1 tag (commit `cbf7162e1`): if `special` is one of the seven `ACSF_ACS_Named*`
 extension-function indices — `Acs_NamedExecute`, `Acs_NamedSuspend`, `Acs_NamedTerminate`,
 `Acs_NamedLockedExecute`, `Acs_NamedLockedExecuteDoor`, `Acs_NamedExecuteWithResult`,
 `Acs_NamedExecuteAlways` (indices `-39` through `-45`, `zcommon.bcs:1667-1673`, checked via
@@ -64,7 +66,7 @@ syntax beyond passing one of the `Acs_Named*` function names as `special`. `SetT
 era (commit `7106c0681`, immediately preceding `cbf7162e1` in the same series) — see that
 function's own doc if/when it exists.
 
-## Divergence from the wiki
+## Wiki/engine divergence: named-script interop not covered
 
 None found for the documented single-player behavior — the wiki's description (change the special
 on all lines with a given id, args passed straight through, named-special-as-int-constant
@@ -74,8 +76,8 @@ Zandronum netcode angle — but this opcode has no netcode angle to cover: it on
 server/local map state (`line->special`/`line->args[]`) directly, with no `SERVERCOMMANDS_*` call
 of its own (contrast `PCD_SETLINEBLOCKING`, which does call
 `SERVERCOMMANDS_SetSomeLineFlags` a few cases above this one in the same switch, `p_acs.cpp:11472`)
-— a line's `special`/`args` aren't part of what gets synced to clients via that mechanism in this
-fork; not re-verified further here since it's outside this function's own behavior.
+— a line's `special`/`args` aren't part of what gets synced to clients via that mechanism in the
+Zandronum engine fork; not re-verified further here since it's outside this function's own behavior.
 
 ## See also
 

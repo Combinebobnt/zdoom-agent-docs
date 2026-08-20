@@ -1,10 +1,12 @@
 # `A_SetArg(int pos, int value)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_SetArg` (retrieved 2026-08-01, oldid=46120) + verified against
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_SetArg` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_SetArg&oldid=46120) + verified against
 the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:5106-5117` and native declaration
 `wadsrc/static/actors/actor.txt:300`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_SetArg)` — actor action on AActor.
 
 Changes the calling actor's argument counter at a given index to a specified integer value.
@@ -19,12 +21,25 @@ Changes the calling actor's argument counter at a given index to a specified int
 - **value**: The new integer value to store in the selected argument counter. No range limits are
   enforced; the value is stored as-is.
 
-## Engine scope
+## Engine-family divergence
 
-**No engine-family divergence.** Both Zandronum and UZDoom/GZDoom have this function with
-identical semantics and signature.
+**No engine-family divergence in the function itself.** Both Zandronum and UZDoom/GZDoom have
+this function with identical semantics and signature: same 0–4 bounds check on `pos` (out-of-range
+values silently ignored, no error), same unrestricted storage of `value`.
 
-## Multiplayer caveat
+**The surrounding netcode model does diverge**, which affects the scope of the caveat below.
+UZDoom's source tree has no client/server authority split at all — no server-authoritative
+broadcast mechanism and no clientside-vs-serverside execution distinction of the kind Zandronum
+implements. UZDoom-family engines instead use a lockstep model where every peer runs the same
+simulation from the same synchronized input stream, so `A_SetArg` writes `args[pos]` identically
+and deterministically everywhere it runs — there is no "server's copy vs. client's copy" for it to
+diverge between, and the desync risk described in the Zandronum-specific section below does not
+exist on UZDoom.
+
+## Zandronum-specific: multiplayer/netcode caveat
+
+This entire section describes Zandronum's client/server architecture specifically and does not
+apply to UZDoom — see "Engine-family divergence" above.
 
 **No network replication.** Unlike functions such as `A_SetScale` or `A_ChangeFlag` that broadcast
 changes to clients, `A_SetArg` modifies the local copy of `args[pos]` without any server-command
@@ -54,7 +69,7 @@ shared state).
 
 Setting an argument on entry to control actor behavior without map-editor intervention:
 
-```
+```text
 ACTOR CustomDispenser : Actor
 {
     Default

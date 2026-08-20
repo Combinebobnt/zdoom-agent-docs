@@ -1,9 +1,12 @@
 # `A_CheckFloor`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1, UZDoom 4.15pre
-**Provenance:** ZDoom Wiki `A_CheckFloor` (retrieved 2026-08-01, oldid=43633) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3702-3713` and UZDoom's `wadsrc/static/zscript/actors/checks.zs:153-156`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_CheckFloor` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_CheckFloor&oldid=43633) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3702-3713` and UZDoom's `wadsrc/static/zscript/actors/checks.zs:153-156`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Action function on `AActor` (`DEFINE_ACTION_FUNCTION_PARAMS` in Zandronum `src/thingdef/thingdef_codeptr.cpp`; ZScript native in UZDoom `wadsrc/static/zscript/actors/checks.zs`).
+**Source excerpt:** This file quotes Zandronum engine source verbatim; see [LICENSE](../../LICENSE) §3 for Zandronum's license terms.
 
 Jumps to a target state if the calling actor is standing on or submerged into the floor.
 
@@ -42,8 +45,6 @@ DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_CheckFloor)
 
 }
 ```
-
-**Source excerpt:** This file quotes Zandronum engine source verbatim; see [LICENSE](../../LICENSE) §3 for Zandronum's license terms.
 
 The `ACTION_JUMP(jump, 0)` call passes a `0` flags argument, which means clients are **not notified** of the state jump by the server. This is safe because clients maintain their own floor-height data locally (per-client terrain information is reliable) — each client can independently check whether its own actor copy is on the floor and execute the jump without waiting for server confirmation. By contrast, checks that depend on server-side-only knowledge (like `A_CheckHealth`) pass `CLIENTUPDATE_FRAME` to explicitly notify all clients of the jump.
 

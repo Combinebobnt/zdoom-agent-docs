@@ -1,8 +1,10 @@
 # `void A_CustomMissile(class<Actor> missiletype, float spawnheight = 32, int spawnofs_xy = 0, float angle = 0, int flags = 0, float pitch = 0)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_CustomMissile` (retrieved 2026-07-31, oldid=49278) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1159` and `wadsrc/static/actors/actor.txt:206`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_CustomMissile` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_CustomMissile&oldid=49278) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1159` and `wadsrc/static/actors/actor.txt:206`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_CustomMissile)` on `AActor` class (callable from any actor's state table).
 
 A customizable projectile attack for non-player actors, typically used by monsters to launch a projectile at their target. **Fork divergence note:** This page describes a ZDoom Wiki source which documents GZDoom/UZDoom. Zandronum's version **does not include a 7th `ptr` parameter** to select the target actor — the target is always `self->target`. The wiki's deprecation notice (recommending `A_SpawnProjectile` instead) is GZDoom-family only and does not apply to Zandronum, where `A_CustomMissile` remains the standard missile-spawning action.
@@ -52,7 +54,7 @@ None.
 
 ## Examples
 
-```
+```text
 // Simple missile attack (aim mode 0)
 Missile:
     POSS E 10 A_FaceTarget

@@ -1,13 +1,20 @@
 # `bool CheckClass(str classname)`
 
+**Tier:** B (source-verified, no wiki-sourced prose).
+**Applies to:** UZDoom=yes, Zandronum=no
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15)
+**Provenance:** no wiki-intake page for this entry (`zcommon.bcs`'s truncated single-argument signature suggests it tracks an old/pre-expansion revision of the upstream ZDoom function rather than the current wiki-documented one, so a wiki page wouldn't describe the same signature zt-bcc declares anyway) — verified directly against the zt-bcc source (`lib/zcommon.bcs:1831`) and the Zandronum engine source (no `ACSF_CheckClass` enum member or switch case anywhere in `src/p_acs.cpp`; dead `FName` entry at `src/namedef.h:304`).
 **Bucket:** extension function (index -200, negative dispatch).
 
-## Not implemented in this fork
+**Implemented on UZDoom**: `case ACSF_CheckClass:` (`src/playsim/p_acs.cpp`) resolves the class
+name via `PClass::FindActor(clsname)` and returns whether it exists — a straightforward existence
+check, matching the truncated single-argument `zcommon.bcs` signature exactly (no `tid`/`ancestry`
+parameters to verify beyond the one declared `classname` string).
+
+## Zandronum-specific: unimplemented function
 
 **This function is declared in the zt-bcc source's `lib/zcommon.bcs:1831` (`-200:CheckClass(str):bool`) but has no case in the Zandronum engine's `EACSFunctions` enum or its `CallFunction` switch** (`src/p_acs.cpp`; a full-file grep for `CheckClass`/`ACSF_CheckClass` returns zero hits, and `CheckClass` exists in `src/namedef.h:304` only as an unrelated, unreferenced `FName` table entry — nothing in the engine ever reads `NAME_CheckClass`). The enum jumps straight from `ACSF_Warp = 92` to `ACSF_GetActorFloorTexture = 204`, skipping indices 200–203 (`CheckClass`, `DamageActor`, `SetActorFlag`, `SetTranslation` in `zcommon.bcs`'s own numbering) — the identical never-backported range documented in full for [SetActorFlag](setactorflag.md), index -202. `DamageActor` (-201) and `SetTranslation` (-203), `CheckClass`'s immediate neighbors in that range, are unimplemented for the same reason and are not separately documented here since neither has a corroborated, source-verified workaround the way `SetActorFlag` does.
 
 When called, `CheckClass` falls through `CallFunction`'s dispatch to the catch-all `default: break;` immediately before its final `return 0;` (`p_acs.cpp:9059-9063`, the same fallthrough `SetActorFlag`/`CheckActorState`/`CheckProximity` hit). **Every call to `CheckClass` silently returns `false`, regardless of input.** No compiler error, no console warning — a call that should distinguish "is/isn't this class" is indistinguishable at runtime from a genuine `false` result.
 
-**Practical consequence:** there is no working `CheckClass` in this fork. `CheckActorClass` (extension function -27, implemented and documented at [checkactorclass.md](checkactorclass.md)) is the real, working way to compare an actor's class by name from ACS — use that instead; it takes a `tid` rather than operating on an implicit target, so a script that only has "the activator" needs to pass its own TID (via `ActivatorTID()`, itself NULL-unsafe — see [ActivatorTID](activatortid.md)) or restructure around `CheckActorClass(0, classname)`'s own `tid==0` semantics before assuming it's a drop-in replacement.
-
-**Provenance:** no wiki-intake page for this entry (`zcommon.bcs`'s truncated single-argument signature suggests it tracks an old/pre-expansion revision of the upstream ZDoom function rather than the current wiki-documented one, so a wiki page wouldn't describe the same signature this fork declares anyway) — verified directly against the zt-bcc source (`lib/zcommon.bcs:1831`) and the Zandronum engine source (no `ACSF_CheckClass` enum member or switch case anywhere in `src/p_acs.cpp`; dead `FName` entry at `src/namedef.h:304`). **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD, which is 3.3-alpha — a function absent from the newer snapshot is necessarily absent from the older target version, so the gap is stable; see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** B (source-verified, no wiki-sourced prose).
+**Practical consequence:** there is no working `CheckClass` in Zandronum. `CheckActorClass` (extension function -27, implemented and documented at [checkactorclass.md](checkactorclass.md)) is the real, working way to compare an actor's class by name from ACS — use that instead; it takes a `tid` rather than operating on an implicit target, so a script that only has "the activator" needs to pass its own TID (via `ActivatorTID()`, itself NULL-unsafe — see [ActivatorTID](activatortid.md)) or restructure around `CheckActorClass(0, classname)`'s own `tid==0` semantics before assuming it's a drop-in replacement.

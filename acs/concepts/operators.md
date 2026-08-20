@@ -1,8 +1,10 @@
 # Operators: short-circuit evaluation, divide/modulus-by-zero, and fixed-point `++`/`--`
 
 **Tier:** A (all three claims traced to the actual codegen/semantic/interpreter source, not inferred from the wiki or from signatures).
-**Engine:** Zandronum 3.2.1 (VM opcode/state-machine behavior verified against the Zandronum source `master` HEAD, a `3.3-alpha` snapshot ahead of the 3.2.1 target — this is core interpreter loop behavior, stable across that gap); the short-circuit and fixed-`++`/`--` findings are toolchain (`zt-bcc`) behavior, not engine-version-dependent.
-**Provenance:** `zt-bcc/src/codegen/expr.c` (`write_logical` short-circuit codegen and its own comment, line ~658; `inc_var`/`inc_fixed`/`inc_indexed`, line ~1168-1235), `zt-bcc/src/semantic/expr.c` (`perform_primitive_inc`, line ~1465), and the Zandronum source's `src/p_acs.cpp` (`PCD_DIVIDE` line 9589, `PCD_MODULUS` line ~9601-9604, `PCD_ANDLOGICAL`/`PCD_ORLOGICAL` line ~10594-10602, the divide/modulus-by-zero console-print-and-`SCRIPT_PleaseRemove` handling around line 13018-13027), verified against the ZDoom wiki's `Operators - ZDoom Wiki.html` (oldid 51290) intake page.
+**Applies to:** UZDoom=yes, Zandronum=yes — the short-circuit, fixed-point `++`/`--` and `str + str` findings are `zt-bcc` toolchain behavior rather than engine behavior, and hold whichever engine ends up running the emitted bytecode. The Zandronum entry below reads a `master` HEAD checkout whose own `version.h` reports `3.3-alpha`, a development snapshot ahead of the 3.2.1 target; this is core interpreter-loop behavior, stable across that gap.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-16)
+**Provenance:** `zt-bcc/src/codegen/expr.c` (`write_logical` short-circuit codegen and its own comment, line ~658; `inc_var`/`inc_fixed`/`inc_indexed`, line ~1168-1235), `zt-bcc/src/semantic/expr.c` (`perform_primitive_inc`, line ~1465), and the Zandronum source's `src/p_acs.cpp` (`PCD_DIVIDE` line 9589, `PCD_MODULUS` line ~9601-9604, `PCD_ANDLOGICAL`/`PCD_ORLOGICAL` line ~10594-10602, the divide/modulus-by-zero console-print-and-`SCRIPT_PleaseRemove` handling around line 13018-13027), verified against the ZDoom wiki's `Operators - ZDoom Wiki.html` (https://zdoom.org/w/index.php?title=Operators&oldid=51290) intake page.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 The ZDoom wiki's [Operators](https://zdoom.org/w/index.php?title=Operators&oldid=51290) page
 lists the full operator set (`=`, arithmetic, bitwise, relational, `&&`/`||`, `!`, `++`/`--`,
@@ -57,3 +59,27 @@ true `1.0`, matching what you'd expect from `fixedVar += 1.0`, for both plain fi
 fixed array elements. This distinction only exists because `fixed` is a `bcc`/BCS extension type
 absent from base ACS and the ZDoom wiki page's examples — worth recording precisely because the
 "obvious" inference from the raw opcode table is wrong.
+
+## `==`/`!=` on `str` is a raw index comparison, not a content comparison
+
+No type-directed dispatch exists for `str` operands — both compile to the same `PCD_EQ`/`PCD_NE`
+used for `int`, a plain stack-integer comparison. This is safe between two runtime-built
+(`StrParam`/pool-origin) strings, but **always false/true respectively** when one
+side is a compiled string literal and the other is pool-origin, even with byte-identical text —
+the two live in disjoint index ranges by construction (a reserved library-ID tag on every
+pool-origin string). See
+[String literal vs. pool equality](string-literal-vs-pool-equality.md) for the full mechanism and
+[`StrCmp`/`StrIcmp`](../functions/strcmp.md) for the comparison that's actually safe across that
+boundary.
+
+## `+` on `str` only concatenates when BOTH operands are literal constants — otherwise it silently adds pool indices as integers
+
+A `zt-bcc` compiler bug (confirmed via raw opcode disassembly), not an engine issue.
+`"literal" + "literal"` correctly constant-folds to a real concatenated string at compile time,
+but `variable + variable` (or any operand that isn't itself compile-time-constant) compiles to a
+plain `ADD` on the two operands' raw pool-index integers — never reaching the print-based
+concatenation codegen path (`concat_str()`) that exists in `zt-bcc`'s own source and looks like it
+should handle this. The result is a bogus index that almost always reads back as an empty string,
+with no compile or runtime error. See
+[String `+` operator variable bug](string-concat-operator-variable-bug.md) for the full evidence
+and the fix (`StrParam`'s format-item list instead of `+`).

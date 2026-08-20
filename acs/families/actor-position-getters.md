@@ -1,13 +1,21 @@
 # Actor position-getter family
 
-`GetActorX`, `GetActorY`, `GetActorZ` — three compiler builtins sharing one C++ `case` block
-almost verbatim (`p_acs.cpp:11998-12016`), which picks the returned field via pointer arithmetic
-on the actor's own `x`/`y`/`z` members. Neither requires the others to be useful — this isn't a
-mandatory-sequence family like [Lump I/O](lump-io.md) — but nearly every finding below applies
-to all three identically, and `GetActorZ`'s one real behavioral divergence (bob offset) only
-makes sense stated as a contrast against its two siblings, so one file avoids maintaining three
-near-duplicate `functions/*.md` pages (same precedent as the [plane-trigger family](plane-trigger.md)).
-
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki pages `GetActorX - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=GetActorX&oldid=38555`),
+`GetActorY - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=GetActorY&oldid=35874`), `GetActorZ - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=GetActorZ&oldid=35809`)
+(all `_intake/`, retrieved 2026-07-29) + source-verified against `p_acs.cpp:11998-12016`
+(shared `case` block), `p_acs.cpp:4445-4456` (`SingleActorFromTID`), `actor.h:970` (consecutive
+`x,y,z` members), `actor.h:885-892` (`GetBobOffset`/`MF2_FLOATBOB`), and `p_acs.h:763-765` (PCD
+enum order). The fixed-point return type, `tid=0`→activator convention, first-match-only
+semantics on nonzero TID, symmetric Get/Set pair (contrast with the
+`GetActorAngle`/`SetActorAngle` asymmetry), and the Z-only bob offset all verified; no
+wiki/fork divergence found for X or Y — each wiki page is simply minimal, omitting failure
+behavior and the setter-symmetry point. **Wiki divergence for Z:** the wiki describes
+`GetActorZ` as returning "the Z coordinate of the actor" without mentioning the bob-offset
+addition at all; that's a source-only finding, not documented anywhere on the wiki.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** all three compiler builtins (`PCD_GETACTORX`/`PCD_GETACTORY`/`PCD_GETACTORZ`,
 `p_acs.cpp:11998-12016`, one shared `case` block). The implementation is
 `(&actor->x)[pcd - PCD_GETACTORX]` — `AActor` declares `fixed_t x, y, z;` as consecutive members
@@ -16,8 +24,13 @@ near-duplicate `functions/*.md` pages (same precedent as the [plane-trigger fami
 target actor via the file-local `SingleActorFromTID(int, AActor*)` helper (`p_acs.cpp:4445-4456`).
 `zt-bcc/src/builtin.c` registers `getactorx`/`getactory`/`getactorz`, each `fixed GetActor*(int)`.
 
-**Tier:** A. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master`/`3.3-alpha`
-HEAD — see "Engine scope" in `../../shared/AUTHORING.md`).
+`GetActorX`, `GetActorY`, `GetActorZ` — three compiler builtins sharing one C++ `case` block
+almost verbatim (`p_acs.cpp:11998-12016`), which picks the returned field via pointer arithmetic
+on the actor's own `x`/`y`/`z` members. Neither requires the others to be useful — this isn't a
+mandatory-sequence family like [Lump I/O](lump-io.md) — but nearly every finding below applies
+to all three identically, and `GetActorZ`'s one real behavioral divergence (bob offset) only
+makes sense stated as a contrast against its two siblings, so one file avoids maintaining three
+near-duplicate `functions/*.md` pages (same precedent as the [plane-trigger family](plane-trigger.md)).
 
 ---
 
@@ -74,9 +87,64 @@ zero, or any positive value depending on where the actor sits on the map.
   [SetActorPosition](../functions/setactorposition.md), which replicates a successful move to
   clients via `SERVERCOMMANDS_MoveThing`, these getters just read whatever's currently in memory.
 
+## Engine-family divergence: internal position storage and read mechanism
+
+The Zandronum engine fork's "Bucket" mechanism above (`(&actor->x)[pcd - PCD_GETACTORX]` pointer
+arithmetic over three consecutive `fixed_t` members) does not carry over. In UZDoom, `AActor`
+stores position as a single `DVector3 __Pos` of doubles (`actor.h:1142`), accessed only through
+`X()`/`Y()`/`Z()` methods — there's no `fixed_t x, y, z` triplet to take a pointer into. UZDoom's
+shared `case PCD_GETACTORX: case PCD_GETACTORY: case PCD_GETACTORZ:` block
+(`playsim/p_acs.cpp:9566-9584`) instead branches explicitly (`pcd == PCD_GETACTORX ? actor->X() :
+actor->Y()`, with `PCD_GETACTORZ` handled in its own `else if`) and converts the double result
+back to a 16.16 fixed value for the ACS stack via `DoubleToACS()` (`FloatToFixed<16>`,
+`p_acs.cpp:607-610`). The three `PCD_GETACTOR*` enum values are still declared consecutively
+(`p_acs.cpp:273-275`), but that adjacency is no longer load-bearing — nothing indexes off it. Net
+effect for scripts: the 16.16 fixed-point return value, the `tid=0`→activator convention, and the
+first-match-only semantics all still hold exactly (see below); only the C++-level implementation
+technique and the underlying double-precision storage differ.
+
+Resolution of the `tid` argument itself also gains a wrinkle: UZDoom's `SingleActorFromTID`
+(`g_levellocals.h:342-345`) is a method on `FLevelLocals` taking a third `clientSide` bool, and
+picks between two entirely separate TID hash tables — the normal one, or `ClientSideTIDHash` —
+based on whether the calling script is itself a `CLIENTSIDE` script. Zandronum's equivalent
+(`SingleActorFromTID(int, AActor*)`, `p_acs.cpp:4445`, already cited above) takes no such
+parameter and always resolves against the single global TID list, regardless of whether the
+calling script is `CLIENTSIDE`. Practical effect: given the same `tid`, `GetActorX`/`Y`/`Z` called
+from a `CLIENTSIDE` script can resolve to a different actor (or find nothing) on UZDoom than the
+same call would on Zandronum, if that TID is held by a clientside-only actor. Both engines still
+apply the `tid==0`→activator fallback and single-`Next()`/first-match-only rule identically once
+the correct table is chosen.
+
+## Engine-family divergence: `GetActorZ` bob-offset amplitude and rate
+
+The bob offset itself — gated on `MF2_FLOATBOB`, added only for `GetActorZ` — is confirmed in
+UZDoom too (`actor->Z() + actor->GetBobOffset()`, `p_acs.cpp:9577`; `AActor::GetBobOffset`,
+`actorinlines.h:85-92`), but its formula is more general than Zandronum's. Zandronum
+(`actor.h:885-892`) hardcodes the amplitude to a fixed ×8 map-unit multiplier and the oscillation
+rate to exactly `1 × level.maptime`. UZDoom multiplies by a per-actor `FloatBobStrength` field and
+scales time by a per-actor `FloatBobFactor` field (`actor.h:1341-1344`, both `double`), so two
+different `MF2_FLOATBOB` actors can bob with different amplitude/speed on UZDoom, whereas on
+Zandronum every floatbobbing actor bobs identically (only `FloatBobPhase` varies, offsetting the
+phase). This only matters for the round-trip/height-above-floor discussion above when comparing
+bob magnitude across actors — the "non-zero only under `MF2_FLOATBOB`, else exactly `0`" claim and
+the round-trip-bakes-the-bob-in problem both still hold unchanged on UZDoom.
+
+## Engine-family divergence: `SetActorPosition` replication contrast (context only)
+
+The getters' own "no netcode replication" claim above still holds on UZDoom (still a raw
+synchronous read either way). But the specific contrast drawn against
+[SetActorPosition](../functions/setactorposition.md) doesn't translate directly: UZDoom's
+`P_MoveThing` (`playsim/p_things.cpp:106`) has no `SERVERCOMMANDS_MoveThing` call or any
+`SERVERCOMMANDS_*` equivalent at all — that whole explicit server→client sync-command mechanism is
+specific to the Zandronum engine fork's server-authoritative netcode model and doesn't exist in
+UZDoom's architecture. So on UZDoom the asymmetry isn't "the setter replicates but the getters
+don't" — neither has anything called replication in Zandronum's sense; UZDoom's own client
+synchronization for actor state uses a different mechanism entirely, outside this file's scope
+(see [SetActorPosition](../functions/setactorposition.md) for its own verified claims).
+
 ## Example (adapted from the wiki)
 
-```c
+```acs
 script 1 (int count)
 {
     // Rains health potions on the player from above
@@ -106,17 +174,3 @@ script 2 (int count, int dist)
 
 The `angle = 1.0 * n / count` trick forces fixed-point division: `n / count` would truncate to
 `0` under integer division before multiplying by `1.0`, so the multiply is done first.
-
-**Provenance:** wiki pages `GetActorX - ZDoom Wiki.html` (`oldid=38555`),
-`GetActorY - ZDoom Wiki.html` (`oldid=35874`), `GetActorZ - ZDoom Wiki.html` (`oldid=35809`)
-(all `_intake/`, retrieved 2026-07-29) + source-verified against `p_acs.cpp:11998-12016`
-(shared `case` block), `p_acs.cpp:4445-4456` (`SingleActorFromTID`), `actor.h:970` (consecutive
-`x,y,z` members), `actor.h:885-892` (`GetBobOffset`/`MF2_FLOATBOB`), and `p_acs.h:763-765` (PCD
-enum order). The fixed-point return type, `tid=0`→activator convention, first-match-only
-semantics on nonzero TID, symmetric Get/Set pair (contrast with the
-`GetActorAngle`/`SetActorAngle` asymmetry), and the Z-only bob offset all verified; no
-wiki/fork divergence found for X or Y — each wiki page is simply minimal, omitting failure
-behavior and the setter-symmetry point. **Wiki divergence for Z:** the wiki describes
-`GetActorZ` as returning "the Z coordinate of the actor" without mentioning the bob-offset
-addition at all; that's a source-only finding, not documented anywhere on the wiki.
-**Engine:** Zandronum 3.2.1. **Tier:** A.

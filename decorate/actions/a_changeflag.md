@@ -1,8 +1,10 @@
 # `void A_ChangeFlag(string flagname, bool value)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_ChangeFlag` (retrieved 2026-07-31, oldid=48413) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4609-4744`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_ChangeFlag` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_ChangeFlag&oldid=48413) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4609-4744`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:4609` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_ChangeFlag)`).
 
 Changes the specified actor flag and sets it to the given value. **Note:** Not all flags will produce useful results when changed during gameplay; some flags control fundamental engine behavior at spawn time or require special handling (see "Special-case flags" below).
@@ -54,6 +56,10 @@ Some flags are marked as deprecated in the engine's flag table. If `flagname` re
 - After the flag changes on the server, if the change actually occurred (the old value differed from the new), the server broadcasts it to all clients via `SERVERCOMMANDS_SetThingFlags`, specifying which flag-word was modified (`FLAGSET_FLAGS`, `FLAGSET_FLAGS2`, etc.).
 
 This prevents desyncs where clients and the server have conflicting actor state.
+
+## Engine-family divergence: multiplayer broadcast
+
+UZDoom's `A_ChangeFlag` has no server-authoritative behavior at all: there is no early-return for client-side actors and no equivalent of `SERVERCOMMANDS_SetThingFlags`, so the flag is simply changed locally on whichever machine runs the script. This means the "Zandronum-specific: server-authoritative" section above (and the "In multiplayer, the updated count is broadcast to clients via `SERVERCOMMANDS_SetMapNumTotal*`" sentences in the "Monster/item/secret counting flags" section) describe Zandronum-only networking; UZDoom has no `SERVERCOMMANDS_*` broadcast mechanism for `A_ChangeFlag` or its counting-flag side effects at all. The counting-flag bookkeeping itself (updating `level.total_monsters`/`total_items`/`total_secrets` when a flag change alters the actor's classification) still happens in UZDoom — it's implemented as an unconditional decrement-then-increment bracket around the flag change (rather than Zandronum's explicit before/after comparison), which nets to the same result: the totals only actually change when the classification genuinely changes, they just aren't broadcast anywhere since UZDoom has no client/server split for this.
 
 ## Related functions
 

@@ -1,9 +1,11 @@
 # `A_GunFlash(state flash = "", int flags = 0)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_GunFlash` (retrieved 2026-08-01, oldid=53828) + verified against
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_GunFlash` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_GunFlash&oldid=53828) + verified against
 the Zandronum source's `src/p_pspr.cpp:1234–1267`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `AInventory` class (action function), defined at `src/p_pspr.cpp:1234`. Compiles for any `Inventory` subclass, including `Weapon`.
 
 Creates a new weapon sprite layer in the flash slot and plays a state sequence on it. Usually called
@@ -37,7 +39,24 @@ In multiplayer, the player state change is **server-authoritative**: the server 
 run `PlayAttacking2()` locally for other players. Only the console player (or when the player is
 in single-player mode) executes `PlayAttacking2()` on the client side.
 
-## NULL-handling divergence from ZScript
+## Engine-family divergence: no dead-player guard in UZDoom
+
+UZDoom's `A_GunFlash` calls `player.mo.PlayAttacking2()` unconditionally whenever
+`GFF_NOEXTCHANGE` is not set — there is no equivalent of Zandronum's `player->mo->health > 0`
+check described above. A dead player (e.g. killed by a reflection rune while firing, the scenario
+Zandronum's guard comment cites) still has `PlayAttacking2()` invoked on UZDoom, transitioning
+the body to its melee/attack-secondary state even though it is already dead.
+
+## Zandronum-specific: client/server behavior
+
+UZDoom has no client/server authority split at all — its source tree contains no
+`SERVERCOMMANDS_*` or `NETWORK_InClientMode`-style constructs anywhere, for this function or in
+general. `A_GunFlash`'s player-state change and flash-sprite update both happen unconditionally
+and locally; the server-authoritative `SERVERCOMMANDS_SetPlayerState` broadcast and the
+console-player/client gating described above are entirely Zandronum-specific netcode with no
+UZDoom counterpart.
+
+## Engine-family divergence: NULL-handling
 
 Unlike the ZScript reference implementation (which returns early if `player == null || player.ReadyWeapon == null`),
 Zandronum returns early **only if `player == NULL`**. When `ReadyWeapon == NULL`, the function
@@ -46,6 +65,22 @@ continues: the flash layer is cleared (via `P_SetPsprite(player, ps_flash, NULL)
 `A_GunFlash()` is called from a `CustomInventory` item's state sequence instead of a weapon.
 The function includes a comment referencing a crash log from `client_GiveInventory` calling
 this function in such a scenario.
+
+Confirmed directly against UZDoom's `Weapon::A_GunFlash` (`wadsrc/static/zscript/actors/inventory/weapons.zs`):
+it opens with `if (null == player || player.ReadyWeapon == null) { return; }`, exactly matching the
+"ZScript reference implementation" behavior described above — UZDoom does not carry Zandronum's
+`ReadyWeapon == NULL` continuation path or its associated `P_SetPsprite`/`PlayAttacking2` side effects.
+
+## Engine-family divergence: A_GunFlash is Weapon-only in UZDoom
+
+In Zandronum, `A_GunFlash` is defined on the `AInventory` bucket (see "Bucket" above), so it runs
+its real logic — including the `ReadyWeapon == NULL` continuation path described above — no matter
+which `Inventory` subclass calls it. In UZDoom, the real implementation is defined only on the
+`Weapon` class (`wadsrc/static/zscript/actors/inventory/weapons.zs`). `CustomInventory` (via its
+`StateProvider` base) instead gets a separate, deprecated (since version 2.3) **empty-body stub**
+version of `A_GunFlash` — calling it from a `CustomInventory` state sequence in UZDoom does
+nothing at all (no flash-layer change, no player state change, just a compile-time deprecation
+notice), rather than reaching either the real function's logic or its NULL-handling edge case.
 
 ## Example usage
 

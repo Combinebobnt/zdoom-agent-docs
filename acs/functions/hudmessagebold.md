@@ -1,5 +1,14 @@
 # `HudMessageBold`
 
+**Tier:** A.
+**Applies to:** N/A — zt-bcc-declared, neither engine implements it
+**Verified against:** none
+**Provenance:** `HudMessageBold - ZDoom Wiki.html`
+(`https://zdoom.org/w/index.php?title=HudMessageBold&oldid=41033`), verified against
+the Zandronum source's `src/p_acs.cpp` (`PCD_ENDHUDMESSAGEBOLD`, shares the single `case
+PCD_ENDHUDMESSAGE: case PCD_ENDHUDMESSAGEBOLD:` block at lines 10984-11144 with `HudMessage`) and
+the zt-bcc source's `src/builtin.c:172` on 2026-07-29.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin — same "Format functions" block as
 [`HudMessage`](hudmessage.md)/[`StrParam`](strparam.md)/`Print`/`Log` (`zt-bcc/src/builtin.c:172`:
 `{ "hudmessagebold", ";iiifff;fff" }`), byte-for-byte the same `g_funcs[]` format string as
@@ -8,18 +17,9 @@ grammar, format-item casts, flag bits, per-type optional-tail table, and the `ho
 are all identical to `HudMessage` — see [`HudMessage`](hudmessage.md) for those; this file only
 covers what's actually different about the Bold variant.
 
-**Tier:** A. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD —
-see "Engine scope" in `../../shared/AUTHORING.md`).
-
-**Provenance:** `HudMessageBold - ZDoom Wiki.html`
-(`https://zdoom.org/w/index.php?title=HudMessageBold&oldid=41033`), verified against
-the Zandronum source's `src/p_acs.cpp` (`PCD_ENDHUDMESSAGEBOLD`, shares the single `case
-PCD_ENDHUDMESSAGE: case PCD_ENDHUDMESSAGEBOLD:` block at lines 10984-11144 with `HudMessage`) and
-the zt-bcc source's `src/builtin.c:172` on 2026-07-29.
-
 ## Syntax
 
-```
+```text
 HudMessageBold( <format-item-list>; type, id, color, x, y, holdTime [, extra1] [, extra2] [, alpha] );
 ```
 

@@ -1,15 +1,17 @@
 # `void A_RaiseChildren()`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_RaiseChildren` (retrieved 2026-08-01, oldid=53237) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4852-4868` and `src/p_things.cpp:527-566`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_RaiseChildren` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RaiseChildren&oldid=53237) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4852-4868` and `src/p_things.cpp:527-566`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_RaiseChildren)` in `src/thingdef/thingdef_codeptr.cpp`.
 
-Resurrects all actors whose master pointer is set to the calling actor, typically creatures spawned by the calling actor. Zandronum version takes **no parameters** — the `flags` parameter and `RF_*` constants described in the ZDoom Wiki do not exist in this fork.
+Resurrects all actors whose master pointer is set to the calling actor, typically creatures spawned by the calling actor. Zandronum version takes **no parameters** — the `flags` parameter and `RF_*` constants described in the ZDoom Wiki do not exist in Zandronum.
 
 ## Signature
 
-```
+```text
 void A_RaiseChildren()
 ```
 
@@ -42,7 +44,7 @@ If a child actor has no `Raise` state defined, `P_Thing_Raise` returns without e
 
 ### No room to raise
 
-If the child's default height and radius would overlap another actor or solid geometry at its current position, `P_CheckPosition` fails and the resurrection is aborted. The child remains dead and at its current location. **This check is unconditional in Zandronum** — there is no parameter to skip it (unlike the ZDoom Wiki's `RF_NOCHECKPOSITION` flag, which does not exist in this fork).
+If the child's default height and radius would overlap another actor or solid geometry at its current position, `P_CheckPosition` fails and the resurrection is aborted. The child remains dead and at its current location. **This check is unconditional in Zandronum** — there is no parameter to skip it (unlike the ZDoom Wiki's `RF_NOCHECKPOSITION` flag, which does not exist in Zandronum).
 
 ## Zandronum difference from ZDoom Wiki
 
@@ -59,9 +61,22 @@ If you port DECORATE code from upstream ZDoom/GZDoom to Zandronum, do not attemp
 
 The ZDoom Wiki states: "Raise and damage functions only work with monsters." This claim has not been fully verified for Zandronum. The `P_Thing_Raise` function gates resurrection on the presence of a `Raise` state, not on a monster-specific flag check. It is possible for non-monster actors to be resurrected if they have a `Raise` state, though this is an uncommon configuration.
 
-## Network behavior
+## Engine-family divergence: flags parameter
+
+**UZDoom implements the wiki-documented `flags` parameter**, unlike Zandronum: `A_RaiseChildren(int flags = 0)` (declared native in `wadsrc/static/zscript/actors/actor.zs`, backed by `DEFINE_ACTION_FUNCTION(AActor, A_RaiseChildren)` in `src/playsim/p_actionfunctions.cpp`). The parameter the previous section says "does not exist" is a Zandronum-only limitation — on UZDoom it exists and behaves as the wiki describes, routed through the shared `P_Thing_Raise` helper (`src/playsim/p_things.cpp`) also used by `A_RaiseMaster`, `A_RaiseSiblings`, `A_RaiseSelf`, and ZScript's `RaiseActor`:
+
+- **`RF_TRANSFERFRIENDLINESS`** (1) makes the resurrected child copy the raiser's allegiance via `CopyFriendliness`, instead of retaining whatever affiliation it had before death.
+- **`RF_NOCHECKPOSITION`** (2) skips the `P_CheckPosition` room check documented above as unconditional on Zandronum — with this flag set, UZDoom raises the child even if its restored height/radius would overlap something.
+
+Both constants have the same values in `src/playsim/p_local.h`'s native enum and their ZScript mirror in `wadsrc/static/zscript/constants.zs`. With the default `flags = 0`, UZDoom's behavior matches what's documented above for Zandronum: unconditional position check, no friendliness transfer.
+
+UZDoom's `P_Thing_Raise` also gates every resurrection behind a `P_CanResurrect(raiser, thing)` check that calls each actor class's overridable `virtual bool CanResurrect(Actor other, bool passive)` hook (default implementation just returns `true`, `wadsrc/static/zscript/actors/actor.zs`) — a ZScript-only extension point with no Zandronum equivalent. It's a no-op unless a mod overrides `CanResurrect`, but a mod that does can silently veto a resurrection `A_RaiseChildren` would otherwise perform.
+
+## Zandronum-specific: network behavior
 
 **Zandronum multiplayer:** This action is handled by the server. The iteration and resurrection calls are resolved server-side; affected clients receive state-change updates (resurrection animations) from the server via `SERVERCOMMANDS_SetThingState`.
+
+**UZDoom has no equivalent split.** UZDoom/GZDoom-family engines have no server-authoritative/client-prediction distinction for action-function execution at all — `A_RaiseChildren`'s implementation (and the shared `P_Thing_Raise` helper it routes through) contains no `NETWORK_InClientMode`-style check or `SERVERCOMMANDS_*`-style replication call anywhere in the call chain. It simply runs the full iterate-and-raise loop wherever it's invoked.
 
 ## Related actions
 

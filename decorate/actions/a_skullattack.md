@@ -1,8 +1,10 @@
 # `A_SkullAttack(fixed speed)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki A_SkullAttack (retrieved 2026-08-01, oldid=47234) + verified against Zandronum source `src/g_doom/a_lostsoul.cpp:64-71` and impact behavior in `src/p_mobj.cpp:3748-3799`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki A_SkullAttack (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_SkullAttack&oldid=47234) + verified against Zandronum source `src/g_doom/a_lostsoul.cpp:64-71` and impact behavior in `src/p_mobj.cpp:3748-3799`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_SkullAttack)`, callable from any actor's state table.
 
 Initiates a charging attack at the calling actor's current target, setting the `MF_SKULLFLY` flag and velocity vectors to move toward the target in a straight line. **The charge is server-side only and will not execute on clients in multiplayer** — a `+CLIENTSIDEONLY` actor using this action will charge exclusively on the server, creating desyncs.
@@ -38,11 +40,25 @@ Server-side only: `NETWORK_InClientMode()` returns immediately without effect. A
 
 **Consequence:** because the whole charge — angle lock, velocity vectors, and the timed climb/fall — is computed once on the server with no client-side prediction, players commonly perceive charging actors as laggy or rubber-banding online, especially at higher latency: the charger appears to snap or warp toward its landing position as ordinary position-sync catches up, rather than visibly traveling the straight line the server calculated. This is more noticeable than for a walking monster because the whole trajectory is committed instantly at the start of the charge instead of being resolved incrementally tic-by-tic.
 
+## Engine-family divergence: client/server authority
+
+UZDoom's `A_SkullAttack` and its `Slam()` impact handler carry no equivalent of Zandronum's `NETWORK_InClientMode()` early-return gate, and no `SERVERCOMMANDS_*` broadcast afterward. That whole client/server authority split does not exist anywhere in UZDoom's source tree. The charge (angle lock, velocity vectors, vertical-climb divisor) and the slam impact both run unconditionally wherever the actor's state machine executes, instead of being computed once on an authoritative server and replicated to clients. The doc's "server-side only" framing and the "Network synchronization" section above both describe Zandronum-specific behavior; on UZDoom there is no separate client path to desync from.
+
+## Engine-family divergence: distance and velocity math
+
+Zandronum derives the charge's horizontal velocity from fixed-point trig lookup tables (`finecosine`/`finesine`, indexed by the actor's `angle_t`), and derives the vertical-velocity divisor from `P_AproxDistance`, an octagonal approximation of 2D distance rather than a true Euclidean one. UZDoom's `A_SkullAttack` computes horizontal velocity via `VelFromAngle()` (floating-point `cos`/`sin`, also pitch-scaled), and derives the vertical-velocity divisor from `AActor::DistanceBySpeed()` (`max(1., Distance2D(dest) / speed)`), true floating-point 2D distance. Both engines aim at the same target position, but the exact climb/fall rate and horizontal speed components can differ slightly between them, most noticeably at extreme angles where the octagonal approximation's error is largest.
+
+## Engine-family divergence: post-slam state transition
+
+The wall/ceiling-hit case (no target actor involved, handled in the movement code that clears `MF_SKULLFLY` when the actor's horizontal move resolves to zero) transitions the same way on both engines: clear `MF_SKULLFLY`, zero velocity, then `SeeState` if defined else `Idle` (or straight to `Idle` with `tics = -1` if `MF2_DORMANT`).
+
+The actor-to-actor collision case (`AActor::Slam`, still native C++ on both engines, not migrated to ZScript) differs. Zandronum's `Slam` always goes to `SeeState` if defined, else `Idle`, after a surviving non-lethal hit, with no other check. UZDoom's `Slam` first looks for a state labeled `Slam` on the actor and jumps there if one is found; only when no such label exists does it fall back to `SeeState`, and even then only if the actor's `RETARGETAFTERSLAM` flag (`flags8`, documented in UZDoom as "forces jumping to the idle state after slamming into something") is *not* set — otherwise it goes straight to `Idle`. `RETARGETAFTERSLAM` doesn't exist in Zandronum at all. UZDoom's own `LostSoul` class sets `+RETARGETAFTERSLAM` by default, so on UZDoom a Lost Soul that survives a non-lethal charge goes to `Idle` rather than back into its `See`/Missile loop. The doc's "allowing re-entry to a Missile state for another charge" description above (in "Impact and aftermath") is accurate for Zandronum, but does not hold for UZDoom's stock Lost Soul.
+
 ## Examples
 
 Lost Soul's missile attack state (from Doom):
 
-```
+```text
 Missile:
   SKUL C 10 bright A_FaceTarget
   SKUL D 4 bright A_SkullAttack

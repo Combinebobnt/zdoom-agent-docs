@@ -1,5 +1,14 @@
 # `void ScriptWait(int script)`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** `ScriptWait - ZDoom Wiki.html`
+(`https://zdoom.org/w/index.php?title=ScriptWait&oldid=35861`), verified against
+the Zandronum source's `src/p_acs.cpp` on 2026-07-29. The wiki's usage line is accurate as far as it
+goes, but understates a real footgun (see "Can't tell 'never started' from 'already finished'"
+below) that only shows up by reading `RunningScripts`' lifecycle in the engine source.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin (`zt-bcc/src/builtin.c:44`, `{ "scriptwait", ";i" }` — one required
 int arg, matches the wiki's signature exactly; table-flagged `PCD_SCRIPTWAIT | F_LATENT` at
 `builtin.c:192`, marking it a *latent* — i.e. potentially script-suspending — call. There's also a
@@ -7,15 +16,6 @@ int arg, matches the wiki's signature exactly; table-flagged `PCD_SCRIPTWAIT | F
 constant — same runtime behavior, just skips a stack push). Implemented in `p_acs.cpp`. The
 sibling `NamedScriptWait(str)` (`PCD_SCRIPTWAITNAMED`) shares the exact same state machine below —
 see that function's own doc for name-specific details; not duplicated here.
-
-**Tier:** A. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD —
-see "Engine scope" in `../../shared/AUTHORING.md`).
-
-**Provenance:** `ScriptWait - ZDoom Wiki.html`
-(`https://zdoom.org/w/index.php?title=ScriptWait&oldid=35861`), verified against
-the Zandronum source's `src/p_acs.cpp` on 2026-07-29. The wiki's usage line is accurate as far as it
-goes, but understates a real footgun (see "Can't tell 'never started' from 'already finished'"
-below) that only shows up by reading `RunningScripts`' lifecycle in the engine source.
 
 Suspends the calling script until the script numbered `script` is no longer running — waiting for
 it to *start* first if it isn't already running when `ScriptWait` is called.
@@ -55,3 +55,28 @@ it to *start* first if it isn't already running when `ScriptWait` is called.
   `SCRIPT_Running` and exits `RunScript()`'s bytecode loop early — see
   [SetResultValue](setresultvalue.md) for why a synchronous `Acs_(Named)ExecuteWithResult` caller
   only ever observes the result value as of the *first* such block.
+
+## Engine-family divergence: opt-in compatibility mode skips the "wait for start" pre-state
+
+UZDoom's state machine for `ScriptWait` is otherwise identical to the two-state mechanism described
+above — same `SCRIPT_ScriptWaitPre`/`SCRIPT_ScriptWait` states, same `RunningScripts` lookup, same
+`PutFirst()`-on-wake scheduling — but UZDoom additionally exposes a per-map compatibility toggle
+(settable via a `compat_scriptwait` MAPINFO entry, or by MD5 hash through the engine's built-in
+compatibility list) that Zandronum has no equivalent of at all. The toggle is off by default and
+exists to reproduce an old ZDoom behavior needed by one specific vintage map.
+
+When that toggle is enabled for a map, only the compile-time-constant form of the call (the one the
+compiler lowers to `PCD_SCRIPTWAITDIRECT`, e.g. `ScriptWait(5)` with a literal script number) is
+affected: instead of picking its entry state by checking whether the target script is currently
+running, it unconditionally enters the "wait for it to stop" state and skips the "wait for it to
+start" state entirely. The practical effect is the opposite of the normal footgun described above —
+if the target script hasn't started yet, this compat form finds `RunningScripts` empty, treats that
+as "already stopped," and returns immediately without waiting for the target to run at all, rather
+than blocking until it starts as the default behavior (and the wiki) describe. The stack-argument
+form (`PCD_SCRIPTWAIT`, used when the script number isn't a compile-time constant) and the named
+form (`PCD_SCRIPTWAITNAMED`) are unaffected by this toggle and always use the normal two-state
+machine described above.
+
+Since the toggle defaults to off and is not something a project's own map would normally set, this
+divergence only matters when running someone else's old map that opts into it — the default,
+documented behavior above holds unchanged on UZDoom.

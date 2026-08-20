@@ -1,5 +1,15 @@
 # `restart;`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** `restart - ZDoom Wiki.html`
+(`https://zdoom.org/w/index.php?title=Restart&oldid=38214`), verified against
+the Zandronum source's `src/p_acs.cpp` and the zt-bcc source's `src` on 2026-07-29. The wiki page is a
+two-sentence stub (usage + one example); everything below "Mechanism" comes from reading
+`PCD_RESTART`'s implementation and the `DLevelScript` constructor directly, because the wiki
+never mentions the one thing that actually matters here: **local variables are not reset.**
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** none of the three — this is a **compiler statement/keyword**, not a callable function
 at all. `restart` never appears in `zt-bcc/src/builtin.c`'s `g_funcs[]` (compiler-builtin bucket)
 or `zcommon.bcs`'s `special` table (action-special/extension-function buckets); it's tokenized as
@@ -8,16 +18,6 @@ or `zcommon.bcs`'s `special` table (action-special/extension-function buckets); 
 `semantic/stmt.c:869`'s `SCRIPT_JUMP_TOTAL` triple). No parentheses, no arguments, bare
 `restart;`. Compiles straight to the zero-operand opcode `PCD_RESTART`
 (`zt-bcc/src/codegen/pcode.h:74`, emitted at `zt-bcc/src/codegen/stmt.c:1149-1150`).
-
-**Tier:** A. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD —
-see "Engine scope" in `../../shared/AUTHORING.md`).
-
-**Provenance:** `restart - ZDoom Wiki.html`
-(`https://zdoom.org/w/index.php?title=Restart&oldid=38214`), verified against
-the Zandronum source's `src/p_acs.cpp` and the zt-bcc source's `src` on 2026-07-29. The wiki page is a
-two-sentence stub (usage + one example); everything below "Mechanism" comes from reading
-`PCD_RESTART`'s implementation and the `DLevelScript` constructor directly, because the wiki
-never mentions the one thing that actually matters here: **local variables are not reset.**
 
 Jumps execution back to the top of the currently-running script, in place — it is a `goto`, not a
 fresh re-invocation.

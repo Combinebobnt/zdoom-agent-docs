@@ -1,15 +1,17 @@
 # `A_JumpIfInTargetInventory` (state action)
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_JumpIfInTargetInventory` (retrieved 2026-08-01, oldid=42399) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:973-976` and the shared `DoJumpIfInventory` logic at lines 913–966.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_JumpIfInTargetInventory` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_JumpIfInTargetInventory&oldid=42399) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:973-976` and the shared `DoJumpIfInventory` logic at lines 913–966.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_JumpIfInTargetInventory)` in `src/thingdef/thingdef_codeptr.cpp` — callable from any actor's state table.
 
 Checks the calling actor's target for a specific inventory item and conditionally jumps to a state if a certain amount is present. This is equivalent to `A_JumpIfInventory` with the `AAPTR_TARGET` pointer parameter, but more concise.
 
 ## Signatures
 
-```c
+```decorate
 state A_JumpIfInTargetInventory(string "inventorytype", int amount, int offset[, int pointer])
 state A_JumpIfInTargetInventory(string "inventorytype", int amount, state "label"[, int pointer])
 ```
@@ -35,7 +37,7 @@ The function searches for the specified inventory item in the target's (or the t
   - **When `amount > 0`:** Jump if `item->Amount >= amount`. Note that if you request more items than the item's `MaxAmount`, the target can never accumulate that many, and the jump will never fire even if the target is carrying the maximum.
   - **When `amount <= 0`:** Jump if `item->Amount >= item->MaxAmount`. This is the "at max capacity" check. Both zero and negative amounts trigger this branch.
 
-## Network and client-side behavior
+## Zandronum-specific: client/server behavior
 
 In network multiplayer (Zandronum):
 
@@ -44,6 +46,25 @@ In network multiplayer (Zandronum):
   - The target actor is flagged `+CLIENTSIDEONLY` (visuals-only; doesn't require server sync), **or**
   - The target actor is the console player's own body.
 - **Inventory state chains in `CustomInventory` `Pickup` states** should not rely on the return value — `A_JumpIfInTargetInventory` explicitly sets the action result to `false` to avoid breaking inventory state flow.
+
+## Engine-family divergence: no client/server split in UZDoom
+
+UZDoom's `A_JumpIfInTargetInventory` (`wadsrc/static/zscript/actors/checks.zs`) has none of the
+client/server machinery described above. Its source tree contains no `NETWORK_InClientMode` check
+and no `SERVERCOMMANDS_*` equivalent anywhere — the weapon/flash-psprite exception and the
+console-player/`+CLIENTSIDEONLY` carve-out for "all other states" are entirely Zandronum netcode
+concepts with no UZDoom counterpart. The underlying check (via the shared `Actor.CheckInventory`
+method — see "Shared implementation" below) always runs its full logic and jumps unconditionally
+and locally, regardless of which state type called it.
+
+The explicit "clear the action result" step also has no UZDoom equivalent. UZDoom's action
+function is declared `action state A_JumpIfInTargetInventory(...)`, returning either `null` or a
+resolved state directly as the jump target — there is no separate boolean "action result slot"
+for it to set, unlike Zandronum's native `DEFINE_ACTION_FUNCTION_PARAMS`/`ACTION_SET_RESULT`
+calling convention. The specific mechanism Zandronum uses to protect `CustomInventory` `Pickup`
+state chains from an unintended result value is therefore absent on UZDoom, though the underlying
+concern (an unrelated boolean leaking into Pickup-chain flow) is a property of the older calling
+convention rather than something UZDoom needs a replacement for.
 
 ## Shared implementation
 

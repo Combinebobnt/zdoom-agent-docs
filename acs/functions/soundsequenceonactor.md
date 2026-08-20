@@ -1,8 +1,10 @@
 # `void SoundSequenceOnActor(int tid, str sndseq)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (checked-out source reports 3.3-alpha; `ACSF_SoundSequenceOnActor` and the sound-sequence subsystem are long-standing, not netcode-gated additions postdating 3.2.1, so this is not expected to be version-sensitive).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `SoundSequenceOnActor - ZDoom Wiki` (https://zdoom.org/w/index.php?title=SoundSequenceOnActor&oldid=35963), verified 2026-07-29 against fork source.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
 
 Starts a sound sequence (defined in a `SNDSEQ` lump, itself referencing sounds registered in
@@ -20,7 +22,7 @@ the zt-bcc source's `lib/zcommon.bcs:1658`), implementation in `p_acs.cpp:6214-6
 - `sndseq` name lookup is silent-fail: `SN_StartSequence(actor, seqname, modenum)` calls
   `FindSequence(seqname)` and simply returns `NULL` if the name isn't found in any loaded
   `SNDSEQ` lump (`s_sndseq.cpp:890-897`) — a typo'd or missing sequence name produces no sound and
-  no log/error, same silent-failure pattern as this fork's other sound builtins.
+  no log/error, same silent-failure pattern as this engine family's other sound builtins.
 - **Replaces, does not stack:** the named-sequence overload calls the numbered overload with its
   `nostop` parameter defaulted to `false` (`s_sndseq.cpp:895`), which means `SN_StopSequence(actor)`
   runs first (`s_sndseq.cpp:847-850`) — calling `SoundSequenceOnActor` again on the same actor with

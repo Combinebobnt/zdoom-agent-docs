@@ -1,10 +1,20 @@
 # `int ConsolePlayerNumber(void)`
 
+**Tier:** A.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Provenance:** wiki page `ConsolePlayerNumber - Zandronum Wiki.html` (`_intake/`, retrieved
+2026-07-28, `https://wiki.zandronum.com/w/index.php?title=ConsolePlayerNumber&oldid=1353`) + source-verified (`p_acs.cpp:7163-7171,12380-12389`, `network.h:270-279`,
+`doomstat.h:122`, `g_game.cpp:202`). The wiki's -1-on-server and DISCONNECT-persistence claims
+hold; the actual mechanism (global read vs. activator-derived in `PlayerNumber()`) is this doc's
+source-verified addition.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
+**Bucket:** extension function.
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+
 Returns the local machine's player number — only meaningful in `CLIENTSIDE` scripts. Extension
 function (`ACSF_ConsolePlayerNumber`, index -102 in `zcommon.bcs`), implementation at
 the Zandronum source's `src/p_acs.cpp:7163-7171`.
-
-**Bucket:** extension function.
 
 ```cpp
 case ACSF_ConsolePlayerNumber:
@@ -44,7 +54,7 @@ case ACSF_ConsolePlayerNumber:
 
 **Example:**
 
-```
+```text
 Script 1 (void) NET CLIENTSIDE
 {
     PrintBold(s: "My player number is ", d: ConsolePlayerNumber());
@@ -53,11 +63,21 @@ Script 1 (void) NET CLIENTSIDE
 
 **Returns:** `int` — local player's number, or `-1` if called on a server.
 
-**Provenance:** wiki page `ConsolePlayerNumber - Zandronum Wiki.html` (`_intake/`, retrieved
-2026-07-28, `oldid=1353`) + source-verified (`p_acs.cpp:7163-7171,12380-12389`, `network.h:270-279`,
-`doomstat.h:122`, `g_game.cpp:202`). The wiki's -1-on-server and DISCONNECT-persistence claims
-hold; the actual mechanism (global read vs. activator-derived in `PlayerNumber()`) is this doc's
-source-verified addition. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source
-`master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.
+## Engine-family divergence
 
-**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+Bound as ACSF (CALLFUNC) index 102 — inside the 100–199 range UZDoom's own ACSF enum reserves
+for Zandronum's extensions and implements none of. A Zandronum-compiled object calling
+`ConsolePlayerNumber()` under UZDoom hits UZDoom's `CallFunction` dispatcher's `default: break;`
+case: no error, no log line, the interpreter stack stays balanced, and the call just returns `0`
+in place of the `-1`-on-server/`consoleplayer`-derived value documented above.
+
+**This can look coincidentally correct in a narrow test.** In singleplayer, the console player's
+number genuinely is `0`, so a script calling `ConsolePlayerNumber()` only in an SP context will
+silently get the right answer under UZDoom even though the real logic above never runs — the
+`-1`-on-server branch and the `consoleplayer` global read are both dead code on that engine.
+Don't take a clean SP smoke test as evidence a Zandronum→UZDoom port is safe for this call; any
+context where the console player isn't necessarily player 0 gets a wrong value with zero
+diagnostic.
+
+See [Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md) for the general
+reserved-ACSF-range silent-failure mechanism.

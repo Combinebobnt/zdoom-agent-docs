@@ -1,9 +1,16 @@
 # `str StrMid(str string, int start, int length)`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `StrMid - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
+`https://zdoom.org/w/index.php?title=StrMid&oldid=37594`) + source-verified against `p_acs.cpp:6661-6683` (`ACSF_StrMid` case) and
+`zt-bcc/lib/zcommon.bcs:1696` (index `-67`) on 2026-07-29.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** extension function (negative index → `ACSF_StrMid` in `p_acs.cpp`).
+
 Extension function `ACSF_StrMid`, index `-67` in the zt-bcc source's `lib/zcommon.bcs:1696` (listed
 as `StrMid(str,int,int):str`). Implementation in the Zandronum source's `src/p_acs.cpp:6661-6683`.
-
-**Bucket:** extension function (negative index → `ACSF_StrMid` in `p_acs.cpp`).
 
 - `string` — the source string.
 - `start` — position of the first character of the returned substring.
@@ -52,8 +59,3 @@ the same `oldstr == NULL || *oldstr == '\0'` empty-string short-circuit and the 
 length-clamping pattern one case above `ACSF_StrMid` in the same switch
 (`p_acs.cpp:6640-6659`) — not documented here since they're being processed as separate intake
 files in this batch.
-
-**Provenance:** wiki page `StrMid - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
-`oldid=37594`) + source-verified against `p_acs.cpp:6661-6683` (`ACSF_StrMid` case) and
-`zt-bcc/lib/zcommon.bcs:1696` (index `-67`) on 2026-07-29. **Engine:** Zandronum 3.2.1 (verified
-against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.

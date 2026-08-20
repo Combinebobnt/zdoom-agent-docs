@@ -1,8 +1,10 @@
 # `str GetActorSectorLocation(int tid, bool point)`
 
 **Tier:** A.
-**Engine:** Zandronum 3.2.1 — introducing commit `1387a120e` ("Added ACS function: 'GetActorSectorLocation'.", 2022-02-20) confirmed via `git merge-base --is-ancestor` to predate the `28f736fb3` ("changed the version string to 3.2.1") version-bump commit in the local the Zandronum source checkout, i.e. it ships in 3.2.1, not just the checkout's `3.3-alpha` HEAD.
-**Provenance:** wiki page `GetActorSectorLocation - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `oldid=2244`) + source-verified against `p_acs.cpp:5518,7955-7994`, `zcommon.bcs:1783`. Cross-checked against `functions/getcontrolpointinfo.md`'s documented `point`-index semantics, which the `point == true` branch here directly feeds. Wiki/fork divergence: wiki implies both modes return a name string; the `point == true` mode actually returns a raw control-point index (or `-1`), never a string.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `GetActorSectorLocation - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetActorSectorLocation&oldid=2244`) + source-verified against `p_acs.cpp:5518,7955-7994`, `zcommon.bcs:1783`. Cross-checked against `functions/getcontrolpointinfo.md`'s documented `point`-index semantics, which the `point == true` branch here directly feeds. Wiki/engine divergence: wiki implies both modes return a name string; the `point == true` mode actually returns a raw control-point index (or `-1`), never a string.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function (negative index, `p_acs.cpp`'s `ACSF_*` switch).
 
 Extension function, `zcommon.bcs:1783` declares it at index `-153`
@@ -25,7 +27,7 @@ Extension function, `zcommon.bcs:1783` declares it at index `-153`
     all**. If the actor is invalid or no matching point sector is found, it returns the plain
     integer `-1`, not an empty string.
 
-## Wiki/fork divergence: `point == true` does not return a string, despite the signature
+## Wiki/engine divergence: `point == true` does not return a string, despite the signature
 
 The wiki page states the function "Returns a string containing the name of the (point) sector,"
 implying `point == true` still gives back a name string (just derived from the point-sector table
@@ -43,7 +45,7 @@ name/wiki-declared signature suggest, rather than it being an oversight.
 
 **Example — correct usage for both modes:**
 
-```
+```text
 // Get this map's SECTINFO name for the sector the activator is standing in.
 str sectorName = GetActorSectorLocation(0, false);
 
@@ -57,3 +59,21 @@ if (pointIndex != -1)
     Log(s: pointName);
 }
 ```
+
+## Engine-family divergence
+
+This function is bound as ACSF (CALLFUNC) index 153, inside the 100–199 range UZDoom's
+`CallFunction` dispatcher reserves for Zandronum's extensions and implements none of — see
+[Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md). A Zandronum-compiled
+object calling `GetActorSectorLocation` under UZDoom hits that range's `default: break;` case and
+gets a plain `0` back, with no error and no log line; execution continues normally.
+
+That `0` is a trap in both call modes, not an obviously-broken value. `point == false` declares a
+`str` return, and ACS/BCS resolves a small, non-dynamic string value as an index into the object's
+own compiled-string table — so the caller doesn't get back an empty string, it gets whatever
+string literal happens to sit at table index 0 in that particular object, printed as if it were
+the actor's real SECTINFO sector name. `point == true` returns a raw point-sector index rather
+than a string, and `0` is a legitimate index (the first entry in `SectorInfo.Points`), not this
+function's own not-found sentinel (`-1`) — so a caller checking `result != -1` sees a "found"
+result and goes on to call `GetControlPointInfo(0, ...)` against whichever point sector happens to
+occupy index 0, silently misreporting the actor's location instead of failing visibly.

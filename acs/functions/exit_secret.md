@@ -1,8 +1,10 @@
 # Exit_Secret
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `Exit_Secret - ZDoom Wiki.html` (https://zdoom.org/w/index.php?title=Exit_Secret&oldid=44668), verified 2026-07-29 against the Zandronum source's `src`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
 `int Exit_Secret(int pos)`
@@ -127,6 +129,32 @@ Per the ZDoom wiki, Exit_Secret loads the secret map "defined for this map in MA
 further states (per the wiki sources) that "on standard Doom 1 maps, ZDoom will only use this special
 on maps E1M3, E2M5, E3M6 and E4M2. In Doom 2, only maps MAP15 and MAP31 will be affected by its use."
 This is a MAPINFO/level-data claim and is out of scope to verify here.
+
+## Engine-family divergence
+
+UZDoom (GZDoom-family) implements the same `LS_Exit_Secret` → `CheckIfExitIsGood` → `SecretExitLevel`
+→ `GetSecretExitMap` shape as Zandronum, but several of the Zandronum-specific gate details above
+don't carry over:
+
+- **No survival-mode countdown gate.** UZDoom has no "survival" gametype, so gate 3 (the
+  countdown block, including its NULL-activator-only second check inside the secret-exit function)
+  doesn't exist at all.
+- **DF2_KILL_MONSTERS behaves very differently.** UZDoom's version is unconditional (not restricted
+  to cooperative play), compares monster counts for exact equality (`killed_monsters !=
+  total_monsters`) rather than a percentage threshold cvar, and on failure just returns `false` with
+  no side effect — it does not teleport the activator to a spawn spot and prints no percentage
+  message. It's also checked *before* `DF_NO_EXIT` rather than after, though that ordering has no
+  observable effect since both gates simply return `false`.
+- **No network-state fallback split on a missing exit map.** `GetSecretExitMap()` falls back from the
+  secret map to the normal next map exactly like Zandronum's singleplayer branch, but if that next
+  map is also empty, `ChangeLevel` always takes the end-sequence path — there is no equivalent to
+  Zandronum's server-only "reload the current map" branch, since UZDoom's `ChangeLevel` has no
+  client/server split at all.
+- **Hub-dead check tests `!multiplayer`** in place of Zandronum's `NETWORK_GetState() ==
+  NETSTATE_SINGLE` — the same intent (singleplayer only), phrased against UZDoom's own state model.
+- **Repeat-exit-in-the-same-tic can be allowed.** `ChangeLevel` gates on `gameaction == ga_completed`
+  same as Zandronum, but only bails if the `COMPATF2_MULTIEXIT` compat flag is *not* set — an added
+  escape hatch Zandronum's version doesn't have.
 
 ## Sibling functions
 

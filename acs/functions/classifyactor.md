@@ -1,10 +1,11 @@
-# ClassifyActor
+# `int ClassifyActor(int tid)`
 
-```
-int ClassifyActor(int tid)
-```
-
-## Summary
+**Tier:** A
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-06)
+**Provenance:** ZDoom Wiki `ClassifyActor` (retrieved 2026-08-06, https://zdoom.org/w/index.php?title=ClassifyActor&oldid=35678) + verified against the Zandronum source's `src/p_acs.cpp:5250-5316`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** compiler builtin (dispatched as `PCD_CLASSIFYACTOR`).
 
 Returns a bitfield describing the classification of an actor by its thing ID. Used to test whether an actor is a player, monster, missile, or other entity type, and whether it's currently alive or dead.
 
@@ -29,7 +30,7 @@ An `int` bitfield where each bit corresponds to a named classification constant 
 
 The return value is a bitfield. Check individual bits using bitwise-AND (`&`):
 
-```
+```text
 if (ClassifyActor(tid) & ACTOR_PLAYER) { /* is a player */ }
 ```
 
@@ -54,11 +55,3 @@ When `tid == 0`, the function tests the script's **activator** (the actor that t
 ## Behavior on TID miss
 
 When `tid` is nonzero and no actor with that TID exists, returns `ACTOR_NONE` (plain `0`). This is indistinguishable from a literal zero-classification, but in practice is only used to detect a missing actor.
-
-## Tier: A
-
-**Provenance:** ClassifyActor - ZDoom Wiki, verified against Zandronum source 2026-07-30.
-
-**Engine:** Zandronum 3.2.1 (verified in `master` HEAD checkout; function is stable across minor versions).
-
-**Source:** Zandronum engine `src/p_acs.cpp:5250` (`DLevelScript::DoClassifyActor`).

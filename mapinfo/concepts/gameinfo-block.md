@@ -1,8 +1,10 @@
 # GameInfo block structure
 
 **Tier:** B
-**Engine:** Zandronum 3.2.1 / UZDoom 4.15pre
-**Provenance:** ZDoom Wiki `MAPINFO/GameInfo_definition` (retrieved 2026-07-31, oldid=54708) + verified against Zandronum source (`src/gi.cpp:202-406`) and UZDoom source (`src/gamedata/gi.cpp:272-481`).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `MAPINFO/GameInfo_definition` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=MAPINFO%2FGameInfo_definition&oldid=54708) + verified against Zandronum source (`src/gi.cpp:202-406`) and UZDoom source (`src/gamedata/gi.cpp:272-481`).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 The `GameInfo` definition block in MAPINFO is distinct from the separate `GAMEINFO` lump — this page describes the former. It sets global game-wide settings and defaults used throughout a session, including UI/menu configuration, default music and graphics, weapon slots, and engine-side client state (skill-level respawn timing, hit-point-to-gib thresholds, teleport fog height, etc.).
 
@@ -10,11 +12,20 @@ The `GameInfo` definition block in MAPINFO is distinct from the separate `GAMEIN
 
 The `gameinfo { ... }` block contains a series of whitespace-separated key-value pairs. Most keys accept a single value or a type-specific set of values (strings, integers, floats, music references, color values); some keys are repeatable (weapon slots, credit pages, precached assets), and some are block-valued (the `Intro` block on GZDoom/UZDoom).
 
-All of the documented keys use a macro-driven parsing system in both engines: the parser in Zandronum's `src/gi.cpp` and UZDoom's `src/gamedata/gi.cpp` both dispatch through a series of `GAMEINFOKEY_*` macros (differentiating type: string, integer, floating-point, color, music, font, array) mapping each key's string name to its corresponding engine-side `gameinfo_t` struct field. Unknown keys are silently ignored.
+All of the documented keys use a macro-driven parsing system in both engines: the parser in Zandronum's `src/gi.cpp` and UZDoom's `src/gamedata/gi.cpp` both dispatch through a series of `GAMEINFOKEY_*` macros (differentiating type: string, integer, floating-point, color, music, font, array) mapping each key's string name to its corresponding engine-side `gameinfo_t` struct field. Unknown keys are handled differently per engine (see divergence section below).
 
 ## Engine-family divergence
 
-**The wiki page describes upstream ZDoom/GZDoom-family features.** Zandronum (primary target) implements a subset of the keys listed below; all keys in this section that **do not appear in the table below** exist only in GZDoom/UZDoom-family engines. Zandronum projects may include them in a MAPINFO source file but they are silently ignored at runtime.
+### Unknown key handling
+
+Unknown keys (keys not recognized by either parser) are handled differently per engine:
+
+- **Zandronum:** silently ignored during parsing.
+- **UZDoom:** logged as `DPrintf(DMSG_ERROR, ...)` but parsing continues (the error is printed to the debug log, not treated as a fatal parse error). Zandronum projects including UZDoom-only keys will have those keys silently ignored.
+
+### Key availability
+
+**The wiki page describes upstream ZDoom/GZDoom-family features.** Zandronum implements a subset of the keys listed below; all keys in this section that **do not appear in the table below** exist only in UZDoom/GZDoom-family engines (the primary target). Zandronum projects may include them in a MAPINFO source file but they are silently ignored at runtime.
 
 ### Zandronum 3.2.1 (verified, exhaustive)
 
@@ -23,13 +34,14 @@ All of the documented keys use a macro-driven parsing system in both engines: th
 
 **Menu font colors:** `menuFontColor_Title`, `menuFontColor_Label`, `menuFontColor_Value`, `menuFontColor_Action`, `menuFontColor_Header`, `menuFontColor_Highlight`, `menuFontColor_Selection`, `menuBackButton`.
 
-**Statscreen fonts:** `statScreen_MapNameFont`, `statScreen_FinishedFont`, `statScreen_EnteringFont`, `statScreen_FinishedPatch`, `statScreen_EnteringPatch` (Zandronum uses `_Patch` instead of `_Font` for finished/entering; UZDoom uses `_Font` and adds `_ContentFont` and `_AuthorFont`).
+**Statscreen fonts:** `statScreen_MapNameFont`, `statScreen_FinishedFont`, `statScreen_EnteringFont` are available in both engines. Zandronum additionally accepts `statScreen_FinishedPatch` and `statScreen_EnteringPatch` as patch-name alternatives to the `_Font` variants. UZDoom adds `statScreen_ContentFont` and `statScreen_AuthorFont`.
 
 **Zandronum-only or Zandronum-early keys:**
 - `addCustomData` / `removeCustomData` — custom player data columns (Zandronum ACS/modding extension).
-- `forceKillScripts` — force `GAMEEVENT_ACTOR_DEATH` ACS script trigger (does not use ZScript).
-- `forceSpawnEventScripts`, `forceDamageEventScripts` — force script triggers on spawn/damage events; checked in Zandronum 3.3-alpha HEAD but may postdate 3.2.1 release.
+- `allowDominationContestScripts` — enable `GAMEEVENT_DOMINATION_CONTEST` ACS script trigger (Zandronum multiplayer mode extension).
+- `forceSpawnEventScripts`, `forceDamageEventScripts` — force script triggers on spawn/damage events.
 - `player5start` — support for a 5th player start position in multiplayer maps.
+- `statscreen_finishedpatch`, `statscreen_enteringpatch` — Zandronum accepts patch-name alternatives to the `_Font` variants for finished/entering statscreen graphics.
 
 ### GZDoom/UZDoom-only (verified absent from Zandronum)
 
@@ -73,4 +85,4 @@ All of the documented keys use a macro-driven parsing system in both engines: th
 
 ## Known gaps
 
-The extractor used to clean the source wiki page produced empty descriptions for `ForceNoGFXSubstitution`, `StatScreen_ContentFont`, `StatScreen_AuthorFont`, and all five `StatScreen_*Font` rows — these likely have descriptions in the live wiki but were not captured here. Zandronum doesn't implement these keys anyway.
+The extractor used to clean the source wiki page produced empty descriptions for `ForceNoGFXSubstitution`, `StatScreen_ContentFont`, and `StatScreen_AuthorFont` — these likely have descriptions in the live wiki but were not captured here. The first key is UZDoom-only; the latter two are UZDoom-only additions (Zandronum does implement `statScreen_MapNameFont`, `statScreen_FinishedFont`, and `statScreen_EnteringFont`).

@@ -1,9 +1,11 @@
 # `A_CheckLOF(state jump [, int flags [, fixed range [, fixed minrange [, angle angle [, angle pitch [, fixed offsetheight [, fixed offsetwidth [, int ptr_target]]]]]]])`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_CheckLOF` (retrieved 2026-08-01, oldid=45092) + verified against
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_CheckLOF` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_CheckLOF&oldid=45092) + verified against
 the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4046-4209` and flag enum at `src/thingdef/thingdef_codeptr.cpp:3931-3964`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_CheckLOF)` — callable from any actor's state table.
 
 Performs a line-of-fire hitscan test to check whether a path between the calling actor and a target (or a specified point) is blocked by other actors. Jumps to a state if the test succeeds (the target is reachable, or optionally another actor is in the way).
@@ -56,15 +58,22 @@ Performs a line-of-fire hitscan test to check whether a path between the calling
 
 **Missing flags (ZDoom/GZDoom extensions):** The wiki also lists `CLOFF_SETTARGET`, `CLOFF_SETMASTER`, and `CLOFF_SETTRACER` — none of which are present in Zandronum. These flags silently do nothing if used in this engine; do not rely on them to set pointer relationships.
 
-**Anonymous action blocks:** The wiki's opening note about jump functions behaving differently inside anonymous functions is not relevant to Zandronum's DECORATE — anonymous `{ ... }` action blocks are a ZScript/GZDoom extension and do not exist in this fork.
+**Anonymous action blocks:** The wiki's opening note about jump functions behaving differently inside anonymous functions is not relevant to Zandronum's DECORATE — anonymous `{ ... }` action blocks are a ZScript/GZDoom extension and do not exist in Zandronum.
 
 **Network synchronization:** This function is server-side only in multiplayer — the client-mode check (`NETWORK_InClientModeAndActorNotClientHandled`) returns immediately, and the actor update is sent per `CLIENTUPDATE_FRAME`.
+
+## Engine-family divergence: parameters and flags UZDoom implements
+
+The items above are described from the wiki's perspective as things Zandronum omits. Verified directly against UZDoom's native `CheckLOF` implementation, they are real, functioning UZDoom/GZDoom-family behavior:
+
+- **`offsetforward` (10th parameter, default 0):** Shifts the trace origin forward (positive) or backward (negative) along the aim direction, the same way `offsetwidth` shifts it sideways. If `CLOFF_MUL_WIDTH` is set, `offsetforward` is multiplied by the actor's radius exactly like `offsetwidth` is (both are scaled by the same flag).
+- **`CLOFF_SETTARGET` / `CLOFF_SETMASTER` / `CLOFF_SETTRACER`:** When the trace actually hits an actor — not a wall/floor/ceiling via `CLOFF_JUMP_ON_MISS`, and not an actor that was filtered/skipped by other flags — any of these flags that are set reassign `self.target` / `self.master` / `self.tracer` respectively to the hit actor, immediately before the jump is taken.
 
 ## Examples
 
 Check if the calling actor can "see" its target at a maximum distance of 1500 units, ignoring obstacles except the target itself:
 
-```
+```text
 A_CheckLOF("Attack", CLOFF_SKIPOBSTACLES, 1500)
 ```
 
@@ -72,12 +81,12 @@ A_CheckLOF("Attack", CLOFF_SKIPOBSTACLES, 1500)
 
 Check if there is any enemy between the calling actor and its target (jump if blocked by an enemy):
 
-```
+```text
 A_CheckLOF("Blocked", CLOFF_JUMPENEMY)
 ```
 
 Check if there is solid geometry between the actor and its target (using `CLOFF_JUMP_ON_MISS`):
 
-```
+```text
 A_CheckLOF("HasObstacle", CLOFF_SKIPOBSTACLES | CLOFF_JUMP_ON_MISS, 2000)
 ```

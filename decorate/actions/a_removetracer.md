@@ -1,20 +1,22 @@
 # `A_RemoveTracer` (remove actor in tracer pointer)
 
 **Tier:** A
-**Engine:** UZDoom 4.15pre / GZDoom-family — does not exist in Zandronum
-**Provenance:** ZDoom Wiki `A_RemoveTracer` (retrieved 2026-08-01, oldid=46795) + verified against the UZDoom source's `src/playsim/p_actionfunctions.cpp:4365-4377`.
+**Applies to:** UZDoom=yes, Zandronum=no
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15)
+**Provenance:** ZDoom Wiki `A_RemoveTracer` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RemoveTracer&oldid=46795) + verified against the UZDoom source's `src/playsim/p_actionfunctions.cpp:4365-4377`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_RemoveTracer)` in `src/playsim/p_actionfunctions.cpp` — callable from any actor's state table.
 
 Removes the actor referenced by the calling actor's `tracer` pointer from the game world, with optional filtering by type, class, and species. A companion to `A_RemoveTarget`, `A_RemoveMaster`, `A_RemoveChildren`, and `A_RemoveSiblings` for selectively removing actors.
 
-## Engine availability
+## Engine-family divergence
 
 **This function does not exist in Zandronum.** It is a UZDoom/GZDoom-family addition and will not compile in Zandronum DECORATE. The Zandronum-only `A_RemoveTarget` and `A_RemoveMaster` exist but support only unconditional removal without parameters; they predate the wiki's advanced parameterized versions documented here.
 
 ## Signature
 
-```
-void A_RemoveTracer(int flags = 0, string filter = "None", string species = "None")
+```text
+void A_RemoveTracer(int flags = 0, class<Actor> filter = null, name species = "None")
 ```
 
 ## Parameters
@@ -25,17 +27,17 @@ Bitfield controlling which actor types can be removed. Multiple flags can be com
 
 - **`RMVF_MISSILES`** — Allows removal of actors with the `MF_MISSILE` flag set (projectile-type actors).
 - **`RMVF_NOMONSTERS`** — Prevents removal of monsters (actors with `MF3_ISMONSTER` flag set). By default, monsters are removable; this flag disables that.
-- **`RMVF_MISC`** — Allows removal of actors that are neither missiles nor monsters (decorations, pickups, etc.).
+- **`RMVF_MISC`** — Allows removal when the actor is not *simultaneously* both a monster (`MF3_ISMONSTER`) and a missile (`MF_MISSILE`). Since no actor normally carries both flags at once, this condition is true for almost any actor — monsters and missiles included, not just decorations/pickups as the flag name might suggest. It is `!(ISMONSTER && MISSILE)`, not `!ISMONSTER && !MISSILE`.
 - **`RMVF_EVERYTHING`** — Overrides all other flags and removes the actor regardless of type discrimination. When set, all other flag checks are bypassed.
 - **`RMVF_EXFILTER`** — Inverts the `filter` class-name check; the tracer is only removed if its class name does **not** match the filter.
 - **`RMVF_EXSPECIES`** — Inverts the `species` check; the tracer is only removed if its species does **not** match the species filter.
 - **`RMVF_EITHER`** — Enables OR-logic for filter matching; the tracer is removed if either its class name matches `filter` OR its species matches `species`. Default behavior is AND-logic (must match both).
 
-### `filter` (string, optional, default: "None")
+### `filter` (class<Actor>, optional, default: null)
 
-Actor class name filter. If specified and not "None", the tracer is only removed if its class name exactly matches this string. Empty string and "None" are equivalent to no filter. Uses the actor's class name for matching, not its parent class or inheritance chain.
+Actor class filter, written in DECORATE as a bare class name or the literal `"None"`/omitted for no filter. If non-null, the tracer is only removed when its class is exactly this class (exact match — a subclass of `filter` does not count as a match). Default `null` means no class filtering.
 
-### `species` (string, optional, default: "None")
+### `species` (name, optional, default: "None")
 
 Species name filter. If specified and not "None", the tracer is only removed if its species property matches this value. Empty string and "None" are equivalent to no filter.
 
@@ -51,9 +53,9 @@ When called:
 3. Applies type discrimination based on flags:
    - With `RMVF_EVERYTHING`, the actor is removed unconditionally (type checks skipped).
    - Otherwise, checks are applied in this order:
+     - If `RMVF_MISC` is set and the actor is not simultaneously both a monster and a missile (true for almost any actor in practice), remove it.
      - If actor is a monster (`MF3_ISMONSTER` set) and `RMVF_NOMONSTERS` is NOT set, remove it.
      - If actor is a missile (`MF_MISSILE` set) and `RMVF_MISSILES` is set, remove it.
-     - If actor is neither monster nor missile and `RMVF_MISC` is set, remove it.
 4. Calls `P_RemoveThing` to handle the actual removal.
 
 ## NULL tracer check
@@ -65,7 +67,7 @@ The function safely checks whether `tracer != NULL` before attempting removal. C
 The type checks in the implementation use this structure:
 
 - `RMVF_EVERYTHING`: Removes regardless of all other flags.
-- `RMVF_MISC`: Removes actors that are not both (monster AND missile) — i.e., decorations and pickups.
+- `RMVF_MISC`: Removes actors that are not simultaneously both a monster AND a missile — since that combination essentially never occurs, this flag in practice matches monsters and missiles too, not just the "misc" (decoration/pickup) category its name implies.
 - Monster check: Removes if `MF3_ISMONSTER` is set and `RMVF_NOMONSTERS` is not set.
 - Missile check: Removes if `MF_MISSILE` is set and `RMVF_MISSILES` is set.
 
@@ -87,7 +89,7 @@ In UZDoom/GZDoom-family multiplayer, `P_RemoveThing` broadcasts actor destructio
 
 A homing projectile that removes other projectiles it passes through:
 
-```
+```text
 ACTOR HomingBolt : FastProjectile
 {
     Speed 40
@@ -112,7 +114,7 @@ ACTOR HomingBolt : FastProjectile
 
 A spawned monster that removes itself when it returns to its spawner:
 
-```
+```text
 ACTOR SummonedDemon : Demon
 {
     Speed 15
@@ -135,7 +137,7 @@ ACTOR SummonedDemon : Demon
 
 Filtering by class name — only remove a tracer if it's a specific projectile type:
 
-```
+```text
 ACTOR ProjectileEater : CacodemonBall
 {
     Projectile
@@ -152,7 +154,7 @@ ACTOR ProjectileEater : CacodemonBall
 
 Using species filtering and inverted checks:
 
-```
+```text
 ACTOR BossMinionDispel : Actor
 {
     Projectile

@@ -1,11 +1,13 @@
 # GetPlayerLivesLeft
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 — added together with `SetPlayerLivesLeft` in commit `eac46667c` ("Added new ACS commands GetPlayerLivesLeft and SetPlayerLivesLeft... In game modes using sv_maxlives..."), confirmed via `git merge-base --is-ancestor eac46667c 28f736fb3` (the 3.2.1 version-bump commit) to predate 3.2.1, so this is present in the 3.2.1 target, not a later addition.
-**Provenance:** `GetPlayerLivesLeft - Zandronum Wiki.html` (wiki `oldid=1351`), verified against the Zandronum source's `src/p_acs.cpp` and `p_interaction.cpp` 2026-07-29.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** `GetPlayerLivesLeft - Zandronum Wiki.html` (wiki `https://wiki.zandronum.com/w/index.php?title=GetPlayerLivesLeft&oldid=1351`), verified against the Zandronum source's `src/p_acs.cpp` and `p_interaction.cpp` 2026-07-29.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Extension function (index -104; `SetPlayerLivesLeft` at -105)
 
-```
+```text
 int GetPlayerLivesLeft(int player)
 ```
 
@@ -41,3 +43,23 @@ doesn't mention this precondition at all.
   `1`/`0` instead of a lives count.
 - `PlayerIsSpectator` — the wiki's own suggestion for checking whether a player is dead/out, rather
   than inferring it from a lives count of `0` (a player can be on their last life and still alive).
+
+## Engine-family divergence
+
+`GetPlayerLivesLeft` is bound as ACSF (CALLFUNC) index 104 — inside the 100–199 range UZDoom's own
+ACSF enum reserves for Zandronum's extensions and implements none of (confirmed via
+`tools/engine_matrix.py GetPlayerLivesLeft`, bin `zandronum-only-silent`). UZDoom's `CallFunction`
+dispatcher is a plain `switch` over the ACSF index with `default: break;` falling through to
+`return 0` — no error, no log line, execution just continues. A Zandronum-compiled object calling
+`GetPlayerLivesLeft` under UZDoom silently gets `0` back in place of a real lives count. See
+[Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md) for the general mechanism
+— this function is one of the confirmed instances it names directly.
+
+That silent `0` is a worse fit here than for most reserved-range functions: `0` is also this
+function's own **legitimate** in-range return, meaning "on their last life" — and it's what
+`ulLivesLeft` already reads by default for every player before any lives-limited gamemode logic
+ever touches it (see "Only meaningful under a lives-limited gamemode" above). A UZDoom caller
+can't distinguish "player is down to their last life" from "this build doesn't implement the call
+at all" from "no lives-limited gamemode is active" — all three read back identically as `0`, unlike
+the function's documented `-1` failure return, which stays visibly distinguishable from a real
+lives count on the engine that actually implements it.

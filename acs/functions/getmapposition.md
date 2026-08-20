@@ -1,10 +1,25 @@
 # `int GetMapPosition(int type)`
 
+**Tier:** A.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `GetMapPosition - Zandronum Wiki.html` (`_intake/`, retrieved
+2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetMapPosition&oldid=2246`) + source-verified against the Zandronum source (`p_acs.cpp:7916-7948`,
+`maprotation.cpp:127-144`) and `zt-bcc/lib/zcommon.bcs:1781,1248-1251`. The wiki's description
+held up fully against source; this doc adds the 0-based-vs-1-based indexing detail and the
+`MAPPOSITION_CURRENT`-only cross-check (both absent from the wiki page). Function was added as
+`GetCurrentMapPosition` in commit `2ba3d3c975` (2022-02-13) and renamed to `GetMapPosition` (with
+the current/next `type` parameter added) in commit `2d88efa44b` (2024-04-23) — confirmed via
+`git merge-base --is-ancestor` that this rename commit predates the 3.2.1 version-bump commit
+`28f736fb3` (2025-08-04), so the function under its current name and signature is present in the
+3.2.1 target.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
+**Bucket:** extension function.
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+
 Returns the 1-based position of the current or next map in the server's map rotation. Extension
 function (`ACSF_GetMapPosition`, index -151 in `zt-bcc/lib/zcommon.bcs:1781`), implementation at
 the Zandronum source's `src/p_acs.cpp:7916-7948`.
-
-**Bucket:** extension function.
 
 ```cpp
 case ACSF_GetMapPosition:
@@ -78,7 +93,7 @@ case ACSF_GetMapPosition:
 
 **Example:**
 
-```
+```text
 int pos = GetMapPosition(MAPPOSITION_CURRENT);
 if (pos == 0)
 {
@@ -90,16 +105,21 @@ if (pos == 0)
 is invalid, or (for `MAPPOSITION_CURRENT` specifically) the running map doesn't match the
 rotation's recorded current-position entry.
 
-**Provenance:** wiki page `GetMapPosition - Zandronum Wiki.html` (`_intake/`, retrieved
-2026-07-29, `oldid=2246`) + source-verified against the Zandronum source (`p_acs.cpp:7916-7948`,
-`maprotation.cpp:127-144`) and `zt-bcc/lib/zcommon.bcs:1781,1248-1251`. The wiki's description
-held up fully against source; this doc adds the 0-based-vs-1-based indexing detail and the
-`MAPPOSITION_CURRENT`-only cross-check (both absent from the wiki page). Function was added as
-`GetCurrentMapPosition` in commit `2ba3d3c975` (2022-02-13) and renamed to `GetMapPosition` (with
-the current/next `type` parameter added) in commit `2d88efa44b` (2024-04-23) — confirmed via
-`git merge-base --is-ancestor` that this rename commit predates the 3.2.1 version-bump commit
-`28f736fb3` (2025-08-04), so the function under its current name and signature is present in the
-3.2.1 target. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD —
-see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.
+## Engine-family divergence
 
-**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+`GetMapPosition` is bound as ACSF (CALLFUNC) index 151, inside the 100–199 range UZDoom's own
+ACSF enum reserves for Zandronum's extensions and implements none of. UZDoom's `CallFunction`
+dispatcher is a plain `switch` with `default: break;` falling through to `return 0` — no error,
+no log line, script execution continues normally. A Zandronum-compiled object calling
+`GetMapPosition` under UZDoom silently gets `0` back rather than a real position, with no
+diagnostic. See [Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md) for the
+general mechanism.
+
+This is a worse case than most reserved-range functions: `0` is already this function's own
+documented "no rotation / map not in rotation" sentinel, so a caller under UZDoom can't
+distinguish "genuinely not running from a rotation" from "this engine doesn't implement the call
+at all" — both look identical, and neither raises any alarm. `GetMapRotationSize` and
+`GetMapRotationInfo` are the same map-rotation subsystem's sibling extension functions and are
+expected to hit this identical silent-0 failure mode for the same reason (see
+`getmaprotationsize.md`/`getmaprotationinfo.md` if their own divergence sections have been filled
+in), since map rotation itself is a Zandronum-only server feature with no UZDoom equivalent.

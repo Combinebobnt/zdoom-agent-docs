@@ -1,11 +1,26 @@
 # `int ChangeTeamScore(int team, int type, int value, bool announce = true)`
 
+**Tier:** A.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `ChangeTeamScore - Zandronum Wiki.html` (`_intake/`, retrieved
+2026-07-29, `https://wiki.zandronum.com/w/index.php?title=ChangeTeamScore&oldid=2242`) + source-verified against the Zandronum source
+(`p_acs.cpp:8071-8125`, `team.cpp:868-891,1155-1240`, `team.h:115,143,146,149`) and
+`zt-bcc/lib/zcommon.bcs:1228-1238,1784`. The wiki's parameter list, enum values 0-3, and return
+convention all hold, but its first-parameter name (`player`), the frags-only negative-value
+carve-out, the no-op-returns-0 ambiguity, the per-type announce gating, and the wider 9-member
+shared `SCORE_*` enum are this doc's source-verified additions. `ChangeTeamScore` was added in
+commit `65f04f8c2` ("Added ACS function: 'ChangeTeamScore'.", 2022-04-22), confirmed via
+`git merge-base --is-ancestor` to be a direct ancestor of `28f736fb3` (the 3.2.1 version-string
+commit) — it predates the 3.2.1 target and is safe to verify against it.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
+**Bucket:** extension function.
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+
 Sets one of a team's four score counters. Extension function (`ACSF_ChangeTeamScore`, index -154
 in `zcommon.bcs`), implementation at the Zandronum source's `src/p_acs.cpp:8071-8125`, dispatching to
 `TEAM_SetFragCount`/`TEAM_SetPointCount`/`TEAM_SetWinCount`/`TEAM_SetDeathCount` in
 the Zandronum source's `src/team.cpp`.
-
-**Bucket:** extension function.
 
 ```cpp
 case ACSF_ChangeTeamScore:
@@ -86,17 +101,21 @@ case ACSF_ChangeTeamScore:
 `type` isn't one of `SCORE_FRAGS`/`SCORE_POINTS`/`SCORE_WINS`/`SCORE_DEATHS`, or the requested
 value already equals the current one.
 
-**Provenance:** wiki page `ChangeTeamScore - Zandronum Wiki.html` (`_intake/`, retrieved
-2026-07-29, `oldid=2242`) + source-verified against the Zandronum source
-(`p_acs.cpp:8071-8125`, `team.cpp:868-891,1155-1240`, `team.h:115,143,146,149`) and
-`zt-bcc/lib/zcommon.bcs:1228-1238,1784`. The wiki's parameter list, enum values 0-3, and return
-convention all hold, but its first-parameter name (`player`), the frags-only negative-value
-carve-out, the no-op-returns-0 ambiguity, the per-type announce gating, and the wider 9-member
-shared `SCORE_*` enum are this doc's source-verified additions. `ChangeTeamScore` was added in
-commit `65f04f8c2` ("Added ACS function: 'ChangeTeamScore'.", 2022-04-22), confirmed via
-`git merge-base --is-ancestor` to be a direct ancestor of `28f736fb3` (the 3.2.1 version-string
-commit) — it predates the 3.2.1 target and is safe to verify against it. **Engine:** Zandronum
-3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`).
-**Tier:** A.
+## Engine-family divergence
 
-**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+`ChangeTeamScore` is bound as ACSF index 154 (`-154` in `zcommon.bcs`), squarely inside the
+100–199 range UZDoom reserves for Zandronum's own extensions and implements none of — see
+[Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md). Under UZDoom,
+`CallFunction`'s dispatch switch has no `case` for this index, falls to `default: break;`, and
+returns `0` with no error or log line; the interpreter rebalances the stack as if the call had
+succeeded, so the script's execution simply continues.
+
+Because this function is a mutator rather than a query, the practical effect is worse than a wrong
+read: none of `TEAM_SetFragCount`/`TEAM_SetPointCount`/`TEAM_SetWinCount`/`TEAM_SetDeathCount` ever
+runs under UZDoom, so the target team's counter is left completely untouched — no scoreboard
+update, no server replication, no announcer sound. A script expecting the change to show up on the
+scoreboard or feed a win-count check instead gets the same `0` this doc's body already documents
+for a genuine no-op write (new value equals current value) or an invalid `team`/`type` on
+Zandronum itself — so on UZDoom the call is indistinguishable, by return value alone, from either
+of those legitimate Zandronum failure paths. A script that doesn't check the return value at all
+will silently never see the score change take effect.

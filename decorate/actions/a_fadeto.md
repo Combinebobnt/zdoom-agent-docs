@@ -1,15 +1,17 @@
 # `A_FadeTo`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_FadeTo` (retrieved 2026-08-01, oldid=44214) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3097-3158`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_FadeTo` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_FadeTo&oldid=44214) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3097-3158`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_FadeTo)` in `src/thingdef/thingdef_codeptr.cpp`.
 
 Gradually adjusts an actor's alpha (translucency/opacity) toward a target value. Unlike `A_FadeOut` (which fades to fully transparent) or `A_FadeIn` (which fades to fully opaque), `A_FadeTo` allows fading to any specific alpha value, making it useful for gradual visibility changes, stealth effects, or semi-transparent appearances.
 
 ## Signature
 
-```
+```text
 void A_FadeTo(fixed target, fixed amount = 0.1, bool remove = false)
 ```
 
@@ -55,7 +57,7 @@ Controls whether the actor is destroyed once its alpha reaches the target value.
 
 - **Zero amount with non-target alpha**: If `amount` is explicitly passed as `0` and `alpha` is not already equal to `target`, the alpha value will not change on that call. Only when `alpha == target` (whether by prior convergence or by coincidence) will the action do nothing further.
 
-## Zandronum vs. wiki divergence
+## Wiki/engine divergence
 
 The ZDoom wiki describes two different signatures:
 
@@ -69,9 +71,18 @@ The ZDoom wiki describes two different signatures:
 - **Default for `remove`**: Wiki says `true` (remove by default); Zandronum's default is `false` (do not remove by default).
 - **Alpha clamping**: GZDoom-family supports `FTF_CLAMP` to restrict alpha to `[0.0, 1.0]`; Zandronum has no clamping (alpha can exceed this range if `target` is set outside it, but will appear clamped during rendering).
 
+## Engine-family divergence
+
+UZDoom's actual declared signature (`native void A_FadeTo(double target, double amount = 0.1, int flags = 0);` in `wadsrc/static/zscript/actors/actor.zs`) confirms that the "new signature" described in the Wiki/engine divergence section above is UZDoom's real implementation, not just a wiki description of a hypothetical variant. UZDoom's `A_FadeTo` (`src/playsim/p_actionfunctions.cpp`) takes an `int flags` parameter using `FTF_REMOVE` (bit 0) and `FTF_CLAMP` (bit 1), not Zandronum's boolean `remove` parameter, and internally represents `target`/`amount` as native `double` rather than fixed-point.
+
+- **Alpha clamping**: UZDoom supports `FTF_CLAMP`; when set, alpha is clamped into `[0.0, 1.0]` after the fade step via `clamp(self->Alpha, 0., 1.)`. Zandronum has no equivalent flag or clamping logic (as already noted above for the wiki's description of this feature).
+- **`remove`/`FTF_REMOVE` default**: UZDoom's native declaration defaults `flags` to `0`, so `FTF_REMOVE` is **not** set by default — matching Zandronum's `remove = false` default, not the wiki's stated default of `true` for the old-style parameter.
+- **Player-body protection is silent, not warned, on UZDoom**: Zandronum explicitly checks `self->player && self->player->mo == self` before honoring a remove request and prints a `PRINT_BOLD` warning (`"Warning: A_FadeTo may not delete player bodies that are still associated to a player!"`) when it refuses. UZDoom's removal path instead goes through the shared `P_RemoveThing()` helper (`src/playsim/p_things.cpp`), which applies the same underlying condition (skip removal if `actor->player != NULL && actor == actor->player->mo`) but does so **silently** — no message is printed to console when a live player's body is protected from removal.
+- **No client/server authority split on UZDoom**: Zandronum's `A_FadeTo` is server-authoritative — gated by `NETWORK_InClientModeAndActorNotClientHandled()` and followed by `SERVERCOMMANDS_SetThingProperty()`/`SERVERCOMMANDS_DestroyThing()` broadcasts to clients (see "Network synchronization (multiplayer)" above). UZDoom's implementation has no client/server split at all — no `NETWORK_*` gating and no `SERVERCOMMANDS_*` calls anywhere in the function; it simply runs the fade and removal logic directly wherever it's called.
+
 ## Example (Zandronum DECORATE)
 
-```
+```text
 actor SemiTransparentSpider : SpiderMasterMind
 {
     States

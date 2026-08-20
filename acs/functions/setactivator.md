@@ -1,12 +1,26 @@
 # `bool SetActivator(int tid [, int pointer_selector])`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `SetActivator - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
+`https://zdoom.org/w/index.php?title=SetActivator&oldid=35016`) + source-verified against `p_acs.cpp:5952-5961` (`ACSF_SetActivator` case),
+`p_acs.cpp:4445-4456` (`SingleActorFromTID`), `p_acs.cpp:5938-5950` (`ACSF_SetPointer`, for the
+self-pointer-guard contrast), and `zt-bcc/lib/zcommon.bcs:1640` (index `-12`, optional 2nd arg).
+The shared-TID resolution order ("Which actor wins…") is source-only, not wiki-derived, and was
+verified against `p_mobj.cpp:3575-3593` (`AActor::AddToHash`, head insertion) and
+`actor.h:1278-1304` (`FActorIterator::Next`, head-first walk with a `tid` filter).
+Selector resolution itself (`COPY_AAPTR`) is documented once in
+[Actor pointer selectors](../concepts/actor-pointers.md) rather than re-derived here.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** extension function (negative index → `ACSF_SetActivator` in `p_acs.cpp`).
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+
 Reassigns the *calling script's own* activator (the same `activator`/pointer the rest of the
 script's execution — `ActivatorTID()`, `PlayerNumber()`, `Log`/`Print`'s activator-relative
 delivery, etc. — reads from then on) to a different actor, or to no actor at all ("the world").
 Extension function (`ACSF_SetActivator`, index `-12` in the zt-bcc source's `lib/zcommon.bcs:1640`),
 implementation in `p_acs.cpp:5952-5961`.
-
-**Bucket:** extension function (negative index → `ACSF_SetActivator` in `p_acs.cpp`).
 
 ```cpp
 case ACSF_SetActivator:
@@ -56,6 +70,33 @@ the activator, `activator` is simply reassigned to itself and the function retur
 just an asymmetry worth knowing if code was ported from a `SetPointer` call site with the same
 selector logic.
 
+## Which actor wins when several share the TID: the most recently spawned one
+
+`SingleActorFromTID` resolves a non-zero `tid` with `FActorIterator iterator(tid); return
+iterator.Next();` (`p_acs.cpp:4453-4454`) — it takes the **first** actor the iterator yields and
+never looks at the rest. Nothing about that choice is arbitrary, and it is worth knowing exactly,
+because TIDs are not unique: nothing in the engine prevents two actors from holding the same one
+(see [Thing_ChangeTID](thing_changetid.md), which never checks for a collision before assigning).
+
+The order is determined by how the TID hash chain is built:
+
+- `AActor::AddToHash` (`p_mobj.cpp:3575-3593`) inserts each actor at the **head** of its bucket:
+  `inext = TIDHash[hash]; TIDHash[hash] = this;`.
+- `FActorIterator::Next` (`actor.h:1287-1300`) starts at `TIDHash[id & 127]` and walks `inext`,
+  skipping entries whose `tid` doesn't match (one bucket serves many TIDs — the hash is just
+  `tid & 127`).
+
+So the chain is in reverse order of TID assignment, and **the most recently spawned (or most
+recently `Thing_ChangeTID`'d) actor holding a TID is the one `SetActivator` selects.** The same
+ordering governs every other `FActorIterator` consumer that takes only the first match.
+
+Practical consequence: the common "spawn an actor with a scratch TID, immediately
+`SetActivator(that_tid)` to manipulate it, then clear the TID again" idiom is safe *even if that
+TID is already in use elsewhere*, because the just-spawned actor is guaranteed to be at the head
+of the chain. That safety holds only for as long as no `Delay`/`Suspend` intervenes between the
+spawn and the `SetActivator` — anything that yields lets another actor take the head, and
+lets other scripts observe the collision.
+
 ## Return value / failure behavior
 
 `activator != NULL` after the assignment — matches the wiki's "1 if the activator exists, 0 (and
@@ -72,14 +113,3 @@ The reassignment is a plain local-variable write to the running script instance'
 script) interpreter state, not something clients need to know about) and persists for the rest of
 that script instance's execution, across function calls, until the script ends or calls
 `SetActivator`/`SetActivatorToTarget`/`SetActivatorToPlayer` again.
-
-**Provenance:** wiki page `SetActivator - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
-`oldid=35016`) + source-verified against `p_acs.cpp:5952-5961` (`ACSF_SetActivator` case),
-`p_acs.cpp:4445-4456` (`SingleActorFromTID`), `p_acs.cpp:5938-5950` (`ACSF_SetPointer`, for the
-self-pointer-guard contrast), and `zt-bcc/lib/zcommon.bcs:1640` (index `-12`, optional 2nd arg).
-Selector resolution itself (`COPY_AAPTR`) is documented once in
-[Actor pointer selectors](../concepts/actor-pointers.md) rather than re-derived here. **Engine:**
-Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in
-`../../shared/AUTHORING.md`). **Tier:** A.
-
-**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.

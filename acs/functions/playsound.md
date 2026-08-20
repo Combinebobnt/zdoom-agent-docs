@@ -1,8 +1,10 @@
 # `void PlaySound(int tid, str sound [, int channel, fixed volume, bool looping, fixed attenuation, bool local])`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (checked out source reports 3.3-alpha; `ACSF_PlaySound` is long-standing Hexen-era ACS, not a netcode-gated addition, so this is not expected to be version-sensitive).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `PlaySound - ZDoom Wiki` (https://zdoom.org/w/index.php?title=PlaySound&oldid=47607), verified 2026-07-29 against fork source.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
 
 Plays a sound as if it originated from the actor(s) matching `tid`. Extension function
@@ -30,7 +32,7 @@ with `PlayActorSound` in one switch case: the Zandronum source's `src/p_acs.cpp:
 - `channel`, `volume`, `looping`, `attenuation` — read straight through as documented by the
   wiki, defaulting to `CHAN_BODY`, `1.0`, `false`, `ATTN_NORM` respectively when omitted
   (`p_acs.cpp:6496-6499`, gated on `argCount`). No surprises here.
-- **`local` (the wiki's 7th parameter) is accepted by the compiler but never read by this fork's
+- **`local` (the wiki's 7th parameter) is accepted by the compiler but never read by Zandronum's
   engine code — it is a silent no-op, not a fork-vs-wiki behavior difference in the visible
   effect, just a dead parameter.** `zcommon.bcs:1689`'s signature
   (`PlaySound(int,str;int,fixed,bound,fixed,bool)`) does declare a 5th optional `bool` after
@@ -49,3 +51,29 @@ with `PlayActorSound` in one switch case: the Zandronum source's `src/p_acs.cpp:
   alongside the explicit `looping` bool at `p_acs.cpp:6520`/`6538`) — this is engine-internal
   plumbing, not something the ACS caller needs to set, but explains why `channel` is passed
   through raw rather than masked.
+
+## Engine-family divergence: `local` parameter is live on UZDoom
+
+UZDoom's `case ACSF_PlaySound:` (`src/playsim/p_acs.cpp:5999-6046`, shared with `ACSF_PlayActorSound`
+the same way as Zandronum) does read the 7th argument: `INTBOOL local = argCount > 6 ? args[6] :
+false;`. When set, it ORs a `CHANF_LOCAL` flag into the channel value passed to `S_PlaySound`
+(`p_acs.cpp:6039/6041`). `S_PlaySound`/`S_PlaySoundPitch` (`src/sound/s_doomsound.cpp:609-630`)
+branch on that flag: with `CHANF_LOCAL` set, the sound only plays if `a->CheckLocalView()` is true
+for the source actor (i.e. only for the client whose view is attached to that actor), and it's
+played via the listener-relative path with `ATTN_NONE` instead of the passed-in attenuation. This
+matches the wiki's description of `local` almost exactly ("played with `ATTN_NONE`" when looking
+through the source actor's eyes) — so on UZDoom, `local` is **not** a dead parameter the way it is
+on Zandronum; omitting it (or passing `false`) reproduces the Zandronum-documented behavior above,
+but explicitly passing `true` has a real, wiki-matching effect on UZDoom that it does not have on
+Zandronum.
+
+The NULL-safety property documented above for `tid=0` with no activator still holds on UZDoom:
+`S_PlaySoundPitch` starts with `if (a == nullptr || a->Sector->Flags & SECF_SILENT || a->Level !=
+primaryLevel) return;` (`s_doomsound.cpp:611-612`), so a NULL `spot` is a safe no-op there too.
+Everything else (tid-0-means-activator, TID-nonzero fan-out to every matching actor, bad-sound-name
+silent no-op via `argCount`-gated defaults for `channel`/`volume`/`looping`/`attenuation`) matches
+the Zandronum behavior described above; UZDoom naturally has no
+`SERVER_IsChannelLooping`/`SERVER_UpdateLoopingChannels` server bookkeeping since that's
+Zandronum-specific multiplayer plumbing, not a vanilla-ZDoom-family concept, and UZDoom's looping
+instead goes through the ordinary `CHANF_LOOP | CHANF_NOSTOP` channel flags on the same
+`S_PlaySound` call.

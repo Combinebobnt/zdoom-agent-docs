@@ -1,8 +1,10 @@
 # `int Thing_SetSpecial(int tid, int special, int arg0, int arg1, int arg2)`
 
 **Tier:** A.
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`).
-**Provenance:** wiki page `Thing_SetSpecial - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `oldid=23145`) + source-verified against the Zandronum source (`p_lnspec.cpp:1050-1079`, `p_acs.cpp:11525-11555` for the `SetThingSpecial` builtin comparison, `sv_main.cpp:2896-2907` for the sync-scope finding) and `zt-bcc/lib/zcommon.bcs:1482` / `zt-bcc/src/builtin.c:92,240` (for `setthingspecial`'s builtin signature). The wiki's parameter list, the "only sets 3 args" claim, and the "use `SetThingSpecial` instead" pointer all hold and are confirmed by reading the actual assignment statements; the always-`true` return, the `tid=0`-no-activator no-op, and the no-live-replication netcode gap are this doc's source-verified additions, none of which the wiki page mentions. `LS_Thing_SetSpecial` is present verbatim in `cf11cbdb3` (a pre-SVN-import directory-restructuring commit, the oldest form of this file in this checkout's history), so it necessarily predates the 3.2.1 version-string commit (`28f736fb3`) by a wide margin; confirmed via `git merge-base --is-ancestor cf11cbdb3 28f736fb3`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `Thing_SetSpecial - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=Thing_SetSpecial&oldid=23145`) + source-verified against the Zandronum source (`p_lnspec.cpp:1050-1079`, `p_acs.cpp:11525-11555` for the `SetThingSpecial` builtin comparison, `sv_main.cpp:2896-2907` for the sync-scope finding) and `zt-bcc/lib/zcommon.bcs:1482` / `zt-bcc/src/builtin.c:92,240` (for `setthingspecial`'s builtin signature). The wiki's parameter list, the "only sets 3 args" claim, and the "use `SetThingSpecial` instead" pointer all hold and are confirmed by reading the actual assignment statements; the always-`true` return, the `tid=0`-no-activator no-op, and the no-live-replication netcode gap are this doc's source-verified additions, none of which the wiki page mentions. `LS_Thing_SetSpecial` is present verbatim in `cf11cbdb3` (a pre-SVN-import directory-restructuring commit, the oldest form of this file in this checkout's history), so it necessarily predates the 3.2.1 version-string commit (`28f736fb3`) by a wide margin; confirmed via `git merge-base --is-ancestor cf11cbdb3 28f736fb3`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** action special (positive index).
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
@@ -52,7 +54,7 @@ FUNC(LS_Thing_SetSpecial)	// [BC]
   `tid, special, arg0, arg1, arg2`). `args[3]`/`args[4]` on the target actor are left at whatever
   they already were — not zeroed, not touched. The wiki's own text points at the fix: the
   **`SetThingSpecial` compiler builtin** (`PCD_SETTHINGSPECIAL`, the Zandronum source's `src/
-  p_acs.cpp:11525-11555`) is confirmed present in this fork and does set all five `args` slots —
+  p_acs.cpp:11525-11555`) is confirmed present in the Zandronum engine fork and does set all five `args` slots —
   it takes the same `tid`/`special` plus all 5 args and additionally supports ZDoom's
   named-script (`ACS_NamedExecute`-family) special-number encoding. That builtin is a separate
   function from this one and isn't documented further here.

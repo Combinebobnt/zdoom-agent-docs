@@ -1,19 +1,19 @@
 # `void Delay(int tics)`
 
-**Bucket:** compiler builtin (`zt-bcc/src/builtin.c:36`, `{ "delay", ";i" }` — one required int
-arg, no optional args, matches the wiki's signature exactly; table-flagged `PCD_DELAY | F_LATENT`
-at `builtin.c:184`, marking it a *latent* — i.e. potentially script-suspending — call).
-Implemented as `PCD_DELAY` in `p_acs.cpp`.
-
-**Tier:** A. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD —
-see "Engine scope" in `../../shared/AUTHORING.md`).
-
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
 **Provenance:** `Delay - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=Delay&oldid=35788`),
 verified against the Zandronum source's `src/p_acs.cpp` on 2026-07-28. The wiki page itself is thin —
 signature, one line of usage, and two examples — and everything below the "Units" bullet is *not*
 in the wiki; it comes from reading `PCD_DELAY`'s implementation and the `SCRIPT_Delayed` state
 handler directly, because the wiki's own runaway-script example is subtly wrong about how `Delay`
 actually behaves at the boundary (see "Delay(0) is not a safe no-op" below).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** compiler builtin (`zt-bcc/src/builtin.c:36`, `{ "delay", ";i" }` — one required int
+arg, no optional args, matches the wiki's signature exactly; table-flagged `PCD_DELAY | F_LATENT`
+at `builtin.c:184`, marking it a *latent* — i.e. potentially script-suspending — call).
+Implemented as `PCD_DELAY` in `p_acs.cpp`.
 
 Suspends the calling script for the given number of tics, then resumes it.
 

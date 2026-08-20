@@ -1,15 +1,17 @@
 # `A_RailAttack` (weapon railgun beam attack)
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_RailAttack` (retrieved 2026-08-01, oldid=53912) + verified against Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1926-1983` and `wadsrc/static/actors/shared/inventory.txt:14`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_RailAttack` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RailAttack&oldid=53912) + verified against Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1926-1983` and `wadsrc/static/actors/shared/inventory.txt:14`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_RailAttack)` in `src/thingdef/thingdef_codeptr.cpp`.
 
 Fires a rail beam attack (hitscan, piercing beam with particle trail). Only works when called from a player pawn's weapon state table — silently returns (no-op) if the actor lacks a player. The beam pierces all targets along its path by default (can be limited with `RGF_NOPIERCING`).
 
 ## Signature
 
-```
+```text
 action void A_RailAttack(int damage, int spawnofs_xy = 0, int useammo = true, color color1 = "", color color2 = "", int flags = 0, float maxdiff = 0, class<Actor> pufftype = "BulletPuff", float spread_xy = 0, float spread_z = 0, float range = 0, int duration = 0, float sparsity = 1.0, float driftspeed = 1.0, class<Actor> spawnclass = "none", float spawnofs_z = 0)
 ```
 
@@ -136,6 +138,68 @@ The ZDoom Wiki page documents upstream ZDoom/GZDoom features not present in Zand
 
 When using this action, ensure DECORATE syntax — `A_RailAttack(damage, spawnofs_xy, useammo, color1, color2, ...)` — not ZScript syntax (which supports named arguments and has a different parameter order for some values).
 
+## Engine-family divergence: full wiki parameter and flag set present
+
+UZDoom implements `A_RailAttack` as a ZScript `action` method on the shared weapon/inventory
+state-provider class (`wadsrc/static/zscript/actors/inventory/stateprovider.zs`), which builds an
+`FRailParams` struct and hands off to a native `RailAttack`/`P_RailAttack` (`src/playsim/p_map.cpp`)
+for the actual trace/damage/trail work. The "Differences from ZDoom/GZDoom" section above is
+accurate for Zandronum, but all three features it lists as wiki-only are genuinely implemented on
+UZDoom, not just declared:
+
+- `RGF_NORANDOMPUFFZ` is a working flag: the native code translates it into a puff-spawn flag
+  (`PF_NORANDOMZ`) that suppresses the puff's normal randomized Z offset.
+- `spiraloffset` is a real 17th parameter (default `270`) that is passed all the way through to
+  `P_DrawRailTrail` (`src/playsim/p_effect.cpp`), which uses it as the starting angle for the
+  spiral particle trail — it is not ignored.
+- `limit` is a real 18th parameter (default `0`, meaning unlimited) that caps how many actors the
+  beam can pierce before stopping, independent of `RGF_NOPIERCING` — the native trace callback
+  stops once the hit count reaches `limit` when `limit` is nonzero.
+
+## Engine-family divergence: color defaults and no player/team-color override
+
+UZDoom's signature defaults `color1`/`color2` to the integer `0` rather than Zandronum's `""` —
+consistent with the existing "Parameter defaults" bullet above — and on UZDoom a `0` genuinely
+means "random gray" for both colors: `P_DrawRailTrail` (`src/playsim/p_effect.cpp`) independently
+resolves `color1 == 0 ? -1 : ParticleColor(color1)` for the outer spiral and
+`color2 == 0 ? -1 : ParticleColor(color2)` for the inner core (`-1` being the particle system's
+"pick a random shade of gray" sentinel), with no further special-casing anywhere in the rail-attack
+code path.
+
+This is a real behavioral divergence, not just a default-syntax one. Zandronum's rail-attack helper
+(`P_RailAttackWithPossibleSpread` in `src/p_map.cpp`, which `A_RailAttack` calls before reaching
+`P_RailAttack` proper) contains an additional player-sourced special case that UZDoom has no
+equivalent of: when the calling actor is a player and both colors evaluate to `0` — which is
+exactly what Zandronum's `""` default evaluates to — it substitutes the firing player's own
+client-configured railgun color for the outer/spiral color (or, if the player is on a team in a
+team-based gamemode, the *team's* configured railgun color for the outer color and the player's own
+color for the inner/core color) instead of leaving the beam colorless. UZDoom's `TEAMINFO` parser
+(`src/gamedata/teaminfo.cpp`) does accept a `RailColor` key, but it's grouped with several others
+that are scanned and discarded — the value is never stored on the team struct, and nothing in
+UZDoom's rail-attack code path, native or ZScript, ever reads a per-team or per-player rail color
+back out. A UZDoom railgun left at default colors is therefore genuinely colorless/random-gray for
+both the spiral and the core, with no per-player or per-team override of any kind, unlike a
+player-fired Zandronum railgun at default colors.
+
+## Engine-family divergence: no client/server authority split
+
+The "Network behavior (multiplayer)" section above describes Zandronum-only architecture. UZDoom's
+native rail-attack code has no equivalent of Zandronum's client-mode early-return, no
+unlagged-clientside-draw escape hatch, and no clientside-only network-flag bypass — grepped
+tree-wide, UZDoom has none of the client/server authority primitives those checks rely on. The beam
+trace, damage, and trail spawn all run through one unified code path with no
+server-authoritative/client-prediction distinction to speak of.
+
+One related but separate difference: UZDoom's ammo-depletion check additionally requires the
+calling state to be a weapon PSprite state (the same state-type guard used by every other
+ammo-consuming action in its state-provider class), on top of `useammo` being true and a valid
+ready weapon being present. Zandronum's equivalent check has no such state-type guard and does not
+verify the ready weapon is non-null either — it depletes ammo unconditionally whenever `UseAmmo` is
+true. Concretely: calling `A_RailAttack` with `useammo` true from a state that isn't part of the
+weapon's own PSprite chain (e.g. an actor state, or a state pointer invoked outside normal
+weapon-fire dispatch) silently skips ammo depletion on UZDoom, while Zandronum's unconditional call
+would still attempt it.
+
 ## Related functions
 
 - **`A_CustomRailgun`** — Monster-facing variant with target aiming (`aim` parameter) and fewer parameters. Defined in the same file.
@@ -144,7 +208,7 @@ When using this action, ensure DECORATE syntax — `A_RailAttack(damage, spawnof
 
 ### Basic railgun (centered, full beam)
 
-```
+```text
 actor SimpleRailgun : Weapon
 {
   Default
@@ -185,7 +249,7 @@ This fires a gold beam (`"ffff00"`) with 20 damage, centered, using ammo, with n
 
 ### Railgun with spread and custom puff
 
-```
+```text
 A_RailAttack(
   15,            // damage
   0,             // spawnofs_xy

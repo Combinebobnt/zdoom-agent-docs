@@ -1,8 +1,10 @@
 # `sv_dropstyle`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-16); Zandronum 3.2.1 @28f736fb3 (2026-08-02)
 **Provenance:** Zandronum Wiki "Server variables" (https://wiki.zandronum.com/w/index.php?title=Server_variables&oldid=2534, saved 2026-08-02), enum values verified against raw wiki HTML.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 
 Controls how items dropped by defeated monsters are scattered on the floor. Affects both the initial trajectory and spread pattern of dropped items.
 
@@ -24,6 +26,10 @@ Default is 0 (use game default).
 ## Network and storage
 
 Marked `CVAR_SERVERINFO | CVAR_GAMEPLAYSETTING`, so it is replicated to clients and affects gameplay balance.
+
+## Wiki/engine divergence: storage/network flags
+
+The flag claim above doesn't hold on UZDoom: `sv_dropstyle` there is declared `CVAR_SERVERINFO | CVAR_ARCHIVE` (still replicated to clients, but auto-saved to the config file rather than tagged as a locked "gameplay setting"). UZDoom's cvar-flag set has no `CVAR_GAMEPLAYSETTING` equivalent at all — that flag is a Zandronum-only mechanism for locking specific settings during duel/Last Man Standing/Invasion modes. For context, current Zandronum source itself also declares this cvar `CVAR_SERVERINFO | CVAR_ARCHIVE`, not `CVAR_SERVERINFO | CVAR_GAMEPLAYSETTING` — so this flag claim doesn't match either engine's present-day source, not just UZDoom's. The value-mode semantics (0/1/2) and their trajectory/spread effects, covered elsewhere in this file, are identical between the two engines.
 
 ## Related cvars and properties
 

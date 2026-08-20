@@ -1,8 +1,10 @@
 # `A_ZoomFactor(float scale = 1, int flags = 0)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_ZoomFactor` (retrieved 2026-08-01, oldid=46783) + verified against the Zandronum source at the 3.2.1 version-bump commit (28f736fb3) for presence in `wadsrc/static/actors/shared/inventory.txt` and engine implementation details in `src/g_shared/a_weapons.cpp:2056-2075`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_ZoomFactor` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_ZoomFactor&oldid=46783) + verified against the Zandronum source at the 3.2.1 version-bump commit (28f736fb3) for presence in `wadsrc/static/actors/shared/inventory.txt` and engine implementation details in `src/g_shared/a_weapons.cpp:2056-2075`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AWeapon, A_ZoomFactor)` in the Zandronum source's `src/g_shared/a_weapons.cpp:2083`.
 
 Adjusts the player's field-of-view multiplier for the current weapon. Each weapon maintains its own independent FOV scale, allowing weapons to have different zoom levels. **Restricted to Weapon and derived classes** — the action is defined on the `AWeapon` class and cannot be called from other actor types.
@@ -29,7 +31,7 @@ A default `scale` of 1.0 restores baseline FOV. To implement multi-level zoom (a
 ## Examples
 
 **Two-level weapon zoom:**
-```
+```text
 ACTOR SniperPistol : Pistol
 {
   States
@@ -59,7 +61,7 @@ ACTOR SniperPistol : Pistol
 ```
 
 **Instant zoom with disabled turn scaling:**
-```
+```text
 TNT1 A 0 A_ZoomFactor(3.0, ZOOM_INSTANT | ZOOM_NOSCALETURNING)
 ```
 

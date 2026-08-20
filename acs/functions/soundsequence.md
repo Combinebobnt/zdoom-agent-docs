@@ -1,8 +1,10 @@
 # `void SoundSequence(str sndseq)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (checked out source reports 3.3-alpha; `PCD_SOUNDSEQUENCE` and its `activationline` gating are long-standing base-engine behavior, not netcode-gated additions postdating 3.2.1, so this is not expected to be version-sensitive).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `SoundSequence - ZDoom Wiki` (https://zdoom.org/w/index.php?title=SoundSequence&oldid=35964), verified 2026-07-29 against fork source.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 
 Plays a sound sequence (defined in the `SNDSEQ` lump) on the frontsector of the *linedef that
@@ -11,7 +13,7 @@ the zt-bcc source's `src/builtin.c:52,200`), implementation in `p_acs.cpp:11415-
 
 - `sndseq` — looked up via `FBehavior::StaticLookupString` (`p_acs.cpp:11416`); if the lookup
   fails, `lookup` stays `NULL` and the whole block (including the `activationline` check) is
-  skipped — a silent no-op, same pattern as other string-arg sound builtins in this fork (see
+  skipped — a silent no-op, same pattern as other string-arg sound builtins in Zandronum (see
   `functions/activatorsound.md`).
 - **The wiki's one-line description ("plays a sound sequence defined in SNDSEQ") omits the real
   gating condition and hides what "plays" means mechanically:** the engine only does anything if
@@ -37,6 +39,6 @@ the zt-bcc source's `src/builtin.c:52,200`), implementation in `p_acs.cpp:11415-
   (`p_acs.cpp:11424-11425`, `// [BB] Tell the clients to play the sound.`) so clients start the
   same sequence locally. Vanilla ZDoom's `PCD_SOUNDSEQUENCE` has no such replication step — purely
   a Zandronum-fork concern.
-- Confirmed to exist in this fork essentially unchanged from the base engine (opcode, lookup
+- Confirmed to exist in the Zandronum engine fork essentially unchanged from the base engine (opcode, lookup
   pattern, and the `activationline`-gated sector call are all present with no version-gating
   markers around them) — not a newer feature subject to the 3.2.1-vs-3.3-alpha caveat.

@@ -1,15 +1,31 @@
 # `A_CustomRailgun` (customizable rail attack for monsters)
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_CustomRailgun` (retrieved 2026-08-01, oldid=53914) + verified against Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1998` and `wadsrc/static/actors/constants.txt`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_CustomRailgun` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_CustomRailgun&oldid=53914) + verified against Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1998` and `wadsrc/static/actors/constants.txt`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_CustomRailgun)` in `src/thingdef/thingdef_codeptr.cpp`.
 
 Fires a customizable rail beam attack (hitscan, piercing beam with particle trail) for monsters or any non-weapon actor. Supports optional target aiming and velocity-leading calculations. The beam pierces all targets along its path by default (can be limited with `RGF_NOPIERCING`).
 
+## Engine-family divergence
+
+UZDoom's `A_CustomRailgun` (`src/playsim/p_actionfunctions.cpp`, `DEFINE_ACTION_FUNCTION(AActor, A_CustomRailgun)`) differs from the Zandronum-specific behavior described throughout this file in several ways:
+
+- **The full 19-parameter signature is real.** UZDoom's native declaration (`wadsrc/static/zscript/actors/actor.zs`) matches the ZDoom Wiki's 19-parameter form exactly, adding `spiraloffset` (int, default `270`), `limit` (int, default `0`), and `veleffect` (double, default `3`) beyond the 16 parameters Zandronum accepts. The "Zandronum limitation" callout under Signature does not apply to UZDoom.
+- **`spiraloffset` is genuinely configurable**, unlike Zandronum where the spiral always starts at a fixed 270-degree angle. The value is passed straight through to the particle-trail routine.
+- **`veleffect` is genuinely configurable**, unlike Zandronum where the velocity-leading multiplier used in `aim` modes 1/2 is hardcoded to `3`.
+- **`limit` is present in the signature but is a no-op.** The function parses a `limit` argument, but `p_actionfunctions.cpp` unconditionally overwrites it with `p.limit = 0` before calling `P_RailAttack`, discarding whatever was passed. The pierce limit cannot actually be configured through this parameter in the current UZDoom source, despite the signature matching the wiki.
+- **`RGF_NORANDOMPUFFZ` is implemented** (`RAF_NORANDOMPUFFZ = 32` in `src/playsim/p_local.h`, honored in `P_RailAttack` to set `PF_NORANDOMZ` on the puff), unlike Zandronum 3.2.1 where it is not exported.
+- **No client/server authority gating.** UZDoom's `A_CustomRailgun` has no equivalent of Zandronum's client-mode early return or unlagged position reconciliation — the function always runs to completion on every machine. UZDoom's source tree has no `NETWORK_InClientMode`/`SERVERCOMMANDS_*`-style client/server split anywhere, so the "Network behavior (multiplayer)" subsection below does not apply.
+- **No player-pawn railgun color override.** UZDoom has no equivalent of Zandronum's team/individual railgun-color substitution when called from a player pawn with `color1==0 && color2==0` — colors are always used as passed (or via the shared `0`-means-random-blue/gray default described under `color1`/`color2` below), regardless of who is calling. The "Player-pawn note" below does not apply.
+
+Everything else described in this file — the `aim`/`spread_xy`/`spread_z`/`maxdiff`/`sparsity`/`driftspeed`/`spawnclass` parameters, the early return when `aim` is 1/2 with no target, `MF_STEALTH`/`MF_AMBUSH` handling, per-call (not per-particle) spread calculation, the `0`-means-random-color/`-1`(`"none"`)-means-invisible color semantics, and pierce vs. no-pierce via `RGF_NOPIERCING` — matches UZDoom's implementation.
+
 ## Signature
 
-```
+```text
 action void A_CustomRailgun(int damage, int spawnofs_xy = 0, color color1 = "", color color2 = "", int flags = 0, int aim = 0, double maxdiff = 0, class<Actor> pufftype = "BulletPuff", double spread_xy = 0, double spread_z = 0, double range = 0, int duration = 0, double sparsity = 1.0, double driftspeed = 1.0, class<Actor> spawnclass = "none", double spawnofs_z = 0)
 ```
 
@@ -168,7 +184,7 @@ When writing code intended to run on both Zandronum and GZDoom-family engines, b
 
 ### Basic rail attack (straight, no aiming)
 
-```
+```text
 actor RailDrone : Monster
 {
   Default
@@ -209,7 +225,7 @@ This fires a blue+white rail with 20 damage, straight ahead. No aiming or spread
 
 ### Targeted rail with leading aim
 
-```
+```text
 A_CustomRailgun(
   30,            // damage
   0,             // spawnofs_xy
@@ -232,7 +248,7 @@ This fires a bright orange+yellow rail that leads the target's movement, pierces
 
 ### Dual off-center rails with spread
 
-```
+```text
 A_CustomRailgun(
   15,            // damage
   -8,            // spawnofs_xy (left side)

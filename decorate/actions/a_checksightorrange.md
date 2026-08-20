@@ -1,8 +1,10 @@
 # `state A_CheckSightOrRange(float distance, state label)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_CheckSightOrRange` (retrieved 2026-07-31, oldid=44212) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3330-3401`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_CheckSightOrRange` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_CheckSightOrRange&oldid=44212) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3330-3401`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_CheckSightOrRange)` in `src/thingdef/thingdef_codeptr.cpp:3374`.
 
 Jumps to a target state if the calling actor is **both** out of range **and** out of sight of all players. Returns (continues to next state) if at least one player satisfies either the distance check or the sight check. Useful for toggling behavior of actors in complex maps with many simultaneous effects.
@@ -35,7 +37,7 @@ The sight check uses `P_CheckSight(..., SF_IGNOREVISIBILITY)`, which:
 - Ignores whether the player is actually **facing** the actor — only whether a potential line of sight exists. If a player is positioned where they could see the actor if they turned, the check returns true.
 - Uses the same 3/4-height eye position as `P_CheckSight`, not the player pawn's center.
 
-## Wiki divergence: distance and visibility measurement
+## Wiki/engine divergence: distance and visibility measurement
 
 The wiki states the check measures "between the center of the calling actor and that of any player pawn." This is **not accurate** in Zandronum:
 
@@ -44,11 +46,22 @@ The wiki states the check measures "between the center of the calling actor and 
 
 This means the distance behavior varies depending on whether the actor and viewer are on the same floor or at different elevations — in the common case where they are roughly at the same height, the check degenerates to a 2D distance check even without an explicit parameter.
 
-## Parameter differences from ZDoom wiki
+## Engine-family divergence: reference point for the vertical clamp
+
+Zandronum and UZDoom both clamp the vertical component of the distance check to the target actor's vertical extent (as described above), but they anchor that clamp from a different point on the *player/camera* side:
+
+- **Zandronum** anchors from the player/camera's **eye height**, 3/4 of the actor's height above its base, the same formula the source comments as matching `P_CheckSight`'s eye height (see above).
+- **UZDoom** anchors from the player/camera's **vertical center**, via the shared `AActor::Center()` helper (`Z() + Height / 2`) — the midpoint of the actor's height, not its eye/view height. UZDoom's `DoCheckSightOrRange` helper (`src/playsim/p_actionfunctions.cpp:1762-1797`, shared by both `A_CheckSightOrRange` and `A_CheckRange`) still names the local variable `eyez`, but the value it holds is the mid-height center, not an eye position.
+
+This changes the outcome only when a player/camera and the checked actor are vertically offset (e.g. one standing on a ledge above the other) by an amount that falls between the two reference heights — a difference of up to 1/4 of the player's height. When both are near the same floor height, the clamp collapses to 0 in both engines and the divergence has no effect. This affects the distance check only; the sight-check branch (`P_CheckSight`) is unaffected since it does not use this clamped vertical value.
+
+## Engine-family divergence: parameters
 
 The ZDoom wiki shows an optional third parameter, `bool 2d_check`, which does **not exist in Zandronum**. Passing a third argument will cause a parse error in Zandronum. (See above for why the 2D-vs-3D behavior is less relevant in practice due to the eye-height clamping.)
 
 The wiki also suggests both `int offset` and `state label` variants; Zandronum has only the `state label` variant (see `wadsrc/static/actors/actor.txt:313`), though `ACTION_PARAM_STATE` may handle both spellings internally.
+
+**UZDoom does implement the `2d_check`-equivalent parameter.** UZDoom's `A_CheckSightOrRange(double distance, statelabel label, bool two_dimension = false)` (`wadsrc/static/zscript/actors/checks.zs:156`) accepts a third boolean matching the wiki's description; when `true`, the vertical component of the distance check is forced to zero regardless of the clamping logic above, giving an explicit pure-2D check rather than relying on same-height degeneration.
 
 ## Network considerations
 
@@ -61,6 +74,10 @@ This means:
 - For `+CLIENTSIDEONLY` actors, each client simulates its own copy and this divergence is acceptable (the flag documents such actors as visuals-only with no cross-machine consistency requirement).
 
 The practical risk is low for typical use cases (defensive checks where a false-negative result does not cause game-breaking behavior), but code using this for high-stakes decisions should be aware of this network topology.
+
+## Engine-family divergence: network execution model
+
+The client/server authority split described above is specific to Zandronum's netcode. UZDoom has no equivalent concept for this function: a search of UZDoom's entire source tree turns up zero occurrences of `NETWORK_InClientMode`/`SERVERCOMMANDS_*` anywhere — not just for this function, the mechanism doesn't exist in UZDoom at all. UZDoom's `A_CheckSightOrRange` (`wadsrc/static/zscript/actors/checks.zs:156`, calling the native `CheckSightOrRange` in `src/playsim/p_actionfunctions.cpp:1799-1826`) contains no client-mode branch, no server-authoritative early return, and no cross-machine state-sync flag comparable to Zandronum's `ACTION_JUMP` parameter (`0` vs. `CLIENTUPDATE_FRAME`). It is a plain function call evaluated identically regardless of network role, so the entire "Network considerations" topology above does not apply to UZDoom.
 
 ## Player cameras and co-op spy
 

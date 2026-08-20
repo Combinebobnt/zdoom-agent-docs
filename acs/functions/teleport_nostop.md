@@ -1,8 +1,10 @@
 # Teleport_NoStop
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (feature predates the fork; verified against the `3.3-alpha` local checkout).
-**Provenance:** `Teleport_NoStop - ZDoom Wiki.html` (`https://zdoom.org/wiki/Teleport_NoStop`), verified 2026-07-29 against the Zandronum source's `src/p_teleport.cpp`, `p_lnspec.cpp`, and `p_spec.h`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** `Teleport_NoStop - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=Teleport_NoStop&oldid=31132`), verified 2026-08-06 against the Zandronum source's `src/p_teleport.cpp`, `p_lnspec.cpp`, and `p_spec.h`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Action special, index 154 in `zcommon.bcs`'s `special` table.
 
 `int Teleport_NoStop(int tid, int sectortag [, int nofog])`
@@ -42,6 +44,11 @@ Per `p_lnspec.cpp:891-895` and `p_teleport.cpp:345-449`:
 - **Zandronum netcode replication:** on the server, teleportation is broadcast to all clients via `SERVERCOMMANDS_TeleportThing(thing, sourceFog, useFog, ...)` (line 241 in `p_teleport.cpp`), and the server adjusts player reaction timing to account for network latency (lines 244-245). This differs from ZDoom, where no netcode notification is sent.
 
 - **Specifier-allowed special (Zandronum multiplayer):** `Teleport_NoStop` is explicitly listed in `GAMEMODE_IsSpectatorAllowedSpecial()` (gamemode.cpp:1132) alongside `Teleport`, `Teleport_NoFog`, and `Teleport_Line`, confirming it is callable by spectators without special restrictions. This is a Zandronum-native carve-out not documented on the ZDoom wiki.
+
+## Engine-family divergence
+
+- **Momentum rotation is Zandronum-only.** The "velocity preserved relative to new facing" behavior described above under Momentum preservation is produced by an explicit Zandronum-specific step in `EV_Teleport` (`src/p_teleport.cpp`, tagged `[BC]` — a Zandronum-native addition, not shared ZDoom-family code) that re-rotates the actor's velocity vector by the difference between its old and new facing angles after a `haltVelocity=false` teleport. UZDoom's equivalent path (`P_Teleport`, `src/playsim/p_teleport.cpp`, driven by the `TELF_KEEPVELOCITY` flag) has no such rotation step: when `TELF_KEEPVELOCITY` is set, the actor's velocity vector is left completely untouched in world space — only the actor's facing angle is updated to the destination spot's angle, same as Zandronum. Practically, on UZDoom a `Teleport_NoStop` through a destination facing a different direction than the source keeps the actor's exact old world-space velocity vector while its facing snaps to the new angle, so relative motion (e.g. what was "moving forward" becomes some other relative direction) does not get re-aligned to the new facing the way it does on Zandronum.
+- **The spectator fog-suppression exception does not exist in UZDoom.** Zandronum's `EV_Teleport`/`P_Teleport` unconditionally suppresses both source and destination teleport fog when the activator is a spectator, a Zandronum multiplayer-netcode concept. UZDoom's `P_Teleport` (`src/playsim/p_teleport.cpp`) has no spectator check anywhere in its fog-spawning logic — fog spawning there follows only the two rules already documented above (destination fog always spawns when `TELF_DESTFOG` is set; source fog follows the `nofog` argument via `TELF_SOURCEFOG`), with no further exception.
 
 ## Contrast with related teleport functions
 

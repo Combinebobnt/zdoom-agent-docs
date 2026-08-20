@@ -1,8 +1,10 @@
 # Sin
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (checked against the Zandronum source's master/3.3-alpha checkout)
-**Provenance:** `Sin - ZDoom Wiki.html` (intake, `oldid=35792`), verified against fork source 2026-07-29.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** `Sin - ZDoom Wiki.html` (intake, `https://zdoom.org/w/index.php?title=Sin&oldid=35792`), verified against fork source 2026-07-29.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
 `fixed Sin(fixed angle)` — **compiler builtin**, not an extension function. Listed in
@@ -48,12 +50,32 @@ The wiki doesn't mention this, and it's real, verified against the Zandronum sou
   typical gameplay-angle use (player/actor angles, HUD math), but relevant if `Sin`/`Cos` are used
   to approximate a smooth curve or chase very small angular deltas.
 
+## Engine-family divergence: no fixed-point lookup-table quantization
+
+Zandronum's `Sin` (above) quantizes the input angle to steps of 1/8192 of a turn via the
+`finesine` lookup table, as detailed above. UZDoom's `PCD_SIN` handler computes the sine
+differently: it converts the incoming 16.16 fixed-point turn-fraction argument to a
+double-precision degrees value (via an intermediate engine angle type), then hands that
+full-precision double to the C library's native double-precision `sin()` (after converting
+degrees to radians) — there is no lookup table and no intermediate truncation to a fixed number
+of table-index bits. The double result is then converted back to a 16.16 fixed-point value for
+the return, the same as Zandronum's output encoding.
+
+Net effect: the "two `angle` values less than 1/8192 of a turn apart return the exact same sine
+value" behavior documented above for Zandronum does **not** hold on UZDoom — UZDoom's `Sin` is
+sensitive to angle differences far finer than 1/8192 of a turn, limited only by double-precision
+math and the final 16.16 fixed-point encoding of the *result*, not by an 8192-entry input table.
+Code written assuming (or relying on) Zandronum's input quantization — e.g. treating two very
+close angles as guaranteed to produce bit-identical `Sin` output — will see different (more
+precise, generally non-identical) return values on UZDoom. For ordinary gameplay-angle use this
+is not user-visible; it matters only for code depending on the exact quantization step itself.
+
 ## Example (from the wiki)
 
 Spawns two Medikits flanking the activator, using `Cos`/`Sin` to offset perpendicular-ish to
 facing angle:
 
-```c
+```acs
 script 1 (void)
 {
     int x = GetActorX (0);

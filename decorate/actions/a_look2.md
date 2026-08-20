@@ -1,8 +1,10 @@
 # `void A_Look2()`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_Look2` (retrieved 2026-07-31, oldid=35060) + verified against Zandronum source `src/p_enemy.cpp:2351-2423`. Also present in UZDoom 4.15pre (`src/playsim/p_enemy.cpp:2306`) with identical target-acquisition logic but without the Zandronum network-specific divergence documented below.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_Look2` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_Look2&oldid=35060) + verified against Zandronum source `src/p_enemy.cpp:2351-2423`. Also present in UZDoom 4.15pre (`src/playsim/p_enemy.cpp:2306`) with identical target-acquisition logic but without the Zandronum network-specific divergence documented below.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/p_enemy.cpp:2351` (`DEFINE_ACTION_FUNCTION(AActor, A_Look2)`).
 
 Sound-based target-acquisition action for monsters: wakes on detected sound from a shootable actor (`LastHeard`), ignoring visual contact. If no target is acquired, animates the actor through fixed state offsets (see below). Used in Strife and Strife-aligned actor definitions.
@@ -25,7 +27,7 @@ When no target is acquired (the `nosee:` fallback):
 - **Approximately 11.7% of calls** (RNG roll < 30/256): jumps to `SpawnState + 1` or `SpawnState + 2` with equal probability, controlled by `(pr_look2() & 1)`.
 - **Independently, if the `+STANDSTILL` flag is not set, approximately 15.6% of calls** (RNG roll < 40/256): overrides to `SpawnState + 3`. If `+STANDSTILL` is set, this branch is skipped entirely, and the RNG is not consumed.
 
-## Wiki divergence: "three states after this function call"
+## Wiki/engine divergence: "three states after this function call"
 
 **The wiki's language is ambiguous.** It says "the three states after this function call are reserved; the function jumps to the states following the call." The code actually uses hardcoded offsets from the actor's `SpawnState` — e.g. `SpawnState + 3` — not relative to the state that invoked A_Look2. This means:
 

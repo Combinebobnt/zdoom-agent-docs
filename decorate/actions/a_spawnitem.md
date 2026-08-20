@@ -1,8 +1,10 @@
 # `A_SpawnItem` (spawn an actor with angular distance)
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_SpawnItem` (retrieved 2026-08-01, oldid=46930) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:2520-2582` and the shared `InitSpawnedItem` helper (`src/thingdef/thingdef_codeptr.cpp:2394-2510`).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_SpawnItem` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_SpawnItem&oldid=46930) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:2520-2582` and the shared `InitSpawnedItem` helper (`src/thingdef/thingdef_codeptr.cpp:2394-2510`).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_SpawnItem)` in `src/thingdef/thingdef_codeptr.cpp`.
 
 Spawns an actor at a specified distance (relative to the calling actor's facing angle) and vertical height, with optional ammo consumption and translation transfer. A simpler predecessor to `A_SpawnItemEx` — use `A_SpawnItemEx` if you need explicit offsets, velocity, or advanced flags.
@@ -11,7 +13,7 @@ Spawns an actor at a specified distance (relative to the calling actor's facing 
 
 ## Signature
 
-```
+```text
 bool A_SpawnItem(class<Actor> itemtype = "Unknown", float distance = 0, float zheight = 0, 
                  bool useammo = true, bool transfer_translation = false)
 ```
@@ -79,6 +81,68 @@ Zandronum's server is authoritative for all spawn decisions:
 
 - **Client-side-only behavior:** When the action is called in client mode and the spawn succeeds (not blocked by `NETWORK_ShouldActorNotBeSpawned`), the spawned actor gets the `NETFL_CLIENTSIDEONLY` flag set, marking it as a visual-only client update.
 
+## Engine-family divergence: two-value return matches the wiki
+
+The "Wiki note" above states Zandronum has no actor-pointer return channel. That is a
+Zandronum-specific limitation, not a UZDoom one: UZDoom's `A_SpawnItem`
+(`wadsrc/static/zscript/actors/attacks.zs`, declared `action bool, Actor A_SpawnItem(...)`)
+returns two values exactly as the ZDoom Wiki describes — a `bool` plus an `Actor` pointer. Code
+targeting UZDoom/GZDoom-family engines can capture the second return value (e.g. `bool ok, Actor
+mo = A_SpawnItem(...)`); the same call in Zandronum only yields the boolean. The `Actor` slot is
+`null` on the null-`missile`-class path, the NULL-`player` path, and the massacre/no-ammo
+short-circuits (see the next section) — but **not** on the monster-space-check-blocked path: there,
+`InitSpawnedItem` calls `mo.Destroy()` and then returns `false`, and `A_SpawnItem` still returns
+that same (now-destroyed) `mo` reference as its second value rather than substituting `null`.
+Code capturing the actor pointer should check the `bool` first rather than assuming a non-null
+second value is safe to use.
+
+## Engine-family divergence: `distance == 0` has no overlap-avoidance substitution
+
+Zandronum's `distance == 0` case silently substitutes `(calling_actor.radius +
+spawned_actor.radius) >> FRACBITS` to avoid spawning the new actor exactly on top of the caller
+(see "Special behavior when `distance == 0`" above). UZDoom's implementation has no equivalent:
+the raw `distance` parameter (including an unmodified `0`) is passed straight to
+`Vec3Angle(distance, Angle, ...)`, a native double-precision helper (`AActor::Vec3Angle`,
+`src/playsim/actorinlines.h`) that computes `length * angle.Cos()` / `length * angle.Sin()` with
+no radius adjustment anywhere in the call chain. Passing `distance = 0` (or omitting it) in
+UZDoom spawns the new actor at the caller's exact X/Y position (offset only by whatever
+`zheight`/bob/floorclip produce on Z) — there is no built-in overlap avoidance. Also incidental:
+UZDoom's angle math uses native `double`/`DAngle::Cos()`/`Sin()` throughout, not the fixed-point
+`finecosine`/`finesine` tables and `FixedMul` Zandronum's version uses; this doesn't change
+observable results for in-range values, but it is a different code path.
+
+## Engine-family divergence: result is always set, but true isn't a spawn-success signal
+
+The "Return value" section below documents several Zandronum early-return paths (massacre check,
+NULL/out-of-ammo weapon, network gate) that skip `ACTION_SET_RESULT` entirely, leaving the result
+at whatever a prior action in the state set it to. **UZDoom's implementation has no such
+ambiguity**: every code path in `A_SpawnItem`
+(`wadsrc/static/zscript/actors/attacks.zs:391-422`) ends in an explicit `return <bool>, <Actor>` —
+`false, null` for a null `missile` class or a NULL `player` when called from a weapon state;
+`true, null` for the massacre-check short-circuit *and* for a NULL or out-of-ammo weapon; and
+`res, mo` (from `InitSpawnedItem`'s own return) for an actual spawn attempt.
+
+That does not make the boolean a reliable "did an actor spawn" signal, though — it means something
+narrower. `InitSpawnedItem(mo, flags)` is called "for an inventory item's use state" per its own
+comment, and the massacre/no-ammo short-circuits deliberately return `true` (not `false`) so a
+weapon or inventory item's use-state chain treats "declined to spawn because the caller was
+massacred" or "declined because there's no ammo" as a non-failure, not as a failed item use. A
+`true` result on UZDoom can mean "an actor was spawned and passed validation" **or** "spawning was
+skipped for a reason that isn't an item-use failure" — those are different outcomes a caller can't
+tell apart from the bool alone. The "do not rely on the result alone to detect failure" caveat
+below still applies on UZDoom, just for this reason instead of Zandronum's unset-on-early-return
+one; the third bullet under "Open questions and untraced details" about a persisting prior result
+is the one part of that caveat that's Zandronum-specific, since UZDoom's bool is always a definite
+value even though it isn't always a spawn-success value.
+
+## Engine-family divergence: no client/server authority split
+
+UZDoom's `A_SpawnItem` has no `NETWORK_ShouldActorNotBeSpawned`/`SERVERCOMMANDS_*`-style gate at
+all (zero occurrences of either symbol anywhere in the UZDoom source tree). None of the "Network
+behavior (Zandronum multiplayer)" section above applies to UZDoom: there is no network gate
+check, no server-to-client spawn/angle/translation broadcast, and no client-side-only flagging on
+the spawned actor — the action simply spawns (or doesn't) identically wherever it runs.
+
 ## Return value
 
 **Zandronum-specific behavior:** The action sets a single boolean result:
@@ -112,7 +176,7 @@ In these cases, the action's result remains whatever the prior action in the sta
 
 ## Example (Zandronum DECORATE)
 
-```
+```text
 actor TimeBomb : Actor
 {
     Default

@@ -1,11 +1,29 @@
 # `int SetPlayerScore(int player, int type, int value)`
 
+**Tier:** A.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `SetPlayerScore - Zandronum Wiki.html` (`_intake/`, retrieved
+2026-07-29, `https://wiki.zandronum.com/w/index.php?title=SetPlayerScore&oldid=1337`) + source-verified against the Zandronum source
+(`p_acs.cpp:7707-7822`, `p_interaction.cpp:2175-2216,2813-2887,3006-3014`) and
+`zt-bcc/lib/zcommon.bcs:1229-1238,1771-1772`. The wiki's parameter list, all 7 enum values, and
+the basic return convention hold as-is; the frags-only negative-value carve-out, the no-op-
+returns-0 ambiguity, the hardcoded (non-optional) announce/team-frags behavior for
+`SCORE_FRAGS`, and the per-type replication side effects are this doc's source-verified
+additions, cross-referenced against the already-documented [`ChangeTeamScore`](changeteamscore.md)
+(same `SCORE_*` enum, same no-op/negative-value patterns, different announce-parameter shape).
+`SetPlayerScore` was added in commit `b9f6e508c` ("Added ACS functions: SetPlayerScore... and
+GetPlayerScore...", 2020-11-29), confirmed via `git merge-base --is-ancestor` to be a direct
+ancestor of `28f736fb3` (the 3.2.1 version-string commit, 2025-08-04) — it predates the 3.2.1
+target and is safe to verify against it.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
+**Bucket:** extension function.
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+
 Sets one of a player's seven score counters. Extension function (`ACSF_SetPlayerScore`, index
 -138 in `zcommon.bcs`), implementation at the Zandronum source's `src/p_acs.cpp:7707-7790`,
 dispatching to `PLAYER_SetFragcount`/`PLAYER_SetPoints`/`PLAYER_SetWins`/`PLAYER_SetDeaths`/
 `PLAYER_SetKills`/direct field writes in the Zandronum source's `src/p_interaction.cpp`.
-
-**Bucket:** extension function.
 
 ```cpp
 case ACSF_SetPlayerScore:
@@ -99,24 +117,28 @@ case ACSF_SetPlayerScore:
 valid in-game player index, `type` isn't one of the seven settable `SCORE_*` values, or the
 requested value already equals the current one.
 
-**Provenance:** wiki page `SetPlayerScore - Zandronum Wiki.html` (`_intake/`, retrieved
-2026-07-29, `oldid=1337`) + source-verified against the Zandronum source
-(`p_acs.cpp:7707-7822`, `p_interaction.cpp:2175-2216,2813-2887,3006-3014`) and
-`zt-bcc/lib/zcommon.bcs:1229-1238,1771-1772`. The wiki's parameter list, all 7 enum values, and
-the basic return convention hold as-is; the frags-only negative-value carve-out, the no-op-
-returns-0 ambiguity, the hardcoded (non-optional) announce/team-frags behavior for
-`SCORE_FRAGS`, and the per-type replication side effects are this doc's source-verified
-additions, cross-referenced against the already-documented [`ChangeTeamScore`](changeteamscore.md)
-(same `SCORE_*` enum, same no-op/negative-value patterns, different announce-parameter shape).
-`SetPlayerScore` was added in commit `b9f6e508c` ("Added ACS functions: SetPlayerScore... and
-GetPlayerScore...", 2020-11-29), confirmed via `git merge-base --is-ancestor` to be a direct
-ancestor of `28f736fb3` (the 3.2.1 version-string commit, 2025-08-04) — it predates the 3.2.1
-target and is safe to verify against it. **Engine:** Zandronum 3.2.1 (verified against
-the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.
-
 **Note:** `GetPlayerScore` is documented separately (processed concurrently in this same intake
 batch) — see `functions/getplayerscore.md` if present. Both functions share the `SCORE_*` enum
 and the `PLAYER_IsValidPlayer` gate; this file does not duplicate `GetPlayerScore`'s own
 `SCORE_SPREAD`/`SCORE_RANK` read-only behavior beyond noting why they're absent here.
 
-**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+## Engine-family divergence
+
+`SetPlayerScore` is bound as `ACSF_SetPlayerScore` at CALLFUNC index 138 — inside the 100–199
+range UZDoom's own ACSF enum reserves for Zandronum's extensions and implements none of (see
+[Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md)). UZDoom's
+`CallFunction` dispatcher is a plain `switch` over the ACSF index with `default: break;` falling
+through to `return 0` — no case exists for 138, so a Zandronum-compiled object calling
+`SetPlayerScore` under UZDoom doesn't error or crash, it just silently skips all seven
+`PLAYER_Set*`/direct-field-write branches documented above: none of `fragcount`/`lPointCount`/
+`ulWins`/`ulDeathCount`/`killcount`/`itemcount`/`secretcount` is touched, no HUD refresh or
+server-replication packet is sent, and for `SCORE_FRAGS` the hardcoded announce sound and
+team-frags update never fire either.
+
+Worse, every UZDoom call returns `0` — the exact value this doc already documents as ambiguous
+between "invalid player/type" and "requested value already matched the current one." A caller
+running on UZDoom can no longer distinguish either of those from "this engine doesn't implement
+the function at all." A script that sets a score to drive a scoreboard display or a win-condition
+check gated on a later read (see `getplayerscore.md`, hit by the same reserved-range no-op) will
+find the counter never actually changed: the scoreboard stays stale and the win condition never
+trips, with nothing in the log pointing at why.

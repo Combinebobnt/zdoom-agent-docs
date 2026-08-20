@@ -1,6 +1,6 @@
 # Sprites doc index
 
-Router only. See `CLAUDE.md` for scope, `../shared/AUTHORING.md` for tiers/engine-scope/licensing.
+Router only. See `AGENTS.md` for scope, `../shared/AUTHORING.md` for tiers/engine-scope/licensing.
 
 ## Concepts
 

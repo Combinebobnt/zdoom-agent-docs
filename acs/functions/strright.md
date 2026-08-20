@@ -1,24 +1,24 @@
 # `StrRight`
 
-**Bucket:** Extension function (`zcommon.bcs`: `-66:StrRight(str,int):str`) — `ACSF_StrRight` in
-the Zandronum source's `src/p_acs.cpp`'s `EACSFunctions` enum (declared right after `ACSF_StrLeft`,
-which shares the identical `case` block).
-
-**Tier:** A. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD —
-see "Engine scope" in `../../shared/AUTHORING.md`).
-
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `StrRight - ZDoom Wiki.html`
 (`https://zdoom.org/w/index.php?title=StrRight&oldid=37593`), verified against
 the Zandronum source's `src/p_acs.cpp:6640-6659` (`case ACSF_StrLeft: case ACSF_StrRight:`) on
 2026-07-29.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** Extension function (`zcommon.bcs`: `-66:StrRight(str,int):str`) — `ACSF_StrRight` in
+the Zandronum source's `src/p_acs.cpp`'s `EACSFunctions` enum (declared right after `ACSF_StrLeft`,
+which shares the identical `case` block).
 
 ## Signature
 
-```
+```text
 str StrRight(str string, int length);
 ```
 
-Both parameters are mandatory in this fork's `zcommon.bcs` declaration — there is no
+Both parameters are mandatory in the zt-bcc compiler fork's `zcommon.bcs` declaration — there is no
 zero-argument or one-argument overload to worry about.
 
 ## Behavior
@@ -51,7 +51,10 @@ edge-case in the shared clamp/lookup logic applies identically to both:
 
 No other wiki/fork divergence found beyond the above — the wiki's stated signature and the two
 documented clamp behaviors (empty-on-missing-string, full-string-on-too-long) are otherwise
-accurate for this fork.
+accurate for both the Zandronum and UZDoom engine forks, which share this byte-for-byte identical
+`case` block (`~/source/UZDoom/src/playsim/p_acs.cpp:6123-6142`; same signed-32-bit-`args`-into-
+`size_t` negative-length quirk, since `args` is `int32_t *` there too, per that file's
+`CallFunction` declaration at line 5376).
 
 ## See also
 

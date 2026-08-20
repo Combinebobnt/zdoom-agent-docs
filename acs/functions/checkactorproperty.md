@@ -1,8 +1,13 @@
 # `bool CheckActorProperty(int tid, int property, raw value)`
 
-Compares an actor property against a given value, with special handling for string and boolean properties. Extension function (index -22, `ACSF_CheckActorProperty` at `src/p_acs.cpp:6101`), implementation in `DLevelScript::CheckActorProperty` (`p_acs.cpp:5020-5086`).
-
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-30)
+**Provenance:** wiki page `CheckActorProperty - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-30, `https://zdoom.org/w/index.php?title=CheckActorProperty&oldid=36602`) + source-verified against `p_acs.cpp:5020-5086`/`6101`, `zcommon.bcs:266-314`. Verified that the 42-property switch is identical to `GetActorProperty`'s supported set; wiki's 8 additional properties checked individually and confirmed unimplemented (7 compile-but-dead in `zcommon.bcs`, 1 absent entirely). String-property NULL-handling risk cross-referenced against crash checklist.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
+
+Compares an actor property against a given value, with special handling for string and boolean properties. Extension function (index -22, `ACSF_CheckActorProperty` at `src/p_acs.cpp:6101`), implementation in `DLevelScript::CheckActorProperty` (`p_acs.cpp:5020-5086`).
 
 ## Parameters
 
@@ -24,14 +29,26 @@ For `APROP_AMBUSH`, `APROP_INVULNERABLE`, `APROP_DROPPED`, `APROP_CHASEGOAL`, `A
 
 Returns `true` (nonzero) if the property value matches, `false` (zero) otherwise. **No distinction** between three false cases: the TID didn't resolve to an actor, the property wasn't handled by the switch, or the value genuinely didn't match — all three return `0`.
 
-## Properties in the wiki but not supported by this fork
+## Wiki/engine divergence: properties not supported by Zandronum
 
-The ZDoom wiki lists **8 additional `APROP_*` constants** that this fork does **not** implement in the engine switch:
+The ZDoom wiki lists **8 additional `APROP_*` constants** that the Zandronum engine fork does **not** implement in the engine switch:
 
 - **7 properties compile in `zcommon.bcs` but have no engine-side implementation** (lines 308-314 of `lib/zcommon.bcs`) and silently return `0` at runtime: `APROP_FRICTION`, `APROP_DAMAGEMULTIPLIER`, `APROP_MAXSTEPHEIGHT`, `APROP_MAXDROPOFFHEIGHT`, `APROP_DAMAGETYPE`, `APROP_SOUNDCLASS`, `APROP_FRIENDLYSEEBLOCKS`. These are exactly the same seven dead names documented for `GetActorProperty`.
-- **1 property is not defined anywhere in this fork**: `APROP_WATERDEPTH` does not appear in `zcommon.bcs` at all and will not compile.
+- **1 property is not defined anywhere in the zt-bcc compiler fork**: `APROP_WATERDEPTH` does not appear in `zcommon.bcs` at all and will not compile.
 
-Treat these eight names as unusable in this fork despite the first seven compiling without warnings. See [GetActorProperty](getactorproperty.md) for the full explanation — Zandronum shares a frozen ZDoom baseline and doesn't ship every later ZDoom feature.
+Treat these eight names as unusable on Zandronum despite the first seven compiling without warnings. See [GetActorProperty](getactorproperty.md) for the full explanation — Zandronum shares a frozen ZDoom baseline and doesn't ship every later ZDoom feature. **See the "Engine-family divergence" section below — most of these are live on UZDoom.**
+
+## Engine-family divergence: property coverage
+
+UZDoom's `CheckActorProperty` (`src/playsim/p_acs.cpp:4473-4545`) covers a materially larger `APROP_*` set than Zandronum's. Of the 8 wiki-listed properties documented above as unsupported on Zandronum, 6 are live on UZDoom:
+
+- `APROP_MAXSTEPHEIGHT`, `APROP_MAXDROPOFFHEIGHT`, and `APROP_FRIENDLYSEEBLOCKS` are handled in the plain-integer-equality group, alongside the properties already documented as supported.
+- `APROP_DAMAGETYPE` and `APROP_SOUNDCLASS` are handled in the case-insensitive string-comparison group — UZDoom compares **9** string properties this way (the 7 documented above, plus these two), not 7.
+- `APROP_WATERDEPTH` is defined in UZDoom's engine-side `APROP_*` enum and handled in the integer-equality group, but **zt-bcc's `lib/zcommon.bcs` still does not declare an `APROP_WATERDEPTH` constant at all** (confirmed absent from the same `zcommon.bcs:266-314` range cited above) — the same compiler serves both engine targets, so a BCS script still cannot reference this property by name on either engine; it's only reachable by passing the raw integer literal in its place.
+
+Only `APROP_FRICTION` and `APROP_DAMAGEMULTIPLIER` remain genuinely unimplemented in UZDoom's `CheckActorProperty` switch (both fall through to the `default: return 0` case) — the same "compiles but dead" status as on Zandronum.
+
+The core mechanics documented above are unchanged on UZDoom: plain-integer equality for the straightforward properties, boolean `!!`-normalization for the same 9 flag properties (`APROP_AMBUSH`/`APROP_INVULNERABLE`/`APROP_DROPPED`/`APROP_CHASEGOAL`/`APROP_FRIGHTENED`/`APROP_FRIENDLY`/`APROP_NOTARGET`/`APROP_NOTRIGGER`/`APROP_DORMANT`), and case-insensitive string comparison with the first operand NULL-guarded (substituted with `""`) but the second (the caller-supplied string-table lookup) left unguarded — see "Crash risk" below, which applies identically on UZDoom. Only the property-coverage set differs.
 
 ## Crash risk with invalid string handles
 
@@ -41,7 +58,7 @@ Treat these eight names as unusable in this fork despite the first seven compili
 
 **Check if an actor's health is above a threshold:**
 
-```
+```text
 if (CheckActorProperty(tid, APROP_HEALTH, 50))
 {
     Log(s: "Actor has health >= 50");
@@ -50,7 +67,7 @@ if (CheckActorProperty(tid, APROP_HEALTH, 50))
 
 **Check if an actor belongs to a specific species (case-insensitive):**
 
-```
+```text
 int species_idx = StrParam(s: "DoomImp");
 if (CheckActorProperty(tid, APROP_SPECIES, species_idx))
 {
@@ -60,11 +77,9 @@ if (CheckActorProperty(tid, APROP_SPECIES, species_idx))
 
 **Check a boolean flag (any nonzero value means "true"):**
 
-```
+```text
 if (CheckActorProperty(tid, APROP_FRIENDLY, 1))
 {
     Log(s: "Actor is friendly");
 }
 ```
-
-**Tier:** A. **Provenance:** wiki page `CheckActorProperty - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-30, `oldid=36602`) + source-verified against `p_acs.cpp:5020-5086`/`6101`, `zcommon.bcs:266-314`. Verified that the 42-property switch is identical to `GetActorProperty`'s supported set; wiki's 8 additional properties checked individually and confirmed unimplemented (7 compile-but-dead in `zcommon.bcs`, 1 absent entirely). String-property NULL-handling risk cross-referenced against crash checklist. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`).

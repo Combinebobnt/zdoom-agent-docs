@@ -1,11 +1,20 @@
 # `bool SetActorPosition(int tid, fixed x, fixed y, fixed z, bool fog)`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `SetActorPosition - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
+`https://zdoom.org/w/index.php?title=SetActorPosition&oldid=40289`) + source-verified against `p_acs.cpp:11987-11996`, `p_things.cpp:164-218`,
+`p_map.cpp:1640-1657`, `p_acs.cpp:4445-4456` (`SingleActorFromTID`). No wiki/fork behavioral
+divergence found beyond the wiki simply omitting detail (fog-at-both-ends, restore-on-failure,
+Zandronum netcode replication) that source-reading filled in.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** compiler builtin.
+
 Directly repositions a single actor by TID, without going through normal thing-movement checks
 (no Z-clip animation, no `Thing_Move`-style pathing). Compiler builtin (`PCD_SETACTORPOSITION`,
 the Zandronum source's `src/p_acs.cpp:11987-11996`), implementation in `P_MoveThing`
 (the Zandronum source's `src/p_things.cpp:164-218`).
-
-**Bucket:** compiler builtin.
 
 - `tid` — target actor's thing ID. **`0` means "the activator"** (`SingleActorFromTID`,
   `p_acs.cpp:4445-4456`) — same zero-means-activator convention documented for
@@ -59,19 +68,47 @@ teleport, no fog, no network message — specifically because a *monster* (not a
 happens to occupy the destination at that instant, which is easy to misdiagnose as a
 network/prediction bug rather than a genuine blocked-destination rejection.
 
+## Engine-family divergence: teleport-fog spawn is actor-customizable, not hardcoded
+
+UZDoom's `P_MoveThing` (`src/playsim/p_things.cpp:106-127`) spawns fog through
+`P_SpawnTeleportFog`, not by hardcoding the `TeleportFog` class the way Zandronum's `P_MoveThing`
+does (`Spawn<ATeleportFog>(...)`, `src/p_things.cpp:179/185`). `P_SpawnTeleportFog`
+(`src/playsim/p_teleport.cpp:45-61`) looks up the *moved actor's own* `TeleFogDestType` property
+for the fog at the new position and `TeleFogSourceType` for the fog left at the old position, and
+spawns whichever class that property resolves to — or spawns no fog at all there if the property
+is null. The stock `Actor` ZScript base class defaults both to `"TeleportFog"`
+(`wadsrc/static/zscript/actors/actor.zs:534-535`), so for any actor that hasn't overridden these
+properties the observable result matches Zandronum's hardcoded spawn exactly. But these properties
+are ZScript-settable (not exposed as a DECORATE keyword), so a ZScript-defined actor with a
+customized `TeleFogSourceType`/`TeleFogDestType` can make a successful, `fog=true`
+`SetActorPosition` call spawn a different actor class at each end, or spawn no fog at either end
+despite `fog=true` — outcomes Zandronum's hardcoded `Spawn<ATeleportFog>` call can never produce.
+
+A second, smaller difference: the Z offset added to each fog's spawn position depends on the moved
+actor's flags on UZDoom but not on Zandronum. Zandronum always adds `TELEFOGHEIGHT` to both fog
+spawn positions. UZDoom's `P_SpawnTeleportFog` computes `fogDelta = mobj->flags & MF_MISSILE ? 0 :
+TELEFOGHEIGHT` — so moving an actor with `MF_MISSILE` set spawns its fog at the exact destination/
+origin Z with no upward offset, while every other actor still gets the `TELEFOGHEIGHT` offset on
+both ends.
+
+Everything else matches: the `SetOrigin`-then-`P_TestMobjLocation`-then-revert sequence, the XY
+blocking + Z floor/ceiling check, and the exact-restore-on-failure semantics are the same on both
+engines. The Zandronum-only `sv_unblockplayers`/`sv_unblockallies` player-vs-player unblock
+exception documented above has no UZDoom counterpart — the UZDoom tree has no
+`P_CheckUnblock`/`ZADF_UNBLOCK_*`/`sv_unblockplayers` anywhere, so on UZDoom any solid actor at the
+destination, including another player, blocks the move unconditionally. Likewise Zandronum's
+`SERVERCOMMANDS_MoveThing` network-replication call on success has no UZDoom equivalent; UZDoom
+instead calls `source->ClearInterpolation()` and sets `RF_NOINTERPOLATEVIEW` on success, which is
+UZDoom's own mechanism for suppressing a visual run/interpolation glitch, in place of Zandronum's
+`PrevX`/`PrevY`/`PrevZ` reassignment — an implementation-detail difference with the same observable
+effect, not a behavioral divergence visible to an ACS caller.
+
 **Example — move an actor to the activator's XY at a fixed Z, verified against destination:**
 
-```
+```text
 if (!SetActorPosition(monsterTid, GetActorX(0), GetActorY(0), GetActorZ(0), false))
 {
     // move was rejected (blocked by geometry/actor, or bad Z at destination) —
     // monsterTid is still at its original position, not at the requested one.
 }
 ```
-
-**Provenance:** wiki page `SetActorPosition - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
-`oldid=40289`) + source-verified against `p_acs.cpp:11987-11996`, `p_things.cpp:164-218`,
-`p_map.cpp:1640-1657`, `p_acs.cpp:4445-4456` (`SingleActorFromTID`). No wiki/fork behavioral
-divergence found beyond the wiki simply omitting detail (fog-at-both-ends, restore-on-failure,
-Zandronum netcode replication) that source-reading filled in.
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.

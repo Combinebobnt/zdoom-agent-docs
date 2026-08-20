@@ -1,8 +1,10 @@
 # `void SectorSound(str sound, int volume)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (checked out source reports 3.3-alpha; `PCD_SECTORSOUND` is long-standing Hexen-era ACS, not a netcode-gated addition, so this is not expected to be version-sensitive).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `SectorSound - ZDoom Wiki` (https://zdoom.org/w/index.php?title=SectorSound&oldid=35965), verified 2026-07-29 against fork source.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 
 Plays a sound anchored to the sector of the linedef that activated the current script — not to
@@ -43,7 +45,7 @@ the Zandronum source's `src/p_acs.cpp:11327-11358`.
 
 **Example (from the wiki, still accurate for the line-triggered case):**
 
-```
+```text
 script 1 (void)
 {
     SectorSound("world/creak1", 127);

@@ -1,21 +1,23 @@
 # The state-machine model
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki "Actor states" (retrieved 2026-07-31, oldid=55033) + ZDoom Wiki
-"DECORATE format specifications" (retrieved 2026-07-31, oldid=52163), both cross-checked against
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki "Actor states" (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=Actor_states&oldid=55033) + ZDoom Wiki
+"DECORATE format specifications" (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=DECORATE_format_specifications&oldid=52163), both cross-checked against
 the Zandronum source's state-table parser and runtime (`src/thingdef/thingdef_states.cpp`,
 `src/p_states.cpp`, `src/info.h`, `src/info.cpp`, `src/p_mobj.cpp`, `src/p_pspr.cpp`,
 `src/thingdef/thingdef_parse.cpp`, `src/namedef.h`, `src/sc_man_scanner.re`). The wiki pages
 describe the modern GZDoom-family engine, which layers ZScript-derived features onto DECORATE
 states that **do not exist in Zandronum's older DECORATE-only codebase** — every claim below has
-been checked against this fork specifically, and every place the wiki's description doesn't hold
+been checked against Zandronum specifically, and every place the wiki's description doesn't hold
 here is called out explicitly rather than silently inherited. Per `../../shared/AUTHORING.md`'s
 engine-scope caveats, the local Zandronum checkout used to verify this is a `master` HEAD
 reporting `3.3-alpha` in `version.h`, not a pristine 3.2.1 checkout — re-check against an actual
 3.2.1 client if a claim here ever turns out not to hold (this page cites `p_mobj.cpp`/
 `p_states.cpp`/`p_pspr.cpp`/`thingdef_states.cpp`, none of which the applied ZandronumMCP patch
 touches, so that patch's line-shift risk doesn't apply here).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 Every DECORATE actor's animation/behavior is one state machine: a flat array of frames
 (`FState` records) with labels pointing into it, and a "next state" pointer baked into each frame
@@ -47,7 +49,7 @@ the way those four keywords do.
 A state line is, in order: a 4-character sprite name, one or more frame characters in a single
 token, a duration, zero or more flag keywords, and an optional trailing action-function call.
 
-```
+```text
 TROO AB 4 BRIGHT A_FaceTarget
 ```
 
@@ -68,9 +70,8 @@ TROO AB 4 BRIGHT A_FaceTarget
   `BRIGHT`, `FAST`, `SLOW`, `NODELAY`, `CANRAISE`, `OFFSET(x, y)` (weapon sprite offset — per the
   wiki, `Offset(0, 0)` specifically means "keep the previous offset" rather than "reset to
   `(0,0)`", a deliberate Hexen-compatibility carve-out, not independently re-verified against
-  source here), and `LIGHT("name"[, "name2", ...])` (dynamic-light attachment — **gated behind a
-  `DYNLIGHT` build flag in this source tree; whether release Zandronum binaries actually build
-  with it defined is unverified in this checkout**, flagged as an open question below). `NODELAY`
+  source here), and `LIGHT("name"[, "name2", ...])` (dynamic-light attachment — see "Engine-family
+  divergence" below for build-flag gating differences between UZDoom and Zandronum). `NODELAY`
   is only meaningful immediately after a `Spawn:` label; using it elsewhere produces a non-fatal
   warning, not a compile error. In a multi-frame expansion (`TROO AB 4 NODELAY`), the flag is
   cleared on every expanded state after the first — it is never carried past the first frame of a
@@ -81,15 +82,17 @@ TROO AB 4 BRIGHT A_FaceTarget
   resolvable action-function name, the parser just ungets it and the state gets no action —
   there's no explicit "no action" keyword needed, an omitted call is simply legal.
 
-**Not available in Zandronum's DECORATE** (ZScript/GZDoom-only additions the wiki page documents
-alongside DECORATE, since ZDoom-family wikis describe the union of both): anonymous
-`{ statements; }` action blocks in place of a bare action-function call, `return`/
+**Not available in Zandronum's DECORATE** (but present in UZDoom's, which integrates ZScript-derived
+features into its DECORATE parser): anonymous `{ statements; }` action blocks in place of a bare
+action-function call, `return`, `if`/`while`/`for`/`do` control-flow statements inside blocks,
 `FindState()`/`ResolveState()` used as a state-jump target, and reading/assigning `self.tics` or
-`curstate.tics`. None of these appear anywhere in `thingdef_states.cpp`'s state-line grammar —
-that file resolves the trailing token exclusively as either a line-special name or a
-`PSymbolActionFunction` lookup, with no `{`-block alternative. See `../../shared/AUTHORING.md`'s
-"Engine scope" — this generalizes the same "ZScript doesn't exist in Zandronum at all" rule
-`zscript/concepts/zscript-engine-availability.md` documents, applied specifically to states.
+`curstate.tics`. In Zandronum's `thingdef_states.cpp`, the state-line grammar resolves the trailing
+token exclusively as either a line-special name or a `PSymbolActionFunction` lookup, with no
+`{`-block alternative. UZDoom's state parser (`src/scripting/decorate/thingdef_states.cpp`)
+compiles anonymous blocks through the ZScript expression/statement backend, supporting full
+control flow inside states. See `../../shared/AUTHORING.md`'s "Engine scope" — this generalizes
+the same "ZScript doesn't exist in Zandronum at all" rule `zscript/concepts/zscript-engine-availability.md`
+documents, applied specifically to DECORATE states.
 
 ## Special sprite-name tokens
 
@@ -147,18 +150,17 @@ just an unusual value:
   state is (re-)entered. `min`/`max` are independently clamped the same way as a plain integer and
   swapped if given in the wrong order.
 
-**The duration field itself only accepts a literal integer or `RANDOM(<int>, <int>)` in this
-fork** — `thingdef_states.cpp`'s duration parsing calls `sc.MustGetNumber()` directly, a raw
+**The duration field itself only accepts a literal integer or `RANDOM(<int>, <int>)` in both
+UZDoom and Zandronum** — both engines' state parsers call `sc.MustGetNumber()` directly, a raw
 numeric-token read, not the general expression parser. The current ZDoom Wiki page shows duration
 examples like `POSS A 100/5;` (arithmetic) and `POSS A TICRATE;` (a named constant) that **do not
 compile in Zandronum** — those require the newer, expression-capable duration field added to
-later GZDoom-family DECORATE, which this fork's parser doesn't have. **What Zandronum does support
-instead**, confirmed at `thingdef_states.cpp:340-430`, is a full expression (including arithmetic
-and named constants) as an **action function's argument** — e.g. `A_SetTics((waterlevel + 10) -
-(accuracy / 10))` (a real function, `thingdef_codeptr.cpp:6007-6011`) compiles and works in
-Zandronum, because action-function arguments go through the generic `ParseParameter`/
-`FxExpression` path regardless of engine version; only the bare duration slot is restricted to a
-literal.
+later GZDoom-family DECORATE versions. Zandronum's parser doesn't have such a feature. However,
+**Zandronum does support** a full expression (including arithmetic and named constants) as an
+**action function's argument** — e.g. `A_SetTics((waterlevel + 10) - (accuracy / 10))` (a real
+function, `thingdef_codeptr.cpp:6007-6011`) compiles and works, because action-function arguments
+go through the generic `ParseParameter`/`FxExpression` path; only the bare duration slot is
+restricted to a literal.
 
 ## Control-flow keywords
 
@@ -178,8 +180,8 @@ Four keywords can appear where a state line normally would, each acting on the *
   parent class moves execution into the *parent's* states permanently — there's no implicit
   "return" back into the subclass. A dynamic jump (`A_Jump`, or in ZScript `FindState`/
   `ResolveState` — not available here, see above) resolves against the actual runtime class
-  instead, per the wiki, though that distinction wasn't independently re-traced against this
-  fork's `A_Jump` implementation for this page.
+  instead, per the wiki, though that distinction wasn't independently re-traced against
+  Zandronum's `A_Jump` implementation for this page.
 - **`Stop`** — the state's `NextState` resolves to `NULL`. Reaching a null state pointer calls
   `AActor::HideOrDestroyIfSafe()` (`p_mobj.cpp:513-521, 619-648`), which **normally destroys the
   actor** — but on a server, for a level-spawned actor, in a game mode whose flags include
@@ -238,9 +240,9 @@ like Pain sequences" (the wiki's phrasing) applies equally to `Death.*`, `Pain.*
 
 ## Reserved / automatically-looked-up label names
 
-Confirmed by direct `FindState(NAME_...)` or literal-string `FindState("...")` call sites in this
-Zandronum checkout (not from general DECORATE convention, since some commonly-cited names turned
-out not to apply to this fork — see below):
+Confirmed by direct `FindState(NAME_...)` or literal-string `FindState("...")` call sites in the
+Zandronum source (not from general DECORATE convention, since some commonly-cited names turned
+out not to apply to Zandronum — see below):
 
 - **Core monster/actor cycle**: `Spawn`, `See`, `Melee`, `Missile`, `Pain`, `Death` (plus its
   legacy-aliased dotted children `Death.Extreme`/`XDeath`, `Death.Fire`/`Burn`,
@@ -261,14 +263,15 @@ out not to apply to this fork — see below):
   `FindState("Held")`, `a_pickups.cpp:872`), `HoldAndDestroy` (literal
   `FindState("HoldAndDestroy")`, `a_pickups.cpp:171`).
 
-**Listed by the wiki but not found anywhere in this checkout** (checked both as a `NAME_`
+**Listed by the wiki but not found anywhere in the Zandronum checkout** (checked both as a `NAME_`
 constant in `src/namedef.h` and as a literal-string `FindState()` argument) — treat these as
 absent in Zandronum rather than assuming wiki parity:
 
-- **`Slam`** — exists only as an unrelated C++ virtual method, `AActor::Slam()`
-  (`actor.h:796`, `p_mobj.cpp:3748`), a collision hook for `SKULLFLY`-type actors. It never calls
-  `FindState`/looks up a `"Slam"` label; there is no engine-recognized `Slam:` state sequence in
-  this fork.
+- **`Slam`** — exists in Zandronum only as an unrelated C++ virtual method, `AActor::Slam()`
+  (`actor.h:796`, `p_mobj.cpp:3748`), a collision hook for `SKULLFLY`-type actors. However, UZDoom
+  does recognize a `Slam:` state label: when a `SKULLFLY`-type actor collides with another actor
+  after charging, the engine looks up and transitions to the `Slam` state if one is defined
+  (`p_mobj.cpp`, collision handler). Zandronum has no such automatic `FindState` lookup for `Slam:`.
 - **`LightDone`** — `A_Light0`/`A_Light1`/`A_Light2` action functions exist
   (`p_pspr.cpp:1353-1385`), but no automatic `FindState("LightDone")`/`NAME_LightDone` lookup was
   found anywhere — the wiki's "all weapons have this built in" claim does not appear to hold here.
@@ -290,12 +293,12 @@ rather than picking one.
 
 - **Comments**: `//` and `/* */` are confirmed to work inside a `States { }` block (shared lexer,
   not state-block-specific), matching the wiki's "DECORATE format specifications" page. Whether a
-  bare `;` also works as a line comment inside a state block specifically is **not confirmed** in
-  this checkout — flagged as an open question below.
+  bare `;` also works as a line comment inside a state block specifically in Zandronum is **not
+  confirmed** — flagged as an open question below.
 - **`#include "path/to/lump"`** can appear anywhere outside an actor definition (not inside a
   `States{}` block, and not inside the surrounding actor's braces at all) to split DECORATE
   content across multiple lumps — per the "DECORATE format specifications" wiki page, not
-  independently re-verified against this fork's include-handling code for this page.
+  independently re-verified against Zandronum's include-handling code for this page.
 - **String escapes are turned off while parsing a state block** (re-enabled immediately after) —
   a backslash inside a `LIGHT("...")` argument is literal, not a C-style escape, unlike string
   literals elsewhere in DECORATE.
@@ -308,25 +311,52 @@ rather than picking one.
   parser transparently rewrites this into an internal call carrying the special's number and up to
   five numeric arguments.
 
-## Open questions (unverified in this checkout — don't guess past these)
+## Engine-family divergence
 
-- Whether the `LIGHT(...)` state keyword has any actual runtime effect in a real Zandronum release
-  build, or is parsed and silently discarded because `DYNLIGHT` isn't defined for that build.
+**Anonymous action blocks and control-flow statements in states**: UZDoom's DECORATE parser
+supports full anonymous `{ ... }` action blocks with control-flow statements (`if`, `while`, `for`,
+`do`), since it compiles DECORATE through the ZScript expression backend. Zandronum's DECORATE
+parser does not — it treats the trailing token on a state line as either a function name or a line
+special, with no block syntax. This is part of the broader ZScript integration in UZDoom-family
+DECORATE, which does not exist in Zandronum at all.
+
+**`LIGHT(...)` state keyword build-flag gating**: In Zandronum, the `LIGHT(...)` state flag is
+conditionally compiled behind a `#ifdef DYNLIGHT` guard — if the engine is built without dynamic
+lights enabled, the flag is parsed but silently discarded. In UZDoom, the `AddStateLight` function
+is always compiled and called; there is no conditional gate, so the flag always has an effect
+regardless of build configuration.
+
+**Null state (`Stop`) behavior**: When an actor reaches a null state (`NextState` pointer is NULL),
+UZDoom immediately calls `Destroy()` on the actor. Zandronum has more complex behavior via its
+`HideOrDestroyIfSafe()` function: on a server in multiplayer modes with the `GMF_MAPRESETS` flag
+set (Zandronum's map-reset modes, e.g. Invasion), level-spawned actors are hidden instead of
+destroyed (unlinked, marked dormant, stored for later resurrection on map reset). Single-player
+or non-resettable modes destroy the actor normally. This map-reset-aware behavior is specific to
+Zandronum's multiplayer architecture and is not present in UZDoom.
+
+**`Slam` state**: UZDoom recognizes an automatically-looked-up `Slam:` state label: when a
+`SKULLFLY`-type actor completes a charging melee attack against another actor, the engine looks up
+a `Slam` state and transitions to it if one is defined. Zandronum has no such automatic lookup —
+the `Slam` mechanism exists only as a C++ virtual method `AActor::Slam()` for internal collision
+handling, never as a DECORATE state label.
+
+## Open questions (unverified in Zandronum — don't guess past these)
+
 - Whether `;` is usable as a state-block line comment (a separate lexer mode appears to support it
-  elsewhere in the source, but its activation during actor/state parsing specifically wasn't
-  traced).
-- Whether a frame sequence containing `[`, `\`, or `]` genuinely requires quoting in this fork's
+  elsewhere in the Zandronum source, but its activation during actor/state parsing specifically
+  wasn't traced).
+- Whether a frame sequence containing `[`, `\`, or `]` genuinely requires quoting in Zandronum's
   lexer, as the wiki states — plausible given those characters' other syntactic roles, but not
   traced against `sc_man`/`thingdef_states.cpp`'s tokenizing of the frame-character field
   specifically.
 - Whether `Offset(0, 0)`'s "keep previous offset" special case (as opposed to resetting to
-  `(0,0)`) holds in this fork's `OFFSET(x,y)` handling — the wiki states this as Hexen-compat
-  behavior; this page's own source read of `thingdef_states.cpp`'s `OFFSET` branch didn't check
-  for a `(0,0)` special case one way or the other.
+  `(0,0)`) holds in Zandronum's `OFFSET(x,y)` handling — the wiki states this as Hexen-compat
+  behavior; this page's own source read of Zandronum's `thingdef_states.cpp`'s `OFFSET` branch
+  didn't check for a `(0,0)` special case one way or the other.
 - Whether `A_Jump`'s dynamic-jump target resolution actually differs from `Goto`'s static,
   compile-time-class-bound resolution the way the wiki describes (i.e., whether `A_Jump` jumping
   into an inherited label lands in the *runtime* class's override rather than the *defining*
-  class's version) — not independently re-traced against this fork's `A_Jump` implementation.
+  class's version) — not independently re-traced against Zandronum's `A_Jump` implementation.
 
 If wiki material resolves any of these, fold the answer into this file directly and drop the
 matching bullet here rather than leaving it stale.

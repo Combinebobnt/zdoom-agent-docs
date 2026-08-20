@@ -1,8 +1,10 @@
 # Creating monsters
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki "Creating new monsters or other complex items" (retrieved 2026-07-31, oldid=52209), cross-checked against the Zandronum source's actor property definitions (`src/thingdef/thingdef_properties.cpp`), action-function implementations (`src/p_enemy.cpp`, `src/g_shared/a_action.cpp`), and shipped DECORATE definitions (`wadsrc/static/actors/doom/possessed.txt`). Per `../../shared/AUTHORING.md`'s engine-scope caveats, the local checkout used to verify this is a `master` HEAD reporting `3.3-alpha`, not a pristine 3.2.1 checkout, though the files cited here are not touched by the applied ZandronumMCP patch.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki "Creating new monsters or other complex items" (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=Creating_new_monsters_or_other_complex_items&oldid=52209), cross-checked against the Zandronum source's actor property definitions (`src/thingdef/thingdef_properties.cpp`), action-function implementations (`src/p_enemy.cpp`, `src/g_shared/a_action.cpp`), and shipped DECORATE definitions (`wadsrc/static/actors/doom/possessed.txt`). Per `../../shared/AUTHORING.md`'s engine-scope caveats, the local checkout used to verify this is a `master` HEAD reporting `3.3-alpha`, not a pristine 3.2.1 checkout, though the files cited here are not touched by the applied ZandronumMCP patch.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 This page covers what distinguishes a monster from other actors in DECORATE, the states and action functions that make one work, and how to create variations (shootable decorations, sound-triggered actors). It does not cover action-function semantics themselves — see the `actions/` directory for those — or the state-machine model, which is already covered in `state-machine.md`.
 
@@ -56,13 +58,13 @@ Beyond the `Monster` property itself, several properties are essential to a func
 - **`Mass`** — affects knockback from explosions and impacts (optional; defaults to a sensible value if not specified).
 - **`SeeSound`, `AttackSound`, `PainSound`, `DeathSound`, `ActiveSound`** — sound lumps played at corresponding events. A monster without these defined may play nothing, or fall back to engine defaults. It's good practice to define all five even if some are silent (specifying an empty string `""` or omitting the line entirely).
 - **`Obituary`** — the message shown when a player is killed by this monster (e.g. `"%o was killed by a zombieman."`). The `%o` token is replaced with the victim's name; `%k` with the killer's name. If omitted, a generic message is used.
-- **`DropItem "ItemType" [probability] [amount]`** — specifies an item the monster drops on death. `probability` defaults to 255 if omitted (`di->probability=255`, `thingdef_properties.cpp:775`) and is stored as a plain `int` with no clamp applied at parse time (`actor.h:691`, `thingdef_properties.cpp:780-781`). At drop time, `P_DropItem` rolls an 8-bit random value and drops the item if `pr_dropitem() <= chance` (`p_enemy.cpp:3471`) — since the roll can never exceed 255, **255 and 256 are functionally identical: both always drop**. This isn't a fork quirk to avoid; `256` is the engine's own idiom for "always drop, no randomness" elsewhere in this source (e.g. weapon/ammo drops on player death pass `256` explicitly, `p_user.cpp:2113-2141`). **The wiki example's `DropItem "Clip" 256` is simply an unconditional drop, not an out-of-range value to be wary of.**
+- **`DropItem "ItemType" [probability] [amount]`** — specifies an item the monster drops on death. `probability` defaults to 255 if omitted (`di->probability=255`, `thingdef_properties.cpp:775`) and is stored as a plain `int` with no clamp applied at parse time (`actor.h:691`, `thingdef_properties.cpp:780-781`). At drop time, `P_DropItem` rolls an 8-bit random value and drops the item if `pr_dropitem() <= chance` (`p_enemy.cpp:3471`) — since the roll can never exceed 255, **255 and 256 are functionally identical: both always drop**. This is the engine's own idiom (not a quirk to avoid); `256` is used for "always drop, no randomness" elsewhere in this source (e.g. weapon/ammo drops on player death pass `256` explicitly, `p_user.cpp:2113-2141`). **The wiki example's `DropItem "Clip" 256` is simply an unconditional drop, not an out-of-range value to be wary of.**
 
 ## Creating shootable decorations
 
 A shootable decoration uses individual flags instead of the `Monster` property — allowing it to take damage without adding to the level's kill count:
 
-```
+```text
 actor ExampleDecoration 9999
 {
   Health 10
@@ -94,13 +96,13 @@ Key differences from a monster:
 - **Optional `+NOBLOOD`** — prevents blood sprites from being spawned on impact.
 - **Action functions are typically simpler** — `A_Scream`, `A_Fall`, `A_NoBlocking` (or the equivalent `A_Fall`, which does the same thing) for death sequences, rather than AI chase functions.
 
-Note: `A_NoBlocking` and `A_Fall` are functionally identical in this fork — both are one-line wrappers calling `A_Unblock(self, true)` with no other logic (`g_shared/a_action.cpp:130-138`). Either can be used; `A_NoBlocking` is common for monsters and `A_Fall` for decorations by convention only.
+Note: `A_NoBlocking` and `A_Fall` are functionally identical in both engines — both are one-line wrappers calling `A_Unblock(self, true)` with no other logic (Zandronum: `g_shared/a_action.cpp:130-138`; UZDoom: `wadsrc/static/zscript/actors/actor.zs`). Either can be used; `A_NoBlocking` is common for monsters and `A_Fall` for decorations by convention only.
 
 ## Creating sound-triggered or conditional actors
 
 An actor that reacts to seeing a player but does not become hostile — for example, an invisible marker that plays a sound — can be created by using a custom `See:` state that does *not* pursue or attack:
 
-```
+```text
 actor SoundMarker 9998
 {
   Health 1

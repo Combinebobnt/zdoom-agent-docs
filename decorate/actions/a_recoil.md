@@ -1,8 +1,10 @@
 # `void A_Recoil(float xyvel)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_Recoil` (retrieved 2026-08-01, oldid=48676) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:2797-2818`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_Recoil` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_Recoil&oldid=48676) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:2797-2818`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `AActor` action function.
 
 Applies velocity to the calling actor in the direction opposite to its facing angle, simulating weapon recoil or knockback. Recoil is purely horizontal (x/y only); the z velocity component is never modified.
@@ -22,6 +24,10 @@ Applies velocity to the calling actor in the direction opposite to its facing an
 - **For non-player actors:** Recoil is skipped on clients (even if `+CLIENTSIDEONLY` is not set); the server applies it and broadcasts a full position/velocity resync via `SERVERCOMMANDS_MoveThingExact` to all clients.
 
 (The fork author flagged the player-side behavior as deliberate-but-unsure in a source comment.)
+
+## Zandronum-specific: client/server behavior
+
+**This entire client/server split is Zandronum-only.** UZDoom's `A_Recoil` (`src/playsim/p_actionfunctions.cpp`, `DEFINE_ACTION_FUNCTION(AActor, A_Recoil)`) calls `self->Thrust(self->Angles.Yaw + DAngle::fromDeg(180.), xyvel)` unconditionally — there is no client-mode check, no player/non-player distinction, and no follow-up position/velocity resync. `Thrust(DAngle, double)` (`src/playsim/actor.h`) only adds to `Vel.X`/`Vel.Y`, matching the horizontal-only behavior described above. UZDoom's source tree has no `NETWORK_InClientMode`-equivalent gate and no `SERVERCOMMANDS_*`-equivalent broadcast mechanism anywhere, so recoil is applied identically for every actor and every peer with no server-authoritative resync step at all.
 
 ## Related functions
 

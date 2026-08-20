@@ -1,8 +1,10 @@
 # GLDEFS lump format overview
 
 **Tier:** B
-**Engine:** Zandronum 3.2.1 (verified against source); GZDoom-family (UZDoom 4.15pre) for features absent from Zandronum
-**Provenance:** ZDoom Wiki `GLDEFS` (retrieved 2026-07-31, oldid=55416), verified against Zandronum source's `src/gl/dynlights/gl_dynlight.cpp`, `src/gl/dynlights/gl_glow.cpp`, `src/gl/textures/gl_texture.cpp`, and `src/gl/textures/gl_skyboxtexture.cpp`. GZDoom-family keyword presence verified via UZDoom 4.15pre source's `src/r_data/gldefs.cpp` but behavior beyond keyword existence not exhaustively traced.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `GLDEFS` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=GLDEFS&oldid=55416), verified against Zandronum source's `src/gl/dynlights/gl_dynlight.cpp`, `src/gl/dynlights/gl_glow.cpp`, `src/gl/textures/gl_texture.cpp`, and `src/gl/textures/gl_skyboxtexture.cpp`. GZDoom-family keyword presence verified via UZDoom 4.15pre source's `src/r_data/gldefs.cpp` but behavior beyond keyword existence not exhaustively traced.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 GLDEFS lumps define graphical effects supported only by the OpenGL renderer: dynamic lights (point/pulse/flicker lights bound to actors), skyboxes, brightmaps (brightness masks for sprites/textures/flats), glowing flats, and hardware shaders. The lump supports `#include` directives and game-specific aliases (`DOOMDEFS`, `HTICDEFS`, `HEXNDEFS`, `STRFDEFS`).
 
@@ -31,7 +33,6 @@ Zandronum and GZDoom-family diverge significantly in GLDEFS scope. The following
 | `lightsizefactor` | **no** | yes | Top-level command to scale attenuated light sizes; only in GZDoom family. |
 | `material` | **no** | yes | PBR/specular material definition (normal/roughness/metallic/AO maps); GZDoom family only. |
 | `colorization` | **no** | yes | Color blending effect definition; GZDoom family only. |
-| `globalshader` | **no** | yes | VKDoom-specific; shader override per class/map/globally. |
 
 ## Dynamic lights in Zandronum
 
@@ -60,7 +61,9 @@ All five dynamic light types support the same core property keywords, with light
 
 **Behavioral notes:**
 
-- `size` and `secondarySize` are byte-clamped (0-255) during parsing before storage.
+- **Size clamping differs between engines** (see Engine-family divergence section below).
+  - Zandronum: `size` and `secondarySize` are clamped to 0-255 during parsing.
+  - UZDoom/GZDoom: `size` and `secondarySize` are clamped to 1-1024 during parsing.
 - **`flickerlight2` auto-swap:** If `secondarySize < size`, the engine silently swaps them at parse time. The wiki's "SECSIZE must be greater than SIZE" describes the intended design, not an error condition; incorrect orderings are corrected, not rejected.
 - `pointlight` does not accept `secondarySize` or `interval`/`chance` (they will error as unknown tags).
 - `sectorlight` does not accept `size` or secondary properties; `scale` is its intensity control instead.
@@ -83,7 +86,7 @@ The following properties parse in UZDoom/GZDoom but not Zandronum:
 
 Lights are bound to actors via `object` blocks, which specify an actor class and optionally individual sprite frames:
 
-```
+```text
 object CLASSNAME
 {
     frame SPRITENAME { light LIGHTNAME ... }
@@ -103,7 +106,7 @@ Zandronum does not support `dontlightactors`, `dontlightothers`, or `dontlightma
 
 Skyboxes are defined as textured cubes. Support two formats:
 
-```
+```text
 Skybox MYSKY6 [fliptop]
 {
   TEXTURE_N    // North
@@ -136,7 +139,7 @@ Place a brightmap image in `brightmaps/auto/` or `materials/brightmaps/auto/` wi
 
 Define in GLDEFS:
 
-```
+```text
 brightmap sprite POSSA1
 {
   map "brightmaps/enemies/zombieman/POSSA1.png"
@@ -158,7 +161,7 @@ If both `iwad` and `thiswad` are specified, the brightmap applies if either cond
 
 The `Glow` block marks textures/flats to emit light. Supports two methods:
 
-```
+```text
 Glow
 {
   Flats { FLAT1 FLAT2 ... }
@@ -182,7 +185,7 @@ Glows only appear on floors/ceilings; they are silently ignored on walls despite
 
 Zandronum supports `HardwareShader` for per-graphic fragment shaders only. The `PostProcess` variant (screenspace shaders, BeforeBloom/Scene/Screen stages) is **not** supported in Zandronum — it exists only in GZDoom family and requires ZScript control via `PPShader` class (which Zandronum lacks entirely).
 
-```
+```text
 HardwareShader [Type] <LumpName>
 {
   Shader "<File>"
@@ -195,12 +198,19 @@ HardwareShader [Type] <LumpName>
 
 Type can be `Flat`, `Sprite`, `Texture`, or `PostProcess` (PostProcess unsupported in Zandronum). File is a text lump containing a GLSL `Process(vec4 color)` function returning a `vec4` pixel color.
 
+## Engine-family divergence: Light size parameter ranges
+
+While both Zandronum and UZDoom/GZDoom support the same light types and most properties, the valid range for `size` and `secondarySize` differs:
+
+- **Zandronum:** Clamps light size parameters to 0-255 (byte range). The wiki documentation describing the "0-255" range reflects Zandronum's implementation.
+- **UZDoom/GZDoom:** Clamps light size parameters to 1-1024. Sizes larger than 255 allow for much brighter, more intensive lights in the renderer.
+
+This affects all light types accepting `size`/`secondarySize` — `pointlight`, `pulselight`, `flickerlight`, and `flickerlight2`. A GLDEFS lump meant for use on both engines should keep sizes in the 1-255 overlap range to avoid unexpected behavior on either engine.
+
 ## Unsupported GZDoom-family-only blocks
 
-The following GLDEFS sections are absent from Zandronum and documented in UZDoom 4.15pre source only:
+The following GLDEFS sections are absent from Zandronum and present only in UZDoom/GZDoom:
 
-- **`material` block:** PBR (physically-based rendering) or specular-map material definition with normal/roughness/metallic/AO maps. Requires advanced fragment shaders. See UZDoom source's `src/r_data/gldefs.cpp` for syntax.
-- **`colorization` block:** Color blending effect with desaturation, inversion, additive/modulative/blended colors. See UZDoom source for syntax.
-- **PostProcess shaders:** Screenspace post-processing shaders with uniform/texture binding and ZScript control. Requires `PPShader` class (UZDoom/GZDoom only). See UZDoom source.
-- **`globalshader` block:** VKDoom-specific shader override per class/map/globally. Not in Zandronum or standard GZDoom.
-
+- **`material` block:** PBR (physically-based rendering) or specular-map material definition with normal/roughness/metallic/AO maps. Requires advanced fragment shaders. Present in UZDoom source's `src/r_data/gldefs.cpp`.
+- **`colorization` block:** Color blending effect with desaturation, inversion, additive/modulative/blended colors. Present in UZDoom source.
+- **PostProcess shaders:** Screenspace post-processing shaders with uniform/texture binding and ZScript control. Requires `PPShader` class (UZDoom/GZDoom only). Present in UZDoom source. Not supported in Zandronum.

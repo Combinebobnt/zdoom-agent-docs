@@ -1,10 +1,22 @@
 # `int PlayerNumber(void)`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Provenance:** wiki page `PlayerNumber - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28,
+`https://zdoom.org/w/index.php?title=PlayerNumber&oldid=37556`) + source-verified (`p_acs.cpp:12380-12389`; builtin registration confirmed at
+`zt-bcc/src/builtin.c:258`). This is a ZDoom-wiki page, not Zandronum-wiki, but `PCD_PLAYERNUMBER`
+is core base-ACS pcode present unchanged in Zandronum — no ZDoom-ahead-of-Zandronum divergence
+found for this function. The wiki's usage/return description holds as written; the `DISCONNECT`
+interaction and the contrast with `ConsolePlayerNumber()` are this doc's source-verified addition,
+kept consistent with `functions/consoleplayernumber.md`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** compiler builtin.
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+
 Returns the player number of the script's **activator**, starting at 0. Base ACS compiler
 builtin (`PCD_PLAYERNUMBER`, listed in `zt-bcc/src/builtin.c`'s `g_funcs[]`), implementation at
 the Zandronum source's `src/p_acs.cpp:12380-12389`.
-
-**Bucket:** compiler builtin.
 
 ```cpp
 case PCD_PLAYERNUMBER:
@@ -41,7 +53,7 @@ case PCD_PLAYERNUMBER:
 
 **Example** (from the wiki — assigns each player a unique TID on join):
 
-```
+```text
 script 5 ENTER
 {
     Thing_ChangeTID(0, 1000 + PlayerNumber());
@@ -51,14 +63,3 @@ script 5 ENTER
 **Returns:** `int` — activator's player index (`0`-based), or `-1` if the script has no player
 activator (including `DISCONNECT` scripts, where the activator's player link may already be torn
 down).
-
-**Provenance:** wiki page `PlayerNumber - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28,
-`oldid=37556`) + source-verified (`p_acs.cpp:12380-12389`; builtin registration confirmed at
-`zt-bcc/src/builtin.c:258`). This is a ZDoom-wiki page, not Zandronum-wiki, but `PCD_PLAYERNUMBER`
-is core base-ACS pcode present unchanged in this fork — no ZDoom-ahead-of-Zandronum divergence
-found for this function. The wiki's usage/return description holds as written; the `DISCONNECT`
-interaction and the contrast with `ConsolePlayerNumber()` are this doc's source-verified addition,
-kept consistent with `functions/consoleplayernumber.md`. **Engine:** Zandronum 3.2.1 (verified
-against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.
-
-**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.

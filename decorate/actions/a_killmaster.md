@@ -1,8 +1,10 @@
 # `void A_KillMaster(name damagetype = "none")`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_KillMaster` (retrieved 2026-08-01, oldid=46801) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3542-3554` and `wadsrc/static/actors/actor.txt:242`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_KillMaster` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_KillMaster&oldid=46801) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3542-3554` and `wadsrc/static/actors/actor.txt:242`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:3545` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_KillMaster)`).
 
 Calls `P_DamageMobj` on the calling actor's master (spawner) with a damage amount equal to the master's current health, killing it if it survives the damage checks. **Zandronum only: this function is drastically simplified compared to GZDoom/UZDoom, which add flags and actor/species filters.**

@@ -1,8 +1,10 @@
 # `A_Tracer2`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_Tracer2` (retrieved 2026-07-31, oldid=34282) + verified against the Zandronum source's `src/g_strife/a_spectral.cpp:99-173` and `src/g_doom/a_revenant.cpp:50-149` (for comparison with `A_Tracer`).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_Tracer2` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_Tracer2&oldid=34282) + verified against the Zandronum source's `src/g_strife/a_spectral.cpp:99-173` and `src/g_doom/a_revenant.cpp:50-149` (for comparison with `A_Tracer`).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_Tracer2)` in `src/g_strife/a_spectral.cpp`.
 
 Seeks toward the calling actor's `tracer` target, adjusting angle and velocity to home in. Designed for Strife homing missiles. Unlike the similar `A_Tracer` (Revenant homing missile), this function acts on **every call** (no gametic gate) and does **not spawn puffs** behind the missile.
@@ -53,6 +55,20 @@ For conventional homing missiles, declaring `+SEEKERMISSILE` is the standard pra
 - **Server-side only**: The function returns immediately if `NETWORK_InClientMode()` is true, so homing calculations happen only on the server.
 - **Broadcast traffic**: On the server, every call broadcasts a full position/angle/velocity update. A map with many simultaneous homing missiles can incur significant netcode overhead; consider state durations carefully when designing high-frequency homing sequences.
 - **Position authority**: Clients receive missile positions from the server and cannot independently adjust homing behavior.
+
+## Engine-family divergence: shared implementation, new `traceang` parameter
+
+On UZDoom, `A_Tracer2` is no longer a Strife-only, parameterless native function. It is implemented as a general ZScript helper in the UZDoom source's `wadsrc/static/zscript/actors/doom/revenant.zs`, with the signature `void A_Tracer2(double traceang = 19.6875)` — an optional turn-rate parameter, in degrees, defaulting to the same ~19.69° Strife rate Zandronum hardcodes as `TRACEANGLE`. Callers can now pass a custom turn rate explicitly (e.g. `A_Tracer2(30.0)`), which has no equivalent on Zandronum, where the rate is fixed at compile time and the function takes no arguments at all.
+
+More significantly, `A_Tracer` (the Revenant homing function) is no longer an independently-implemented function on UZDoom. Its ZScript body performs only the puff/smoke-spawn and the 1-in-4 gametic gate described above, then defers the actual homing math to a plain call to `A_Tracer2(16.875)` — the Revenant's own turn rate, passed as an explicit argument. So on UZDoom the two functions share one code path; the "Comparison with A_Tracer" table above (turning rate, puff spawn, gametic gate) still describes the observable behavioral difference correctly, but the underlying mechanism is now composition (`A_Tracer` calling `A_Tracer2`) rather than two independently-implemented functions as on Zandronum (the Strife-side `src/g_strife/a_spectral.cpp` versus the Doom-side `src/g_doom/a_revenant.cpp`).
+
+## Engine-family divergence: floating-point steering math
+
+Zandronum's `A_Tracer2` works in fixed-point `angle_t` BAM units and `finesine`/`finecosine` lookup tables, and derives its vertical-seek divisor from `P_AproxDistance` (an octagonal distance approximation, not true Euclidean distance). UZDoom's version is fully floating-point: `AngleTo`/`deltaangle` compute the facing delta as a `double` degree value directly (no BAM conversion), `VelFromAngle()` derives velocity from that angle and the actor's `Speed`, and the vertical-seek divisor comes from `AActor::DistanceBySpeed` — `max(1, Distance2D(dest) / speed)`, true 2D Euclidean distance rather than the octagonal table approximation. The two engines converge on the same turn-rate constants and the same ±1/8-unit-per-call vertical step, so trajectories track closely, but exact per-tic angle and pitch values can differ slightly, most noticeably at short range where the octagonal approximation's error from true distance is largest.
+
+## Engine-family divergence: no client/server execution gate
+
+The "Network considerations" section above describes Zandronum-specific behavior with no UZDoom equivalent: neither `NETWORK_InClientMode()` nor `SERVERCOMMANDS_MoveThingExact` (or any similarly-named broadcast mechanism) exists anywhere in the UZDoom source tree. UZDoom's `A_Tracer2` runs its full homing calculation unconditionally, every call, on every machine — there is no server-authoritative gate and no explicit per-call position/angle/velocity broadcast. This follows from UZDoom's GZDoom-family netcode model (every peer runs the same deterministic simulation) rather than Zandronum's explicit client/server split with server-authoritative position broadcasts, and it is the same divergence already documented for the sibling function `A_SeekerMissile` (`decorate/actions/a_seekermissile.md`).
 
 ## Related functions and cross-references
 

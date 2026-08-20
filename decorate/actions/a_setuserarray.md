@@ -1,8 +1,10 @@
 # `void A_SetUserArray(name varname, int index, int value)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_SetUserArray` (retrieved 2026-08-01, oldid=42563) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:5168-5194` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_SetUserArray)`).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_SetUserArray` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_SetUserArray&oldid=42563) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:5168-5194` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_SetUserArray)`).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:5168` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_SetUserArray)`).
 
 Sets an element of an integer array user variable on the calling actor to a specified value. Like `A_SetUserVar`, this function is part of the mechanism for storing actor-specific custom data via user variables.
@@ -19,13 +21,13 @@ When called, `A_SetUserArray` performs two validation checks:
 
 **1. Variable lookup and type check** — the function looks up `varname` in the calling actor's class symbol table. If the variable is not found, is not marked as a user variable, or is not of type `int[]` (e.g., a scalar integer, float array, or non-user field), the function prints an error message to the console and returns without making any change:
 
-```
+```text
 <varname> is not a user array in class <classname>
 ```
 
 **2. Bounds check** — if the variable exists and is valid, the function checks whether `index` falls within the array bounds `[0, size)`. If the index is negative or >= the declared array size, the function prints an error message and returns:
 
-```
+```text
 <index> is out of bounds in array <varname> in class <classname>
 ```
 

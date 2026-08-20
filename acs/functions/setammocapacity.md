@@ -1,8 +1,10 @@
 # `void SetAmmoCapacity(str typename, int maxamount)`
 
 **Tier:** A.
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`).
-**Provenance:** wiki page `SetAmmoCapacity (ACS) - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `oldid=52592`) + source-verified against `p_acs.cpp:11843-11879`, `g_shared/a_pickups.h:240` (`AAmmo : public AInventory`), `zt-bcc/src/builtin.c:132`. Wiki/fork divergence (direct-parent-only `Ammo` check, activator-only targeting, item-creation-on-first-use with `Amount` zeroed, Zandronum-only server-sync packet) recorded above rather than silently trusted or omitted.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `SetAmmoCapacity (ACS) - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=SetAmmoCapacity_%28ACS%29&oldid=52592`) + source-verified against `p_acs.cpp:11843-11879`, `g_shared/a_pickups.h:240` (`AAmmo : public AInventory`), `zt-bcc/src/builtin.c:132`. Wiki/fork divergence (direct-parent-only `Ammo` check, activator-only targeting, item-creation-on-first-use with `Amount` zeroed, Zandronum-only server-sync packet) recorded above rather than silently trusted or omitted.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 
 Sets the max-carry amount of an ammo type on the **activator only**. Compiler builtin
@@ -50,7 +52,7 @@ Sets the max-carry amount of an ammo type on the **activator only**. Compiler bu
 **Example — grow max ammo capacity on pickup (from the wiki, semantics verified against this
 fork):**
 
-```
+```text
 if (GetAmmoCapacity("Clip") < 800)
 {
     SetAmmoCapacity("Clip", GetAmmoCapacity("Clip") + 100);

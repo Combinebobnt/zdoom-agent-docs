@@ -1,15 +1,21 @@
 # `void A_CustomMeleeAttack(int damage = 0, sound meleesound = "", sound misssound = "", name damagetype = "none", bool bleed = true)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_CustomMeleeAttack` (retrieved 2026-07-31, oldid=54194) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1380–1409`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_CustomMeleeAttack` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_CustomMeleeAttack&oldid=54194) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1380–1409`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Action function, defined on `AActor` (callable from any actor's state table).
 
 A customizable melee attack for monsters. Calls `A_FaceTarget` and checks if the caller's target is within melee range. If in range, deals damage and plays the `meleesound`; if out of range, plays the `misssound` instead. Does nothing if there is no current target.
 
-## Server-side behavior (Zandronum fork divergence)
+## Zandronum-specific: server-side execution gate
 
 On a Zandronum client, this action returns immediately unless the calling actor has the `+CLIENTSIDEONLY` flag — the entire attack (facing the target, range check, damage, sound) is server-side only. This is a Zandronum-specific netcode gate; the ZDoom wiki, describing upstream behavior, makes no mention of this restriction.
+
+## Engine-family divergence: no client-mode execution gate
+
+UZDoom's `A_CustomMeleeAttack` (`src/playsim/p_actionfunctions.cpp`, `DEFINE_ACTION_FUNCTION(AActor, A_CustomMeleeAttack)`) has no equivalent of Zandronum's client/`+CLIENTSIDEONLY` gate — the function body has no client/server branch at all, and no `NETWORK_InClientMode`/`SERVERCOMMANDS_*`-style check exists anywhere in the UZDoom source tree. The function runs to completion on every machine rather than being gated to a single authoritative side. Every other behavior described in this file (the `damage`/`meleesound`/`misssound`/`damagetype`/`bleed` parameters, the `"none"`-to-`"Melee"` damagetype fallback, and the bleeding fallback to the original `damage` value when `newdam` is `0`) matches UZDoom's implementation exactly.
 
 ## Parameters
 

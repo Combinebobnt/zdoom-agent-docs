@@ -1,8 +1,10 @@
 # `void A_KillSiblings(name damagetype = "none")`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_KillSiblings` (retrieved 2026-08-01, oldid=46802) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3583-3608` and `wadsrc/static/actors/actor.txt:244`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_KillSiblings` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_KillSiblings&oldid=46802) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3583-3608` and `wadsrc/static/actors/actor.txt:244`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:3583` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_KillSiblings)`).
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
@@ -23,6 +25,10 @@ Unlike `A_KillMaster` (which carries no network check), `A_KillSiblings` has an 
 However, actors marked with the `+CLIENTSIDEONLY` flag (which sets the internal `NETFL_CLIENTSIDEONLY` network flag) are simulated entirely client-side with no server counterpart, so the action **does execute on clients for these actors**. This allows decorations, effects, and other client-only entities to manage their own sibling relationships without server involvement.
 
 This two-tier design prevents desync: server actors' sibling relationships are managed by the server, while client-only actors (which have no server-side state to conflict) manage themselves.
+
+## Zandronum-specific: network gate has no UZDoom equivalent
+
+UZDoom's `A_KillSiblings` (`src/playsim/p_actionfunctions.cpp:4270-4296`) carries no client/server authority check at all — there is no `NETWORK_InClientMode()` call, no test of a `+CLIENTSIDEONLY`/`NETFL_CLIENTSIDEONLY`-style flag, and no server/client split anywhere in the function or the shared `DoKill` helper it calls. UZDoom/GZDoom-family engines have no server-authoritative vs. client-predicted execution model for action functions at all, so the entire "server-side only with client-side-only exception" design described above is a Zandronum-only concept: on UZDoom, `A_KillSiblings` simply iterates every actor sharing the caller's master and calls `DoKill` on each, unconditionally, regardless of network state.
 
 ## Siblings and the master relationship
 

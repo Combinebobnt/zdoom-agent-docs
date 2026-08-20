@@ -1,8 +1,10 @@
 # `fixed GetActorAngle(int tid)`
 
 **Tier:** A.
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master`/`3.3-alpha` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`).
-**Provenance:** wiki page `GetActorAngle - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `oldid=40295`) + source-verified against `p_acs.cpp:12032-12037, 4445-4453`, `doomtype.h` for `angle_t` signedness, and `zt-bcc/src/builtin.c:133`. The fixed-point angle encoding, `fixed` return type, and nonzero-TID read-only-first-match asymmetry with `SetActorAngle` all verified; no wiki/fork divergence found (the `GetActorAngle`/`SetActorAngle` asymmetry is unmentioned on the wiki but is real in the fork and documented in `SetActorAngle`'s own entry).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `GetActorAngle - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=GetActorAngle&oldid=40295`) + source-verified against `p_acs.cpp:12032-12037, 4445-4453`, `doomtype.h` for `angle_t` signedness, and `zt-bcc/src/builtin.c:133`. The fixed-point angle encoding, `fixed` return type, and nonzero-TID read-only-first-match asymmetry with `SetActorAngle` all verified; no wiki/fork divergence found (the `GetActorAngle`/`SetActorAngle` asymmetry is unmentioned on the wiki but is real in the fork and documented in `SetActorAngle`'s own entry).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 
 Gets the facing angle of an actor by TID. Compiler builtin (`PCD_GETACTORANGLE`,
@@ -44,7 +46,7 @@ resolve the actor and then extracts its angle member.
 
 ## Example (adapted from the wiki)
 
-```c
+```acs
 script 10 ENTER
 {
     // Thrust the activator (a player) in the direction it's facing

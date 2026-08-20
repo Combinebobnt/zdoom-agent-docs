@@ -1,8 +1,10 @@
 # Function pointers
 
 **Tier:** A
-**Engine:** UZDoom 4.15pre / GZDoom-family — does not exist in Zandronum
-**Provenance:** ZDoom Wiki `Function pointers` (retrieved 2026-07-31, oldid=54363) + verified against the UZDoom source's `src/common/scripting/backend/codegen.cpp` (restrictions, `.call()` mechanics) and `wadsrc/static/zscript/engine/base.zs` (standard-library interface).
+**Applies to:** UZDoom=yes, Zandronum=no
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15)
+**Provenance:** ZDoom Wiki `Function pointers` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=Function_pointers&oldid=54363) + verified against the UZDoom source's `src/common/scripting/backend/codegen.cpp` (restrictions, `.call()` mechanics) and `wadsrc/static/zscript/engine/base.zs` (standard-library interface); re-verified 2026-08-03 against UZDoom 5.0.0-pre (commit fbad53bff5) after upstream pull — no behavioral drift found.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 Function pointers in ZScript allow you to store references to functions and call them indirectly. They enable callbacks (different functions with the same type signature), runtime polymorphism without class inheritance, and cross-mod integration patterns.
 
@@ -24,9 +26,10 @@ Function<ui double(double, double)> myUiMath;
 Function pointers can only point to **static functions and instance methods**. The following function kinds **cannot** be referenced:
 - **Action functions** — these are hardcoded into the state machine and don't have first-class callable values.
 - **Virtual functions** — the VM doesn't support taking pointers to virtual methods; you must use inheritance and method overrides instead.
-- **Variadic functions** — functions with `...` parameters (e.g., `Console.Printf`) are not supported.
 
-The compiler enforces these restrictions at compile time, rejecting any attempt to assign an action, virtual, or variadic function to a function pointer with an error message.
+The compiler enforces this restriction at compile time: converting an action or virtual function to a function pointer type is rejected with a single shared error, `"virtual/action function pointers are not allowed"` (`src/common/scripting/backend/codegen.cpp`'s `convertRawFunctionToFunctionPointer`), and the same two flags (`VARF_Virtual | VARF_Action`) are checked again when a function-pointer-typed class property resolves its `"Class::Function"` string default (`NativeFunctionPointerCast`).
+
+**Variadic functions** (functions with `...` parameters, e.g. `Console.Printf`) are not independently verified as blocked. No dedicated compile-time check against the vararg flag was found anywhere in the function-pointer assignment or cast paths — the only rejection is the shared virtual/action one above. Whether pointing to a native vararg function actually works (and, if so, what happens to arguments past the fixed parameter list when called through `.call()`) is unverified; treat the "not supported" framing as unconfirmed rather than a documented restriction.
 
 ## Assigning function pointers
 
@@ -71,7 +74,7 @@ The cast syntax requires two sets of parentheses: `(Function<...>)(value)`.
 
 ## Function pointers in properties
 
-Within a class property definition, you can initialize a function pointer field with a reference specified as a string in the format `ClassName::FunctionName`. This is resolved at class instantiation time:
+Within a class property definition, you can initialize a function pointer field with a reference specified as a string in the format `ClassName::FunctionName`. This is **not** resolved per-instance at object creation: the string is parsed and the function looked up once, at the end of script compilation (`ZCCDoomCompiler::InitDefaultFunctionPointers`, called from `ZCCDoomCompiler::Compile()` after states and functions are compiled), and the resolved pointer is written directly into the class's default field data. Every instance of the class then inherits that already-resolved pointer through the normal default-value-copying mechanism, the same as any other default-initialized field — there is no per-instantiation lookup cost or possibility of late binding:
 
 ```zscript
 property myFunc: myFuncField;

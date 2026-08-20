@@ -1,15 +1,17 @@
 # `void A_RaiseSiblings()`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_RaiseSiblings` (retrieved 2026-08-01, oldid=53236) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4875-4894`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_RaiseSiblings` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RaiseSiblings&oldid=53236) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4875-4894`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:4875` (`DEFINE_ACTION_FUNCTION(AActor, A_RaiseSiblings)`).
 
-Resurrects all actors that share the calling actor's master (spawner) from corpses, excluding the calling actor itself. Zandronum version takes **no parameters** — the `flags` parameter and `RF_*` constants described in the ZDoom Wiki do not exist in this fork.
+Resurrects all actors that share the calling actor's master (spawner) from corpses, excluding the calling actor itself. Zandronum version takes **no parameters** — the `flags` parameter and `RF_*` constants described in the ZDoom Wiki do not exist in Zandronum.
 
 ## Signature
 
-```
+```text
 void A_RaiseSiblings()
 ```
 
@@ -49,7 +51,7 @@ If a sibling actor has no `Raise` state defined, `P_Thing_Raise` returns without
 
 ### No room to raise
 
-If the sibling's default height and radius would overlap another actor or solid geometry at its current position, `P_CheckPosition` fails and the resurrection is aborted. The sibling remains dead and at its current location. **This check is unconditional in Zandronum** — there is no parameter to skip it (unlike the ZDoom Wiki's `RF_NOCHECKPOSITION` flag, which does not exist in this fork).
+If the sibling's default height and radius would overlap another actor or solid geometry at its current position, `P_CheckPosition` fails and the resurrection is aborted. The sibling remains dead and at its current location. **This check is unconditional in Zandronum** — there is no parameter to skip it (unlike the ZDoom Wiki's `RF_NOCHECKPOSITION` flag, which does not exist in Zandronum).
 
 ## Network behavior
 
@@ -59,6 +61,19 @@ If the sibling's default height and radius would overlap another actor or solid 
 - **Client side:** Clients never execute the resurrection logic, even if the actor is marked `+CLIENTSIDEONLY`. Clients receive the state-change via the server's broadcast command.
 
 This differs from `A_KillSiblings`, which allows `+CLIENTSIDEONLY` actors to manage their own sibling relationships client-side.
+
+## Zandronum-specific: network gate has no UZDoom equivalent
+
+UZDoom's `A_RaiseSiblings` (`src/playsim/p_actionfunctions.cpp:2748-2767`) carries no client/server authority check at all — there is no `NETWORK_InClientMode()` call, no early-return-if-client logic, and no server/client split anywhere in the function or the `P_Thing_Raise` helper (`src/playsim/p_things.cpp:437-483`) it calls for each sibling. UZDoom/GZDoom-family engines have no server-authoritative vs. client-predicted execution model for action functions at all, so both the "Early exit if client" step in the Behavior list above and the entire "Network behavior" section above (early exit on clients, server-side-only resurrection) are Zandronum-only concepts: on UZDoom, `A_RaiseSiblings` iterates every actor sharing the caller's master and calls `P_Thing_Raise` on each unconditionally, regardless of network state.
+
+## Engine-family divergence: flags parameter matches the wiki
+
+**UZDoom's `A_RaiseSiblings` takes an optional `int` flags argument (defaulting to 0)** — declared on the `Actor` class in the ZScript stdlib (`wadsrc/static/zscript/actors/actor.zs:1351`) — unlike Zandronum's no-argument version. The flag forwards straight through to `P_Thing_Raise`, and both wiki-documented flags are implemented exactly as described:
+
+- **`RF_NOCHECKPOSITION`** (value 2, `src/playsim/p_local.h:474`) — skips the `P_CheckPosition` room check entirely, so the sibling is revived at its stored position even if something would otherwise block it.
+- **`RF_TRANSFERFRIENDLINESS`** (value 1, `src/playsim/p_local.h:473`) — after reviving the sibling, copies the raiser's team/friendliness onto it via `AActor::CopyFriendliness`. Only takes effect when the raiser (the calling actor) is non-null.
+
+This means the "Zandronum difference from ZDoom Wiki" section below is Zandronum-specific: on UZDoom the wiki's parameter set is fully implemented, not a description of an unported feature. One additional UZDoom-only gate beyond what the wiki documents: `P_Thing_Raise` also runs the resurrection past `P_CanResurrect` (`src/playsim/p_enemy.cpp:2730`), which lets either the raiser or the sibling veto the resurrection through its own virtual ZScript `CanResurrect` override — each actor's override, if it has one, is asked in turn (the raiser's first, then the sibling's, with a flag distinguishing which role is being asked about) and can refuse the resurrection; an actor with no override always allows it, so this gate is a no-op unless a mod defines one. Zandronum's simpler `P_Thing_Raise` has no equivalent hook.
 
 ## Zandronum difference from ZDoom Wiki
 

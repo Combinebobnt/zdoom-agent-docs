@@ -1,15 +1,17 @@
 # `Inventory`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `Classes:Inventory` (retrieved 2026-08-01, oldid=53243) + verified against Zandronum source (`src/g_shared/a_pickups.h` lines 145–223, `src/g_shared/a_pickups.cpp`).
-**Bucket:** Native C++ class (`class AInventory : public AActor` in `src/g_shared/a_pickups.h:145`).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `Classes:Inventory` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=Classes%3AInventory&oldid=53243) + verified against Zandronum source (`src/g_shared/a_pickups.h` lines 145–223, `src/g_shared/a_pickups.cpp`).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** native C++ class in Zandronum (`class AInventory : public AActor` in `src/g_shared/a_pickups.h:145`); ZScript class in UZDoom (`wadsrc/static/zscript/actors/inventory/inventory.zs:27`; `class Inventory : Actor`, an ordinary scripted class — DECORATE-only fields like `ItemFlags` carry a `deprecated` marker but remain present for compatibility).
 
 The base class for all inventory items — pickups that can be collected, dropped, and carried in a player or monster's inventory. This is the parent class for all item types: Ammo, Armor, Health, Keys, Weapons, PowerUps, and custom inventory items. Any actor inheriting from `Inventory` becomes a functional pickup item but produces no special effects by itself; effects are defined by subclasses.
 
 ## ZScript methods are not applicable
 
-The wiki's "Methods" section documents ZScript virtuals (DECORATE only exists on Zandronum; ZScript was added to GZDoom-family engines). Zandronum DECORATE authors cannot override any of these methods — they are internal C++ engine behavior only. The sections below describe those behaviors as they affect modding in DECORATE, not as an overridable API.
+The wiki's "Methods" section documents ZScript virtuals. On Zandronum, DECORATE is the only actor-definition format that exists at all, and its authors cannot override any of these methods — they are internal C++ engine behavior only. On UZDoom, DECORATE lumps are still parsed and loaded (`src/scripting/decorate/thingdef_parse.cpp`), translated at load time into the same native `Inventory` ZScript class described below — but DECORATE syntax itself still has no mechanism to override a virtual method, so a DECORATE author on UZDoom is in exactly the same position as one on Zandronum: these are non-overridable engine behavior from DECORATE, only overridable by writing an actual ZScript subclass. The sections below describe those behaviors as they affect modding in DECORATE, not as an overridable API.
 
 ## Core pickup lifecycle
 
@@ -103,6 +105,20 @@ The pickup process follows this order:
 
 **Map resets (Survival/LMS):** When a map resets and an item is level-spawned but not configured to respawn regularly (no `DF_ITEMS_RESPAWN`), the item is moved to `HideIndefinitely` instead of the normal hide state. This preserves the item for map-reset respawning without respawning mid-game.
 
+## Zandronum-specific: map-reset item persistence (`HideIndefinitely`, `GMF_MAPRESETS`)
+
+Confirmed against UZDoom's `Inventory` ZScript class: this entire mechanism has no UZDoom
+equivalent, not even as a stub. UZDoom's `GoAway()`/`GoAwayAndDie()` have no branch analogous to
+Zandronum's `STFL_LEVELSPAWNED`/`GMF_MAPRESETS` check — Zandronum's `GoAway()` calls
+`HideIndefinitely()` and Zandronum's `GoAwayAndDie()` sets a `HideIndefinitely` state directly when
+that condition holds; UZDoom's versions of both methods only ever choose between "stay" and the
+normal `Hide()`/destroy path. UZDoom also has no `HideIndefinitely` state defined on `Inventory` at
+all (only `HideDoomish`/`HideSpecial`/`Held`/`HoldAndDestroy`), and `ShouldRespawn()` on UZDoom has
+no equivalent of Zandronum's survival-mode `IF_FORCERESPAWNINSURVIVAL` early-return. Worth keeping
+for porting work: a DECORATE actor that depends on surviving an LMS/Survival map reset via this
+path has no direct UZDoom translation and would need reimplementing against whatever level-reset
+hooks UZDoom's own game modes expose (not investigated here — out of scope for this file).
+
 ## Methods used by subclasses
 
 **`bool Use(bool pickup)`** — Called when the item is used (from inventory or during autoactivate pickup). Default returns false (item has no use). Subclasses override to define behavior (e.g., weapons change to ready state, health pickups heal).
@@ -117,7 +133,7 @@ The pickup process follows this order:
 
 **`AInventory *CreateTossable()`** — Creates a copy for dropping. Returns NULL if the item can't be dropped (has `IF_UNDROPPABLE`/`IF_UNTOSSABLE` or `Amount <= 0`). Returns `this` if only one remains, otherwise spawns a copy with `Amount = 1`. **Zandronum-specific behavior:** In client mode, the client updates the local amount but does not spawn; the server sends the spawned actor separately.
 
-**`void Travelled()`** — Called when the item's owner moves to another map (hub or non-hub). Used for special cleanup or reinitalization.
+**`void Travelled()`** — Called when the item's owner moves to another map (hub or non-hub). Used for special cleanup or reinitalization. Default body is empty on both engines.
 
 **`void OwnerDied()`** — Called when the owner dies, allowing the item to react (e.g., some powerups end, some persist).
 
@@ -131,13 +147,52 @@ Zandronum's virtual method signatures differ from the wiki's ZScript originals:
 - `GetSpeedFactor()` — Returns `fixed_t`, not `double`.
 - `CreateTossable()` — Takes no arguments (not `int amt`).
 
-Zandronum-only virtual methods (not on the wiki):
+Methods this file previously labeled "Zandronum-only (not on the wiki)" — re-checked directly
+against UZDoom's `Inventory` ZScript class (`wadsrc/static/zscript/actors/inventory/inventory.zs`)
+rather than against wiki coverage. Three of the five actually exist on UZDoom too; only the last
+two are genuinely engine-specific to Zandronum:
 
-- `bool DrawPowerup(int x, int y)` — Allows powerup-specific HUD drawing.
-- `bool Grind(bool items)` — Called when the item is crushed; returns true if destroyed.
-- `void MarkPrecacheSounds()` — Precache sounds the item uses.
-- `AInventory *PrevItem()` — Returns the previous item in the global inventory list.
-- `const char *PickupAnnouncerEntry()` — Zandronum-specific; returns the announcer entry for the pickup.
+- `bool DrawPowerup(int x, int y)` — exists on UZDoom, but as `virtual ui version("2.4")
+  bool DrawPowerup(int x, int y)`: `ui`-scoped (callable only from UI-context code, e.g. HUD
+  drawing) and gated behind ZScript version 2.4.
+- `bool Grind(bool items)` — exists on UZDoom with an identical signature and near-identical body
+  (dropped items with `bDontGib` unset are destroyed; non-dropped items fall through to
+  `Actor.Grind`).
+- `void MarkPrecacheSounds()` — exists on UZDoom with an identical signature.
+- `AInventory *PrevItem()` — confirmed absent from UZDoom's `Inventory` class and not found
+  anywhere else in the UZDoom source tree. Genuinely Zandronum-only; UZDoom only exposes
+  `NextInv()`/`PrevInv()` (which walk the `IF_INVBAR`-flagged subset, not the full raw list).
+- `const char *PickupAnnouncerEntry()` — the *method* is confirmed absent from UZDoom. The
+  `Inventory.PickupAnnouncerEntry` DECORATE *property* does still parse on UZDoom
+  (`DEFINE_CLASS_PROPERTY(pickupannouncerentry, S, Inventory)` in
+  `src/scripting/thingdef_properties.cpp`) but is an explicitly-commented no-op ("Dummy for
+  Skulltag compatibility...") — it accepts the string and discards it. A DECORATE actor ported
+  from Zandronum that relies on this property for announcer callouts will compile silently on
+  UZDoom and produce no announcer sound at all.
+
+## Engine-family divergence: CreateTossable amount parameter
+
+Zandronum's `CreateTossable()` takes no arguments and always drops either one unit (spawning a
+copy with `Amount = 1` and decrementing the original) or, if only one unit remains, the item
+itself. UZDoom's `Inventory::CreateTossable(int amt = -1)` additionally accepts an explicit amount
+to drop: `amt` is clamped to `[1, Amount]`, and if it equals the full remaining `Amount` (and
+`bKeepDepleted` isn't set) the item becomes the pickup itself rather than spawning a copy —
+otherwise a copy with `Amount = amt` is spawned and the original is reduced by `amt`. Code that
+calls `CreateTossable()` with no arguments behaves the same on both engines (drops one unit); the
+partial-stack drop behavior is a UZDoom-only addition with no Zandronum equivalent.
+
+## Engine-family divergence: `Travelled()` hook location
+
+Zandronum declares `Travelled()` directly on `AInventory` (`src/g_shared/a_pickups.h:204`, empty
+default body). UZDoom's `Inventory` class does not redeclare `Travelled()` at all — it inherits an
+identical empty-body `virtual void Travelled() {}` from the common `Thinker` base class
+(`wadsrc/static/zscript/doombase.zs:287`), alongside a `PreTravelled()` counterpart
+(`doombase.zs:278`) that has no `AInventory` equivalent on Zandronum. Both engines run the hook at
+the same point (a carried-over item on hub/level travel) and both default to a no-op, so overriding
+`Travelled()` in a subclass behaves identically either way — the divergence is only that UZDoom
+generalized level-travel hooks to every `Thinker`, not just inventory items, per that engine's
+level-traveling rework, and offers the additional pre-travel hook `Inventory` subclasses can use on
+UZDoom but not on Zandronum.
 
 For complete details on properties, flags, and subclasses, see the concepts docs on
 [creating monsters](../concepts/creating-monsters.md) (`DropItem`, monster-carried inventory) and

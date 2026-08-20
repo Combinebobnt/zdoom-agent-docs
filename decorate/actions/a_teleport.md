@@ -1,19 +1,31 @@
 # `A_Teleport` (actor teleportation)
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (limited feature set; UZDoom/GZDoom-family have significantly more flags and options)
-**Provenance:** ZDoom Wiki `A_Teleport` (retrieved 2026-08-01, oldid=44219) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:5221-5289`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_Teleport` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_Teleport&oldid=44219) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:5221-5289`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_Teleport)` in `src/thingdef/thingdef_codeptr.cpp`.
 
 Attempts to teleport the calling actor to a random `SpecialSpot`-derived actor (or any actor type specified via `targettype`) within a specified distance range. On successful teleport, spawns a fog actor at the departure location and optionally jumps the actor to a specified state. Fails silently (no state jump) if no valid spot is found or if the target state does not exist.
 
-## Engine divergence (important)
+## Engine-family divergence
 
 **Zandronum vs. UZDoom/GZDoom-family:** The wiki page describes ZDoom/UZDoom behavior, which includes many flags and parameters that **do not exist in Zandronum 3.2.1**. See "Zandronum-only parameters and flags" below. If you are writing DECORATE for Zandronum, only use the listed flags and parameters; others will be silently ignored or cause compilation errors.
 
+(Verified directly against UZDoom's own `A_Teleport` implementation, not just the wiki: every flag and the `ptr` parameter listed below as wiki-only does in fact exist in UZDoom's `T_Flags`/parameter declarations — see the further divergences below for behavioral specifics the wiki page and this file's Zandronum-only sections don't otherwise surface.)
+
+## Engine-family divergence: fog spawning, state-jump gating, and network authority
+
+Three further Zandronum-vs-UZDoom behavioral differences, found verifying `A_Teleport`'s own UZDoom implementation directly (`src/playsim/p_actionfunctions.cpp`) rather than inferred from the flag-existence list above:
+
+- **Destination fog also spawns by default on UZDoom.** With `flags=0` and the default `fogtype` of `TeleportFog`, UZDoom's implementation spawns a fog actor at *both* the departure location (unless `TF_NOSRCFOG`) and the arrival location (unless `TF_NODESTFOG`). Zandronum's implementation (see "Teleportation process" below) only ever spawns a fog at the departure location — it has no destination-fog spawn at all, consistent with `TF_NODESTFOG` not existing there.
+- **A missing/invalid `teleportstate` blocks the move itself on Zandronum, but not on UZDoom.** Zandronum resolves `teleportstate` (falling back to a "Teleport" state, then failing) *before* it ever searches for a spot or attempts the move — no valid state means the actor never teleports at all. UZDoom resolves `teleport_state` *after* the move, fog spawn, and Z/angle/velocity updates have already happened (inside the post-move success branch, immediately before the state jump) — so on UZDoom the actor does teleport (new position, fog, zeroed velocity, facing the spot) even with no valid target state; only the state jump itself is skipped. The "Fails silently... if... the target state does not exist" framing in this file's intro and "Teleportation process" section is accurate for Zandronum only.
+- **No client/server authority split on UZDoom.** Zandronum's implementation gates the whole function behind a client-mode check so only the server ever executes it (see "Network behavior" below). UZDoom's implementation has no equivalent check and runs unconditionally wherever it's called, consistent with UZDoom having no client/server authority split anywhere in its source tree.
+
 ## Signature (Zandronum)
 
-```
+```text
 state, bool A_Teleport(state teleportstate = NULL, class targettype = BossSpot, 
                        class fogtype = TeleportFog, int flags = 0, 
                        fixed mindist = 0, fixed maxdist = 0)
@@ -121,9 +133,13 @@ By default, Zandronum respects the `NOTELEPORT` actor flag — an actor with thi
 
 If the destination spot's Z position would place the actor inside a solid (floor or ceiling), Zandronum automatically adjusts the Z position upward to clear the obstruction. There is no `TF_SENSITIVEZ` flag to change this behavior — Zandronum always does the adjustment (the wiki's flag would make it fail instead).
 
+### No `PreTeleport`/`PostTeleport` interception (UZDoom)
+
+UZDoom's `Actor` base class declares `PreTeleport`/`PostTeleport` virtuals (`wadsrc/static/zscript/actors/actor.zs`) that can cancel or react to a teleport — but they are invoked only by `FLevelLocals::EV_Teleport` (`src/playsim/p_teleport.cpp`), the line/sector-teleporter and ACS `Teleport()`-special code path. `A_Teleport` never calls `EV_Teleport`; it moves the actor directly via the lower-level `P_TeleportMove()` primitive (`src/playsim/p_map.cpp`), which has no hook calls at all. This does **not** carry over the ACS-side `Teleport()` special's documented `PreTeleport`/`PostTeleport` cancellation behavior: overriding `PreTeleport` to return `false`, or overriding `PostTeleport`, has no effect on a DECORATE `A_Teleport()` call, on UZDoom or otherwise.
+
 ## Example (Zandronum DECORATE)
 
-```
+```text
 actor TeleportImp : DoomImp 601
 {
   States

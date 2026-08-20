@@ -10,9 +10,9 @@ that needs a source you haven't configured will say so and ask, rather than gues
 
 | Key | What it is | Your local path |
 |---|---|---|
-| `zandronum` | Zandronum engine C++ source — the primary engine target across this tree (see `shared/AUTHORING.md`'s "Engine scope") | |
-| `uzdoom` | UZDoom engine C++ source — a GZDoom-family fork; the local ZScript source of record (`zscript/`), and used for DECORATE/MAPINFO/etc. divergence from Zandronum. **GPL-3.0** — read freely, never quote verbatim (see `shared/AUTHORING.md`) | |
+| `uzdoom` | UZDoom engine C++ source — the primary engine target across this tree (see `shared/AUTHORING.md`'s "Engine scope"); a GZDoom-family fork, and the local ZScript source of record (`zscript/`). **GPL-3.0** — read freely, never quote verbatim (see `shared/AUTHORING.md`) | |
 | `gzdoom` | GZDoom engine C++ source proper — not currently checked out anywhere in this project's environment; UZDoom is used as the nearest available GZDoom-family stand-in. Also **GPL-3.0**, same quoting restriction as `uzdoom` | |
+| `zandronum` | Zandronum engine C++ source — co-equal and fully verified secondary engine target (the version consuming projects currently ship on); used for DECORATE/MAPINFO/etc. divergence from UZDoom | |
 | `zt-bcc` | zt-bcc/bcc — an ACS-superset compiler; this tree's current compiler target | |
 | `zt-bcc.wiki` | zt-bcc's wiki (BCS language reference: Grammar, Declarations, Types, Functions, ...) | |
 | `acc` | The original ACC compiler — an alternative to zt-bcc/bcc serving the same role (compiling ACS source), relevant when a question is about base-ACS behavior rather than a BCS-specific extension. **Not open source** (restrictive 1999 Raven Software EULA, never relicensed under GPL like Heretic/Hexen were) — read it to understand behavior and describe that behavior in your own words, but never copy any of its code into a doc file's fenced block. See `shared/AUTHORING.md`'s "Never quote `acc` source verbatim." | |

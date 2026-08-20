@@ -1,9 +1,20 @@
 # `int SetPlayerProperty(int who, int set, int which)`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `SetPlayerProperty - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
+`https://zdoom.org/w/index.php?title=SetPlayerProperty&oldid=52943`) + source-verified against `p_lnspec.cpp:2987-3216`, `d_player.h:227-251`,
+`doomdef.h:539`, `compatibility.cpp:108`, `zt-bcc/lib/zcommon.bcs:119-138,1530`.
+`BCOMPATF_LINKFROZENPROPS`-introducing commit (`5af1e6f734b`, 2013-07-02) confirmed to predate the
+3.2.1 version-bump commit (`28f736fb3`). `PROP_BUDDHA2`/`PROP_GODMODE2` confirmed absent from
+`d_player.h`'s cheat enum (not just unwired) by direct grep, distinguishing them from
+`PROP_FRIGHTENING`/`PROP_NOCLIP`/`PROP_NOCLIP2`/`PROP_GODMODE` (bit exists, switch case doesn't).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** action special (positive index).
+
 Action special (index 191, the zt-bcc source's `lib/zcommon.bcs:1530`), implementation in
 `FUNC(LS_SetPlayerProperty)` (the Zandronum source's `src/p_lnspec.cpp:2987-3216`).
-
-**Bucket:** action special (positive index).
 
 - `who` — `0` affects only the activator, nonzero affects every in-game, non-spectating player.
 - `set` — nonzero turns the property on / gives it, `0` turns it off / takes it away. Exception:
@@ -43,7 +54,7 @@ Zandronum. Splitting the full enum by actual engine behavior:
 - **`PROP_UNUSED1`/`PROP_UNUSED2` (13, 14) are explicitly guarded no-ops** — the `powers[]` lookup
   table has `NULL` at both indices and the function returns `false` before doing anything
   (`p_lnspec.cpp:3005-3008`). Matches the wiki's own "Does nothing. Do not use."
-- **`PROP_BUDDHA2` (17) and `PROP_GODMODE2` (22) don't exist in this fork at all** — there is no
+- **`PROP_BUDDHA2` (17) and `PROP_GODMODE2` (22) don't exist in Zandronum at all** — there is no
   `CF_BUDDHA2`/`CF_GODMODE2` bit anywhere in `d_player.h`'s cheat enum. These are newer upstream
   ZDoom values the wiki documents that Zandronum never implemented; passing them falls through
   the property switch with no matching `case`, so `mask` stays `0` and the call is a **silent
@@ -54,9 +65,39 @@ Zandronum. Splitting the full enum by actual engine behavior:
   `CF_NOCLIP2`, `CF_GODMODE`) *do* exist and work elsewhere in the engine (console `god`/`noclip`
   commands, netevent cheats) — but `LS_SetPlayerProperty`'s `switch (arg2)` (`p_lnspec.cpp:3006-3024`)
   simply has no `case` for any of them.** Same silent-no-op outcome as `PROP_BUDDHA2`/`PROP_GODMODE2`,
-  but this one isn't "feature doesn't exist in this fork" — the feature exists, this specific
+  but this one isn't "feature doesn't exist in Zandronum" — the feature exists, this specific
   action special just never wires it up. There is no substitute call in this special for setting
   these from ACS.
+
+## Engine-family divergence: the "these five PROP_* values are dead" claims above are Zandronum-only
+
+UZDoom wires up every property this doc lists above as a Zandronum-only no-op or Zandronum-absent
+value. Its `LS_SetPlayerProperty` switch (UZDoom's `src/playsim/p_lnspec.cpp`, function starting
+around line 2911) has explicit cases for `PROP_BUDDHA2` and `PROP_GODMODE2` mapping to their own
+cheat-flag bits, and separate explicit cases for `PROP_FRIGHTENING`, `PROP_NOCLIP`, `PROP_NOCLIP2`,
+and `PROP_GODMODE`, each mapping to the matching cheat-flag bit (`PROP_NOCLIP2` sets both the
+regular and "2" noclip bits together, mirroring how the console `noclip2` cheat works). All of the
+underlying bits this doc names as "exist elsewhere but never wired here" (`src/playsim/d_player.h`
+in UZDoom) are present and are reachable through this special on UZDoom:
+
+- `SetPlayerProperty(who, set, PROP_BUDDHA2)` and `SetPlayerProperty(who, set, PROP_GODMODE2)`
+  actually toggle the "absolute" buddha/god cheat variants (the ones no voodoo-doll damage can
+  bypass), not a silent no-op.
+- `SetPlayerProperty(who, set, PROP_FRIGHTENING)`, `PROP_NOCLIP`, `PROP_NOCLIP2`, and `PROP_GODMODE`
+  actually toggle the same cheat state the equivalent console commands (`god`, `noclip`) drive, not
+  a silent no-op.
+
+Only `PROP_UNUSED1` (13) and `PROP_UNUSED2` (14) remain genuine no-ops on UZDoom, for the same
+reason as Zandronum: they fall inside the powerup-give/take index range but the lookup table has
+no class name at those slots, so the function bails out before doing anything. A script gated on
+"these five properties are always inert, only `PROP_UNUSED1`/`PROP_UNUSED2` are dead" — reasonable
+on Zandronum — silently starts having real, cheat-granting effects for five of those values the
+moment the same script runs on UZDoom.
+
+Separately, the "Spectators are always skipped" claim above doesn't transfer either — UZDoom has no
+spectator concept anywhere in its player/level state (nothing named "spectator" appears in UZDoom's
+source at all), so the all-players branch simply affects every player the engine considers
+in-game; there's no spectator state left for it to skip.
 
 ## `who != 0` has an extra compat-flag interaction that `who == 0` doesn't
 
@@ -71,7 +112,7 @@ bump (`28f736fb3`), so it's present at the current target engine, not a 3.3-alph
 **Example — the wiki's own toggle-freeze pattern, still idiomatic (`PROP_TOTALLYFROZEN` is not
 deprecated):**
 
-```
+```text
 void PlayerFreeze (bool isOn)
 {
     if (isOn)
@@ -85,12 +126,3 @@ void PlayerFreeze (bool isOn)
     }
 }
 ```
-
-**Provenance:** wiki page `SetPlayerProperty - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
-`oldid=52943`) + source-verified against `p_lnspec.cpp:2987-3216`, `d_player.h:227-251`,
-`doomdef.h:539`, `compatibility.cpp:108`, `zt-bcc/lib/zcommon.bcs:119-138,1530`.
-`BCOMPATF_LINKFROZENPROPS`-introducing commit (`5af1e6f734b`, 2013-07-02) confirmed to predate the
-3.2.1 version-bump commit (`28f736fb3`). `PROP_BUDDHA2`/`PROP_GODMODE2` confirmed absent from
-`d_player.h`'s cheat enum (not just unwired) by direct grep, distinguishing them from
-`PROP_FRIGHTENING`/`PROP_NOCLIP`/`PROP_NOCLIP2`/`PROP_GODMODE` (bit exists, switch case doesn't).
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.

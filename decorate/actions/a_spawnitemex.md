@@ -1,15 +1,17 @@
 # `A_SpawnItemEx` (spawning with position, velocity, and control flags)
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_SpawnItemEx` (retrieved 2026-07-31, oldid=52288) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:2591-2710` and `src/thingdef/thingdef_codeptr.cpp:2394-2510` (`InitSpawnedItem` helper). `SXF_TRANSFERAMBUSHFLAG` re-confirmed present and wired (`wadsrc/static/actors/constants.txt:56`, checked in `InitSpawnedItem`) 2026-08-01; `SXF_SETMASTER`/`SXF_TRANSFERPOINTERS`/originator target-override interaction re-traced the same day, resolving the prior "open question" below.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_SpawnItemEx` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_SpawnItemEx&oldid=52288) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:2591-2710` and `src/thingdef/thingdef_codeptr.cpp:2394-2510` (`InitSpawnedItem` helper). `SXF_TRANSFERAMBUSHFLAG` re-confirmed present and wired (`wadsrc/static/actors/constants.txt:56`, checked in `InitSpawnedItem`) 2026-08-01; `SXF_SETMASTER`/`SXF_TRANSFERPOINTERS`/originator target-override interaction re-traced the same day, resolving the prior "open question" below.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_SpawnItemEx)` in `src/thingdef/thingdef_codeptr.cpp`.
 
 Spawns an actor at specified offsets from the calling actor, with controllable velocity direction and a rich flag set for managing inheritance of properties (translation, pointers, pitch, scale, etc.) and spawning constraints.
 
 ## Signature
 
-```
+```text
 bool A_SpawnItemEx(class<Actor> missile, fixed xofs = 0, fixed yofs = 0, fixed zofs = 0,
                    fixed xvel = 0, fixed yvel = 0, fixed zvel = 0, angle angle = 0,
                    int flags = 0, int failchance = 0, int tid = 0)
@@ -154,9 +156,108 @@ The originator is used by `InitSpawnedItem` to:
 
 - **Monster spawn restrictions:** If `DamageType == NAME_Massacre` on the calling actor and the spawned actor is monster-based, the spawn is skipped entirely (before `ACTION_SET_RESULT` is set). This prevents re-spawning during a player-wipe death.
 
+## Engine-family divergence: `SXF_SETMASTER` has no monster-based gating on UZDoom
+
+On Zandronum, `mo->master = originator` for `SIXF_SETMASTER` is nested two levels deep: it only
+runs inside the `mo->flags3 & MF3_ISMONSTER` branch, and only inside the further
+`originator->flags3 & MF3_ISMONSTER` sub-branch (see "Precise conditions" above) — a
+player-type originator or a non-monster spawned actor makes the flag a no-op.
+
+On UZDoom, the equivalent `if (flags & SXF_SETMASTER) { mo.master = originator; }` check sits
+**after** the whole monster/originator `if`/`else` block, completely unconditional on either
+actor's monster-ness. `mo.master` is set to `originator` whenever the flag is passed — including
+when the spawned actor is not a monster, when the originator is a player, or (if the missile
+target chain bottoms out) even when `originator` is `null`. The "if the originator is a player,
+`SXF_SETMASTER` has no effect at all" carve-out documented above for Zandronum does not hold on
+UZDoom.
+
+## Engine-family divergence: several wiki-documented flags absent from Zandronum are real and wired on UZDoom
+
+The "NOT present in Zandronum" flags listed above — `SXF_TRANSFERALPHA`, `SXF_TRANSFERRENDERSTYLE`,
+`SXF_SETTARGET`, `SXF_SETTRACER`, `SXF_NOPOINTERS`, `SXF_ORIGINATOR`, `SXF_TRANSFERSPRITEFRAME`,
+`SXF_TRANSFERROLL`, `SXF_ISTARGET`, `SXF_ISMASTER`, `SXF_ISTRACER` — all exist as real bit values
+on UZDoom and are checked and acted on in its `InitSpawnedItem` helper, matching the wiki:
+
+- `SXF_TRANSFERALPHA` / `SXF_TRANSFERRENDERSTYLE` copy the calling actor's `Alpha` / `RenderStyle`
+  to the spawned actor.
+- `SXF_SETTARGET` / `SXF_SETTRACER` set the spawned actor's `target` / `tracer` to the originator —
+  same "originator" concept described above, and same unconditional-on-monster-ness placement as
+  `SXF_SETMASTER`'s UZDoom behavior (see previous section).
+- `SXF_NOPOINTERS` clears `LastHeard`, `target`, `master`, and `tracer` on the spawned actor. It is
+  applied after `SXF_TRANSFERPOINTERS` (so it overrides that flag) but before `SXF_SETMASTER`/
+  `SXF_SETTARGET`/`SXF_SETTRACER` (so those, if also passed, override `SXF_NOPOINTERS` in turn). It
+  also suppresses the monster-friendliness/`CopyFriendliness`/attacker-target-override block
+  entirely (that block is additionally guarded by `!(flags & SXF_NOPOINTERS)` on UZDoom, a guard
+  Zandronum's equivalent block has no counterpart for).
+- `SXF_ORIGINATOR` skips the missile-target-chain walk that normally computes the "originator" (see
+  "Originator concept" above), leaving the originator as the calling actor itself. Zandronum always
+  performs this walk unconditionally with no way to opt out.
+- `SXF_TRANSFERSPRITEFRAME` copies the calling actor's current `sprite`/`frame` to the spawned actor.
+- `SXF_TRANSFERROLL` copies the calling actor's `Roll` to the spawned actor.
+- `SXF_ISTARGET` / `SXF_ISMASTER` / `SXF_ISTRACER` point the *calling* actor's own `target` /
+  `master` / `tracer` at the newly spawned actor (the inverse direction of `SXF_SETTARGET`/
+  `SXF_SETMASTER`/`SXF_SETTRACER`).
+
+Passing any of these eleven flags in Zandronum DECORATE still has no effect there, per the existing
+note above — this section is UZDoom-only behavior.
+
+## Engine-family divergence: return value includes the spawned actor pointer on UZDoom
+
+The "Return value" section above documents Zandronum setting only a single boolean result, in
+contrast to the wiki's documented two-value return. UZDoom's `A_SpawnItemEx` is declared
+`bool, Actor A_SpawnItemEx(...)` and really does return both values — the success boolean and a
+direct reference to the spawned actor (`null` when the spawn didn't produce one) — matching the
+wiki, not the single-bool Zandronum behavior described above.
+
+## Engine-family divergence: failchance/massacre skips always set an explicit result on UZDoom
+
+Zandronum's `failchance` early-return and its massacre-check early-return (see "Monster spawn
+restrictions" below) both `return` without calling `ACTION_SET_RESULT`, so the action's result slot
+is left at whatever it was before the call — the behavior the "Return value" section above
+describes as "not updated."
+
+UZDoom has no such carryover concept: both the `failchance` skip and the massacre skip are plain
+`return true, null;` statements, so the result is always explicitly `true` (with a `null` actor
+reference) in both cases, never a leftover prior value. Code that relies on Zandronum's
+"result unchanged on a chance-skipped spawn" behavior to distinguish that case from a real spawn
+does not work the same way on UZDoom — both a successful spawn and a chance/massacre skip can
+return `true`; only the `Actor` half of the return value distinguishes them (`null` for a skip,
+non-null for an actual spawn — actual-spawn failure from a blocked monster space check does still
+return `false`).
+
+## Engine-family divergence: no client/server split — `SXF_CLIENTSIDE` is inert on UZDoom
+
+Zandronum's `SXF_CLIENTSIDE` flag and the entire "Zandronum-specific networking behavior" section
+above (server-authoritative spawn gating via `NETWORK_ShouldActorNotBeSpawned`, `SERVERCOMMANDS_*`
+broadcast on success, `NETFL_CLIENTSIDEONLY`) are Zandronum/Skulltag-only mechanisms. UZDoom's
+source still declares the `SXF_CLIENTSIDE` bit constant (carrying over its original "only used by
+Skulltag" comment), but neither `InitSpawnedItem` nor `A_SpawnItemEx` ever test it — the flag
+compiles and is silently accepted but has zero effect on UZDoom. This matches the general pattern
+that UZDoom's source tree has no client/server authority split anywhere.
+
+## Engine-family divergence: value types are `double`, not fixed-point, on UZDoom
+
+The "Note on types" above already flags that the ZDoom Wiki's signature uses `double` rather than
+Zandronum's `fixed`. UZDoom's actual parameter types confirm the wiki's form: `xofs`/`yofs`/`zofs`,
+`xvel`/`yvel`/`zvel`, and `angle` are all native `double`, and the offset/velocity rotation math
+uses ordinary floating-point `sin`/`cos` rather than Zandronum's `finesine`/`finecosine` fixed-point
+lookup tables. The offset and velocity rotation formulas themselves (including the "negative y
+means left" relative-mode orientation) are otherwise identical between the two engines.
+
+## Engine-family divergence: `tid` reassignment does not assert on UZDoom
+
+The `tid` parameter's description above notes Zandronum asserts the spawned actor's TID is 0 before
+assigning the parameter value, with undefined behavior (an assertion failure in debug builds) if
+that assumption doesn't hold. UZDoom assigns `tid` via the general-purpose `ChangeTid` method
+instead, which unconditionally removes the actor from the TID hash first and then re-adds it under
+the new TID — there is no precondition on the actor's prior TID being 0, and no assertion. A
+spawned actor class that already carries a nonzero default TID is reassigned cleanly on UZDoom,
+resolving what the "Open questions" section below flags as untraced for Zandronum specifically —
+that section's question is Zandronum-only; it does not apply to UZDoom's implementation.
+
 ## Example (Zandronum DECORATE)
 
-```
+```text
 actor PoisonCloud
 {
     // Properties omitted for brevity

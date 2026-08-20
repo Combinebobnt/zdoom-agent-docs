@@ -1,15 +1,17 @@
 # `void StopSound(int tid, int channel)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (checked out source reports 3.3-alpha; `ACSF_StopSound` and its `SERVERCOMMANDS_StopSound`/looping-channel bookkeeping are long-standing core sound plumbing, not a netcode feature postdating 3.2.1, so this is not expected to be version-sensitive).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `StopSound - ZDoom Wiki` (https://zdoom.org/w/index.php?title=StopSound&oldid=40903), verified 2026-07-29 against fork source.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
 
 Stops a currently-playing sound on a given channel for the actor(s) matching `tid`. Extension
 function (`ACSF_StopSound`, index `-62` in the zt-bcc source's `lib/zcommon.bcs:1690`), implementation
 in `DLevelScript::CallFunction`, the Zandronum source's `src/p_acs.cpp:6556-6591`.
 
-- `tid` — **`0` means "the script's activator"** (`p_acs.cpp:6560`: `if (args[0] == 0) S_StopSound(activator, chan);`), same zero-means-activator convention as other actor-targeting functions in this fork.
+- `tid` — **`0` means "the script's activator"** (`p_acs.cpp:6560`: `if (args[0] == 0) S_StopSound(activator, chan);`), same zero-means-activator convention as other actor-targeting functions across both engines.
 - **`tid=0` with no activator is verified safe — no NULL guard needed.** `S_StopSound(activator,
   chan)` is called with no NULL check on `activator`, but `S_StopSound(AActor*, int)`
   (`s_sound.cpp:1582-1596`) only ever compares `chan->Actor == actor` for pointer identity — it

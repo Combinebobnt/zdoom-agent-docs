@@ -1,8 +1,10 @@
 # `void A_DamageTarget(int amount [, name damagetype [, int flags [, class<Actor> filter [, name species [, int src [, int inflict]]]]]])`
 
 **Tier:** A
-**Engine:** UZDoom 4.15pre / GZDoom-family — does not exist in Zandronum
-**Provenance:** ZDoom Wiki `A_DamageTarget` (retrieved 2026-08-01, oldid=46968) + verified against the UZDoom source's `src/playsim/p_actionfunctions.cpp:3985-4002`.
+**Applies to:** UZDoom=yes, Zandronum=no
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15)
+**Provenance:** ZDoom Wiki `A_DamageTarget` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_DamageTarget&oldid=46968) + verified against the UZDoom source's `src/playsim/p_actionfunctions.cpp:3985-4002`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_DamageTarget)` in the UZDoom source's `src/playsim/p_actionfunctions.cpp:3985`.
 
 Damages the calling actor's target pointer by a specified amount. Negative amounts heal instead. This function cannot be used in Zandronum — only GZDoom-family engines (UZDoom, GZDoom) implement it. **See "Zandronum alternatives" below** if you are targeting Zandronum.
@@ -82,6 +84,6 @@ If the target's health is already 0 or below, or if it is otherwise already dead
 - **`A_GiveToTarget`** — gives inventory items to the target (UZDoom/GZDoom-family only).
 - **`A_TakeFromTarget`** — removes inventory items from the target (UZDoom/GZDoom-family only).
 
-## Engine availability
+## Engine-family divergence
 
 This action exists only in UZDoom/GZDoom-family engines (GZDoom 2.3.1+, UZDoom 4.15pre+). It does not exist in Zandronum, which provides only the Master/Children/Siblings damage variants without advanced filtering or control-pointer parameters. **Zandronum users cannot compile or use `A_DamageTarget`** — attempting to call it will result in a parse error ("unknown action function").

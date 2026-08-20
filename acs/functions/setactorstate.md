@@ -1,11 +1,19 @@
 # `int SetActorState(int tid, str statename, bool exact = false)`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `SetActorState - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
+`https://zdoom.org/w/index.php?title=SetActorState&oldid=36009`) + source-verified against `p_acs.cpp:12604-12652`, `p_states.cpp:217-317`,
+`p_mobj.cpp:502-560`, `zt-bcc/src/builtin.c:151`. No wiki/fork behavioral divergence found beyond
+the Zandronum-only netcode replication call noted above (an addition, not a contradiction).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** compiler builtin.
+
 Forces the actor(s) matching `tid` into a DECORATE state, found by label name. Compiler builtin
 (`PCD_SETACTORSTATE`, the Zandronum source's `src/p_acs.cpp:12604-12652`), backed by
 `FActorInfo::FindStateByString`/`FindState` (`p_states.cpp:274-317`) and `AActor::SetState`
 (`p_mobj.cpp:502`).
-
-**Bucket:** compiler builtin.
 
 - `tid` — **`0` means "the activator"**, matching the same convention as `GetActorProperty` and
   other actor-targeting builtins. If `tid == 0` and there is no activator (e.g. called from a
@@ -28,7 +36,7 @@ Forces the actor(s) matching `tid` into a DECORATE state, found by label name. C
   is used instead (e.g. `"Foo.Bar"` falls back to `"Foo"` if `"Foo.Bar"` doesn't exist). If `exact`
   is true, any leftover unmatched segments (`count < numnames`) make the whole lookup return
   `NULL` — i.e. the actor's state is left unchanged — even if a shorter prefix matched. This
-  confirms the wiki's description is accurate for this fork.
+  confirms the wiki's description is accurate for both the Zandronum and UZDoom engine forks.
 - **Return value** — the number of actors that actually changed state (0 or 1 for `tid == 0`, an
   arbitrary count for a shared `tid`), matching the wiki. If the state label doesn't resolve at
   all for a given actor (`FindState` returns `NULL`), that actor is simply skipped and not counted
@@ -44,17 +52,12 @@ actor's normal per-tic `think()`/`P_SetMobjState` cycle. For a monster still und
 therefore invoke a state's action pointer at a point in the actor's lifecycle the DECORATE author
 never expected (e.g. mid-attack, before `A_Chase` next runs), which is the concrete mechanism
 behind the wiki's "refrain from using this for actors with monster AI" caution — this held up
-against the fork's actual `SetState` implementation, not just wiki folklore.
+against both the Zandronum and UZDoom engine forks' actual `SetState` implementations, not just
+wiki folklore.
 
-## Zandronum-specific netcode note (not in the ZDoom wiki source)
+## Zandronum-specific: netcode note (not in the ZDoom wiki source)
 
 On a listen/dedicated server (`NETWORK_GetState() == NETSTATE_SERVER`), every successful state
 change triggers `SERVERCOMMANDS_SetThingFrame` to replicate the new frame to clients
 (`p_acs.cpp:12617-12618`, `12641-12642`) — this is a Zandronum multiplayer addition with no
 equivalent in the vanilla ZDoom wiki page this doc was sourced from.
-
-**Provenance:** wiki page `SetActorState - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
-`oldid=36009`) + source-verified against `p_acs.cpp:12604-12652`, `p_states.cpp:217-317`,
-`p_mobj.cpp:502-560`, `zt-bcc/src/builtin.c:151`. No wiki/fork behavioral divergence found beyond
-the Zandronum-only netcode replication call noted above (an addition, not a contradiction).
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.

@@ -1,10 +1,12 @@
 # SoundSequenceOnPolyobj
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** `SoundSequenceOnPolyobj - ZDoom Wiki.html` (zdoom.org, oldid=33052), verified against the Zandronum source on 2026-07-29.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** `SoundSequenceOnPolyobj - ZDoom Wiki.html` (zdoom.org, https://zdoom.org/w/index.php?title=SoundSequenceOnPolyobj&oldid=33052), verified against the Zandronum source on 2026-07-29.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
-```
+```text
 void SoundSequenceOnPolyobj(int polynum, str sndseq);
 ```
 
@@ -26,7 +28,7 @@ play only a single sequence at a time."
 
 The wiki's more specific claim — that a subsequent movement/rotation instruction on the same
 polyobject overrides the sequence started here (even with a silent/undefined sound) — also checks
-out against this fork: every polyobject movement thinker (`PolyDoor`, `PolyMove`, `PolyRotate`,
+out against Zandronum: every polyobject movement thinker (`PolyDoor`, `PolyMove`, `PolyRotate`,
 etc. in `po_man.cpp`, e.g. lines 622, 721, 856, 936, 1019, 1073, 1082) itself calls
 `SN_StartSequence(poly, poly->seqType, SEQ_DOOR, ...)` at the start of the move, again with the
 stop-previous default. So calling `SoundSequenceOnPolyobj` and then immediately issuing a
@@ -51,6 +53,6 @@ wiki's advice to call `SoundSequenceOnPolyobj` *after* the movement special inst
   different `SN_StartSequence` overload but shares the same stop-previous-then-start and
   silent-failure behavior. Not documented as a `families/*.md` group here; see this repo's
   `CLAUDE.md` "family-file collision guard" note if that changes later.
-- No divergence found between this fork and the ZDoom-wiki description beyond the additional
+- No divergence found between Zandronum and the ZDoom-wiki description beyond the additional
   detail (confirmed here, not stated on the wiki) that the silent-no-op failure mode covers both
   a bad string index and an unmatched polyobject tag equally.

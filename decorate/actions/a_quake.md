@@ -1,9 +1,11 @@
 # `A_Quake(int intensity, int duration, int damrad, int tremrad [, sound sfx])`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_Quake` (retrieved 2026-07-31, oldid=50609) + verified against
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_Quake` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_Quake&oldid=50609) + verified against
 the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:5308` and `src/g_shared/a_quake.cpp`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_Quake)`, defined in `src/thingdef/thingdef_codeptr.cpp:5308` and implemented via `P_StartQuake` in `src/g_shared/a_quake.cpp:170`.
 
 Creates an earthquake effect centered on the calling actor, dealing damage and applying tremor over a specified duration.
@@ -35,6 +37,11 @@ The `Radius_Quake` line special (Action 120) is similar but uses 64-unit tiles f
 - **A_QuakeEx** — The ZDoom wiki references a more advanced `A_QuakeEx` action with additional parameters for customizing quake behavior. This action **does not exist in Zandronum**; it is a GZDoom/UZDoom-family extension only.
 - **Intensity parameter type** — ZDoom 4.11.0+ made intensity a float; Zandronum accepts only integers.
 - **Sound default** — ZDoom wiki describes a `"world/quake"` default; Zandronum has no default (omitting the parameter results in silent quake).
+- **Sound default confirmed on UZDoom** — UZDoom's `A_Quake` is declared `native void A_Quake(double intensity, int duration, double damrad, double tremrad, sound sfx = "world/quake")` in `wadsrc/static/zscript/actors/actor.zs`, so it does default to `"world/quake"` when `sfx` is omitted, matching the ZDoom wiki and unlike Zandronum's silent-by-default behavior above.
+- **Intensity clamp bounds** — UZDoom's `P_StartQuakeXYZ` (`src/playsim/mapthinkers/a_quake.cpp`) clamps intensity to `[0.0, 9.0]`, leaving `0` as `0`. Zandronum's `P_StartQuake` (`src/g_shared/a_quake.cpp`) clamps to `[1, 9]`, treating `0` as `1`. An `A_Quake` call with intensity 0 therefore still thrusts and shakes the screen on Zandronum (as intensity 1) but produces zero thrust and zero screen shake on UZDoom — the damage roll (which doesn't depend on intensity) still happens on both.
+- **Distance calculation** — Zandronum's `DEarthquake::Tick`/`StaticGetQuakeIntensity` (`src/g_shared/a_quake.cpp`) measure both the damage-radius and tremor-radius checks with `P_AproxDistance`, an octagonal approximation whose overestimate peaks at roughly 11.8% (not at a 45-degree offset, but nearer a 2:1 axis ratio) rather than being a fixed percentage. UZDoom's equivalents (`DEarthquake::DoQuakeDamage`/`StaticGetQuakeIntensities` in `src/playsim/mapthinkers/a_quake.cpp`) use true Euclidean `AActor::Distance2D` (or `Distance3D` if `QF_3D` were set, which `A_Quake`'s fixed `flags=0` never does). Net effect: a true circular damage/tremor radius on UZDoom versus a rounded-octagon radius on Zandronum that falls short of the circle by up to ~11.8% along some diagonal directions.
+- **No client/server authority split on UZDoom** — Zandronum's `DEarthquake` constructor explicitly checks `NETWORK_GetState() == NETSTATE_SERVER` and broadcasts `SERVERCOMMANDS_Earthquake` to clients (see the "Networking" behavior note above). UZDoom's `DEarthquake`/`P_StartQuakeXYZ` contain no equivalent server/client split anywhere in `src/playsim/mapthinkers/a_quake.cpp` — the server-authoritative mechanism the "Networking" note describes does not exist in UZDoom at all.
+- **Camera-shake magnitude and formula differ** — the per-axis intensity UZDoom feeds into its view-shake calculation is unconditionally doubled (a flat 2x multiply, regardless of quake flags) by `DEarthquake::GetModIntensity` before use, and the resulting shake is computed by a `QuakePower`-based formula in `src/rendering/r_utility.cpp`. Zandronum instead feeds the raw (undoubled) intensity through a modulo-based jitter around `pr_torchflicker()` in `src/r_utility.cpp`. Screen-shake amplitude and pattern for the same `intensity` argument are not equivalent between the two engines.
 
 ## See also
 

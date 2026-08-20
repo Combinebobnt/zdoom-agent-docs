@@ -1,6 +1,24 @@
 # `int SetActorFlag(int tid, str flagname, bool value)`
 
-**Compiles and links, but is dead in this fork's engine at every checked revision — including
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=no
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15)
+**Provenance:** wiki page `SetActorFlag - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
+`https://zdoom.org/w/index.php?title=SetActorFlag&oldid=45141`) + source-verified against the Zandronum source `master` HEAD
+(the Zandronum source's `src/p_acs.cpp:5357-5461,9059-9063`, `thingdef/thingdef.h:32`) and its git
+history (`2e8aa53e6`, confirmed not an ancestor of `master`). Wiki describes real upstream ZDoom
+behavior faithfully; the divergence is entirely on Zandronum's side (function never merged to
+Zandronum `master` / the 3.2.1 target) and is recorded above rather than silently assumed to work.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** extension function (declared as one; has no actual implementation to point to).
+
+**Implemented on UZDoom** (`case ACSF_SetActorFlag:` at `src/playsim/p_acs.cpp`): resolves the
+target actor(s) by `tid` (0 meaning the activator, matching this doc's other UZDoom-only entries'
+tid-0 convention), looks up the flag by name via the engine's `ModActorFlag` helper, and reports
+the count of actors actually modified as its `int` return value — a real per-actor loop, not the
+single-actor form the wiki's Zandronum-oriented phrasing might suggest.
+
+**Compiles and links, but is dead in Zandronum's engine at every checked revision — including
 the `master` HEAD that stands in for the 3.2.1 target.** Extension function, declared at
 the zt-bcc source's `lib/zcommon.bcs:1833` (`-202:SetActorFlag(int,str,bool):int`), so `bcc` happily
 accepts a call to it and emits `ACSF_SetActorFlag` (index 202) as the runtime call. But
@@ -11,8 +29,6 @@ all. The enum jumps straight from `ACSF_Warp = 92` to `ACSF_GetActorFloorTexture
 (`p_acs.cpp:5461`, comment `// [BB] Out of order ZDoom backport.`), silently skipping indices
 200–203 (`CheckClass`, `DamageActor`, `SetActorFlag`, `SetTranslation` in `zcommon.bcs`'s
 numbering) entirely — they were never backported to this branch.
-
-**Bucket:** extension function (declared as one; has no actual implementation to point to).
 
 ## What actually happens if you call it
 
@@ -43,25 +59,26 @@ string-flag-name overload of the internal `ModActorFlag` helper it would have ne
 bool)`, not a string-name-lookup version) — confirming this isn't a case of the feature existing
 under a different entry point, it's genuinely absent end-to-end.
 
-**Practical consequence:** there is no working way to set an arbitrary named actor flag from ACS
-in this fork. `CheckFlag` (`ACSF_CheckFlag`, `-75` in `zcommon.bcs`, implemented at
+**Practical consequence (Zandronum only — UZDoom just calls `SetActorFlag` directly, see above):**
+there is no working way to set an arbitrary named actor flag from ACS on Zandronum. `CheckFlag`
+(`ACSF_CheckFlag`, `-75` in `zcommon.bcs`, implemented at
 `p_acs.cpp:6802-6810`) — the wiki's own "See also" link — **does** work as a read-only flag
 query. `A_ChangeFlag` exists (the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4609`) but is
-a DECORATE action function, not callable from ACS. If a script needs to flip a named flag at
-runtime, the only real options are the verified DECORATE-side workaround below, one of the
-specific dedicated setters this fork does implement (e.g. `ChangeActorAngle`/`ChangeActorPitch`),
+a DECORATE action function, not callable from ACS. If a Zandronum script needs to flip a named
+flag at runtime, the only real options are the verified DECORATE-side workaround below, one of the
+specific dedicated setters Zandronum does implement (e.g. `ChangeActorAngle`/`ChangeActorPitch`),
 or a boolean `APROP_*` via `SetActorProperty` for the flags that have a matching property, like
 `APROP_AMBUSH`/`APROP_INVULNERABLE`/`APROP_FRIENDLY` — see `functions/getactorproperty.md`'s
 property-type table for which flags have an `APROP_*` counterpart.
 
-## Verified workaround: `CustomInventory` + `A_ChangeFlag`, triggered via `GiveActorInventory`
+## Verified workaround (Zandronum only): `CustomInventory` + `A_ChangeFlag`, triggered via `GiveActorInventory`
 
-The standard Zandronum-community fix, and it holds up against this fork's source: define a
+The standard Zandronum-community fix, and it holds up against Zandronum's source: define a
 DECORATE item whose base class is **`CustomInventory`** (not plain `Inventory`) with only a
 `Pickup:` state block (no `Use:` state), and give it to the target actor from ACS with
 `GiveActorInventory`/`GiveInventory`.
 
-```
+```text
 ACTOR SetAmbushFlag : CustomInventory
 {
     +INVENTORY.QUIET
@@ -73,7 +90,7 @@ ACTOR SetAmbushFlag : CustomInventory
     }
 }
 ```
-```
+```text
 GiveActorInventory(mons_tid, "SetAmbushFlag", 1);
 ```
 
@@ -102,12 +119,3 @@ Why this actually works, traced end to end against the Zandronum source's `src`:
 One item class per flag (or per fixed flag+value combo) is required — there's no way to pass the
 flag name/value as ACS-side parameters into the DECORATE state, since `A_ChangeFlag`'s arguments
 are compiled into the state definition, not read from the giving script.
-
-**Provenance:** wiki page `SetActorFlag - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
-`oldid=45141`) + source-verified against the Zandronum source `master` HEAD
-(the Zandronum source's `src/p_acs.cpp:5357-5461,9059-9063`, `thingdef/thingdef.h:32`) and its git
-history (`2e8aa53e6`, confirmed not an ancestor of `master`). Wiki describes real upstream ZDoom
-behavior faithfully; the divergence is entirely on this fork's side (function never merged to
-Zandronum `master` / the 3.2.1 target) and is recorded above rather than silently assumed to work.
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`; the non-implementation predates and postdates the 3.2.1 version-bump
-commit `28f736fb3` alike, since it was simply never merged). **Tier:** A.

@@ -1,8 +1,10 @@
 # `void LocalAmbientSound(str sound, int volume)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (checked out source reports 3.3-alpha; `PCD_LOCALAMBIENTSOUND` and its `SVCF_ONLYTHISCLIENT` targeting are long-standing, not netcode-gated additions postdating 3.2.1, so this is not expected to be version-sensitive).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `LocalAmbientSound - ZDoom Wiki` (https://zdoom.org/w/index.php?title=LocalAmbientSound&oldid=35966), verified 2026-07-29 against fork source.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 
 Plays a sound at world volume (no distance attenuation), audible only to the script's activator —
@@ -11,7 +13,7 @@ the zt-bcc source's `src/builtin.c:58,206`), implementation in `p_acs.cpp:11375-
 
 - `sound` — looked up via `FBehavior::StaticLookupString` (`p_acs.cpp:11379`); a bad/unregistered
   string index leaves `lookup` as `NULL` and the whole block is skipped — a silent no-op, same
-  pattern as the other sound builtins in this fork (see `functions/activatorsound.md`).
+  pattern as the other sound builtins in the Zandronum engine fork (see `functions/activatorsound.md`).
 - `volume` — matches the wiki's 0-127 int range; divided by 127 to get the `0.0`-`1.0` float scale
   `S_Sound` expects (`(float)(STACK(1)) / 127.f`, `p_acs.cpp:11384`).
 - **"World volume" = `ATTN_NONE`** (`s_sound.h:277`, `// full volume the entire level`) — same
@@ -27,7 +29,7 @@ the zt-bcc source's `src/builtin.c:58,206`), implementation in `p_acs.cpp:11375-
   non-owned camera actor), the local playback check can fail even though "the activator" in the
   ACS sense hasn't changed. The wiki's plain "only heard by the activator" phrasing doesn't capture
   this.
-- **`activator == NULL` is a documented no-op in this fork, not a crash** — a comment right above
+- **`activator == NULL` is a documented no-op in the Zandronum engine fork, not a crash** — a comment right above
   the case (`p_acs.cpp:11376`, `// [BB] With Skulltag's in game joining / leaving, it's possible
   that activator is NULL`) guards the whole block; if there's no activator (e.g. called from an
   `OPEN` script, or during Skulltag/ST-legacy join/leave transitions), nothing plays and nothing is
@@ -50,7 +52,7 @@ the zt-bcc source's `src/builtin.c:58,206`), implementation in `p_acs.cpp:11375-
 
 **Example:**
 
-```
+```text
 script 1 ENTER
 {
     LocalAmbientSound("QTalk", 127); // full volume, heard only by this script's activator

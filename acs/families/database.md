@@ -1,8 +1,10 @@
 # Database family
 
 **Tier:** A for all fifteen — wiki-derived and source-verified 2026-07-29.
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md` for the version-gap caveat).
-**Provenance:** wiki page `Database - Zandronum Wiki.html` (`?oldid=1276`, saved 2026-07-29) + source-verified against the Zandronum source (`p_acs.cpp:5473-5490,7225-7371`, `za_database.cpp` in full, `za_database.h`).
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `Database - Zandronum Wiki.html` (`?https://wiki.zandronum.com/w/index.php?title=Database&oldid=1276`, saved 2026-07-29) + source-verified against the Zandronum source (`p_acs.cpp:5473-5490,7225-7371`, `za_database.cpp` in full, `za_database.h`).
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** all fifteen are extension functions (negative index in `zcommon.bcs`), semantics in the Zandronum source's `src/p_acs.cpp` (`case ACSF_*DBEntr*`/`ACSF_*DBResult*`/`ACSF_*DBTransaction`, around line 7225-7371) which thinly wrap the Zandronum source's `src/za_database.cpp` (`DATABASE_*`), the actual SQLite layer. Indices -108 to -125 (`zcommon.bcs:1741-1758`, with -113 and -114 reserved/unused between `IncrementDBEntry` and `SortDBEntries`, and -122 reserved between `GetDBEntryRank` and `BeginDBTransaction`).
 
 `SetDBEntry`, `GetDBEntry`, `SetDBEntryString`, `GetDBEntryString`, `IncrementDBEntry`,
@@ -18,6 +20,11 @@ All fifteen are documented below regardless of real-world usage — see the fami
 `../../shared/AUTHORING.md`'s Authoring rule section (an unused family is exactly the one nobody has figured out
 yet), and because the persistence/availability gotchas below aren't guessable from the wiki page
 alone.
+
+**Porting note:** UZDoom/GZDoom-family engines have no equivalent to this family at all — see
+[Persistent storage: Zandronum's ACS database has no UZDoom/GZDoom-family
+equivalent](../../shared/concepts/persistent-storage-engine-divergence.md) for the full comparison
+and the closest (materially weaker) analogue.
 
 ---
 
@@ -98,10 +105,28 @@ returned database to start at the second highest value" phrasing is just describ
 **Handle lifetime gotcha, not on the wiki:** `FreeDBResults` (`p_acs.cpp:7296-7306`) only shrinks
 `g_dbQueries` when you free the **most-recently-allocated** (highest-index) handle still live —
 freeing any earlier handle just clears its own entry in place and leaves the vector's tail
-untouched. Handles are never reused for a later `GetDBEntries`/`SortDBEntries` call regardless
-(every call does `g_dbQueries.resize(size+1)` and takes the new trailing slot) — so failing to
-free in strict LIFO order doesn't corrupt anything, but it does mean stale empty slots accumulate
-in `g_dbQueries` for the rest of the game session instead of being reclaimed.
+untouched, so failing to free in strict LIFO order doesn't corrupt anything — no *live* handle's
+data is ever overwritten by a later allocation, since every `GetDBEntries`/`SortDBEntries` call
+always appends past whatever the vector's current size is (`g_dbQueries.resize(size+1)`, taking
+the new trailing slot). But it does mean stale empty slots accumulate in `g_dbQueries` for the
+rest of the game session instead of being reclaimed, *unless* the tail itself gets freed.
+
+**Correction (2026-08-07):** an earlier version of this entry additionally claimed "handles are
+never reused... regardless" — traced through the exact case-block logic (not just the prose) and
+that overstates it. If the handle being freed *is* the current tail, `g_dbQueries` really does
+shrink by one (the `if (handle == g_dbQueries.size()-1) g_dbQueries.resize(size-1)` branch), and
+the *next* `GetDBEntries`/`SortDBEntries` call then reissues that exact numeric value — a genuinely
+different result set answering to the same handle number as one that was just freed. Worked
+example: allocate handle `0`, allocate handle `1`, free `1` (the tail — the vector shrinks back to
+size 1), allocate again — the new call returns `1` again, not `2`. This doesn't corrupt anything
+(the surviving point above is still correct: no *live* handle is ever overwritten), but a caller
+that stashes a handle number across two `FreeDBResults`/allocate cycles and assumes it still
+identifies the same result set — or assumes numbers are a monotonically-increasing session-unique
+ID — would be wrong. Found and confirmed while porting this family's semantics for
+`~/source/uzdoom-acsdb-shim` (a UZDoom-side reimplementation, project-specific, not itself part of
+this tree) — its own result-handle table is a structural port of this exact vector logic
+(push-to-allocate, clear-plus-conditional-pop-to-free), so the reuse case reproduces identically
+there too.
 
 ### `int CountDBResults(int handle)`
 
@@ -140,3 +165,30 @@ synchronous `sqlite3_*` calls (`za_database.cpp`) with no threading or async que
 this file. Since ACS executes inline in the single-threaded game tic, any of these functions
 blocks the entire simulation for as long as the underlying SQLite call takes — the wiki's warning
 about batching writes into a transaction to avoid stalls is accurate advice, not folklore.
+
+## Engine-family divergence
+
+All fifteen members are bound at ACSF (CALLFUNC) indices 108–125 — squarely inside the 100–199
+range UZDoom's own ACSF enum reserves for Zandronum's extensions and implements none of (see
+[Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md)). A Zandronum-compiled
+object calling any of them under UZDoom hits UZDoom's `CallFunction` dispatcher's `default:
+break;` case: no error, no log line, execution continues with a plain `0` in place of the real
+return value — the entire SQLite-backed key/value store this family documents simply does not
+exist on that engine.
+
+The practical shape of the failure differs by role. For the query/write functions
+(`SetDBEntry`/`GetDBEntry`/`SetDBEntryString`/`GetDBEntryString`/`IncrementDBEntry`/
+`GetDBEntryRank`), the write half silently never happens and the read half returns `0` —
+indistinguishable from this family's own documented "key not found" / "database unavailable"
+returns, which are already `0`-shaped on Zandronum. For the two string-returning getters
+(`GetDBEntryString`/`GetDBResultKeyString`/`GetDBResultValueString`), the fallback `0` is not a
+valid pool-origin string handle at all (same mismatch documented on `acs/functions/strftime.md`
+and `getplayercountry.md`) — a caller gets an unrelated string-table lookup, not the empty string
+the "not found" case actually returns. Worst is the opaque **result-handle** pair this file's own
+intro highlights: `GetDBEntries`/`SortDBEntries` never produce a real handle under UZDoom, so any
+`GetDBResult*`/`CountDBResults`/`FreeDBResults` call chained off their `0` return operates on a
+handle that was never valid in the first place — on Zandronum this is exactly the misuse pattern
+the wiki warns against for a *freed* handle, not a *never-issued* one, so the failure mode a
+ported script would actually hit isn't the one its own error handling was written to catch.
+`BeginDBTransaction`/`EndDBTransaction` become silent no-ops with no SQLite error to log, since
+`database_ExecuteCommand` itself never runs.

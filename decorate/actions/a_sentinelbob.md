@@ -1,15 +1,17 @@
 # `A_SentinelBob`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_SentinelBob` (retrieved 2026-08-01, oldid=34311) + verified against the Zandronum source's `src/g_strife/a_sentinel.cpp:12-52`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_SentinelBob` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_SentinelBob&oldid=34311) + verified against the Zandronum source's `src/g_strife/a_sentinel.cpp:12-52`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_SentinelBob)` in `src/g_strife/a_sentinel.cpp` — callable on any actor class, not restricted to Sentinel despite the name.
 
 Applies upward or downward vertical acceleration to smoothly bob an actor. This is an **accelerator**, not a position setter — `velz` is adjusted by ±1 unit/tic (`FRACUNIT` each call), so the function must be called repeatedly in a loop for continuous effect.
 
 ## Signature
 
-```
+```text
 void A_SentinelBob()
 ```
 
@@ -49,9 +51,13 @@ The wiki states this action is "not the same as using the FLOATBOB flag." Mechan
 - **Server-side only**: Clients return immediately without effect (step 1).
 - **Velocity replication**: The server broadcasts velocity changes to clients via `SERVERCOMMANDS_MoveThing` or `SERVERCOMMANDS_MoveThingExact` on each call (though clients do not perform the bobbing calculation themselves).
 
+## Engine-family divergence: no client/server broadcast
+
+UZDoom's `A_SentinelBob` is now implemented in ZScript (`extend class Actor` in the UZDoom source's `wadsrc/static/zscript/actors/strife/sentinel.zs`, not a native `DEFINE_ACTION_FUNCTION`), and carries none of Zandronum's network-authority machinery: there is no client-mode early return (step 1), no replication call in the `MF_INFLOAT`/`bInFloat` branch (step 2), and no replication call at the end of the function (step 7) — nothing in the UZDoom source tree corresponds to `SERVERCOMMANDS_MoveThing`/`SERVERCOMMANDS_MoveThingExact`. The bob math itself carries over unchanged: the same `bInFloat` zero-out, the same `threshold != 0` gate, the same `ceilingz`/`floorz` envelope calculation (in double map units rather than Zandronum's `fixed_t`, with no behavioral difference), and the same `reactiontime` side effect. In short, UZDoom's version is Zandronum's steps 3–6 with no client/server split wrapped around them.
+
 ## Example (Zandronum DECORATE)
 
-```
+```text
 ACTOR Sentinel 3006
 {
     States

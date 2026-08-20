@@ -1,13 +1,25 @@
 # `bool IsPlayerContestingControlPoint(int player, int point)`
 
+**Tier:** A.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `IsPlayerContestingControlPoint - Zandronum Wiki.html` (`_intake/`,
+retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=IsPlayerContestingControlPoint&oldid=2254`) + source-verified against `p_acs.cpp:5550,8059-8069`,
+`sectinfo.h:61-70`, `domination.cpp:90-102,113-183,211-224`,
+`p_interaction.cpp:3005-3022`, `zt-bcc/lib/zcommon.bcs:1813`. The wiki's prose description
+("Returns whether the given player is currently contesting the given control point") is
+accurate; only its parameter signature (`bool point`) is wrong, and it omits both the
+silent-`false`-on-invalid-input behavior and the Domination-only-populates-`contesting` caveat
+above.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
+**Bucket:** extension function (negative index, `p_acs.cpp`'s `ACSF_*`/`ASCF_*` switch).
+
 Reads whether a player is currently one of the contesters of a Domination-gametype control
 point (a `SECTINFO` "point" entry — same underlying data as `GetControlPointInfo`, see
 `functions/getcontrolpointinfo.md` for the point-index/`SectorInfo.Points` background).
 Extension function, `zcommon.bcs:1813` declares it at index `-185`
 (`ACSF_IsPlayerContestingControlPoint`, the Zandronum source's `src/p_acs.cpp:5550`), implementation
 is the `case ACSF_IsPlayerContestingControlPoint:` block at `p_acs.cpp:8059-8069`.
-
-**Bucket:** extension function (negative index, `p_acs.cpp`'s `ACSF_*`/`ASCF_*` switch).
 
 - `player` — a player index. Validated with `PLAYER_IsValidPlayerWithMo()`
   (`p_interaction.cpp:3018-3022`): **out-of-range index, a player slot not in the game, a
@@ -56,26 +68,30 @@ clientside reflects real state, not just server-local state.
 
 **Example — check if the local player is contesting point 0 (Domination gametype only):**
 
-```
+```text
 if (IsPlayerContestingControlPoint(PlayerNumber(), 0))
     Log(s: "You are contesting the point.");
 ```
-
-**Provenance:** wiki page `IsPlayerContestingControlPoint - Zandronum Wiki.html` (`_intake/`,
-retrieved 2026-07-29, `oldid=2254`) + source-verified against `p_acs.cpp:5550,8059-8069`,
-`sectinfo.h:61-70`, `domination.cpp:90-102,113-183,211-224`,
-`p_interaction.cpp:3005-3022`, `zt-bcc/lib/zcommon.bcs:1813`. The wiki's prose description
-("Returns whether the given player is currently contesting the given control point") is
-accurate; only its parameter signature (`bool point`) is wrong, and it omits both the
-silent-`false`-on-invalid-input behavior and the Domination-only-populates-`contesting` caveat
-above. **Engine:** Zandronum 3.2.1 — the introducing commit (`c2eb5ab96`, "Add
-IsPlayerContestingControlPoint function to test if a player is contesting a particular control
-point", 2024-09-11) was confirmed via `git merge-base --is-ancestor` to predate the `28f736fb3`
-("changed the version string to 3.2.1") commit in the Zandronum source's checkout, i.e.
-it ships in 3.2.1, not just the checkout's `3.3-alpha` HEAD. **Tier:** A.
 
 **Note on family grouping:** this function is closely related to `GetControlPointInfo` /
 `SetControlPointInfo` (same `SectorInfo.Points` data, same Domination-only caveats) and could
 arguably be consolidated into a `families/control-points.md` page alongside them instead of
 living as a separate per-function file. This file was kept standalone per this batch's
 instructions; a future pass may want to merge it into such a family file.
+
+## Engine-family divergence
+
+This function's ACSF index (185, per `zcommon.bcs:1813`'s `-185` binding above) falls inside the
+100–199 range UZDoom's own ACSF enum reserves for Zandronum's extensions and implements none of —
+see [Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md) for the mechanism.
+UZDoom's `CallFunction` dispatcher is a plain `switch` with `default: break;` falling through to
+`return 0`; a Zandronum-compiled object calling this function under UZDoom gets a silent `0` back
+with no error, no log line, and the script keeps running as if nothing happened.
+
+Because the return value is a boolean, that silent `0` reads as `false` — "not contesting" — which
+is already one of *three* ways this function legitimately returns `false` on Zandronum itself (an
+invalid/spectating/bodyless player, an out-of-range `point`, or a non-Domination gametype all
+silently produce the same result; see above). Under UZDoom the reserved-range miss becomes a
+fourth, indistinguishable source of the same `false` — there is no error channel anywhere in this
+function's contract, on either engine, so a UZDoom port has no observable signal that the call
+never did anything.

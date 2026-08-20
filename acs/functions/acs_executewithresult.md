@@ -1,10 +1,13 @@
 # `int ACS_ExecuteWithResult(int script [, int s_arg1, int s_arg2, int s_arg3, int s_arg4])`
 
-Action special (index 84) that runs a numbered script synchronously on the current map and returns the result value the script sets via `SetResultValue`. Unlike `ACS_Execute`/`ACS_ExecuteAlways` (which return a simple bool start/fail signal), this function is the primary implementation for synchronous script execution with a result value — the named variant `Acs_NamedExecuteWithResult` forwards to this action special via the `NamedACSToNormalACS[]` dispatch table (`p_lnspec.cpp:86-95`).
-
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-14)
+**Provenance:** wiki page `ACS_ExecuteWithResult - ZDoom Wiki.html` (`_intake/`, retrieved 2026-08-14, `https://zdoom.org/w/index.php?title=ACS_ExecuteWithResult&oldid=50130`) + source-verified against `p_lnspec.cpp:1833-1851`, `p_acs.cpp:9120-13050,13234-13288`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Action special (index 84 in the special table). Implementation: `FUNC(LS_ACS_ExecuteWithResult)` at the Zandronum source's `src/p_lnspec.cpp:1833-1851`, dispatched via `P_StartScript` with flags `ACS_ALWAYS | ACS_WANTRESULT | (optionally ACS_BACKSIDE)`.
 
-**Tier:** A. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD). **Provenance:** wiki page `ACS_ExecuteWithResult - ZDoom Wiki.html` + source-verified against `p_lnspec.cpp:1833-1851`, `p_acs.cpp:9120-13050,13234-13288`.
+Action special (index 84) that runs a numbered script synchronously on the current map and returns the result value the script sets via `SetResultValue`. Unlike `ACS_Execute`/`ACS_ExecuteAlways` (which return a simple bool start/fail signal), this function is the primary implementation for synchronous script execution with a result value — the named variant `Acs_NamedExecuteWithResult` forwards to this action special via the `NamedACSToNormalACS[]` dispatch table (`p_lnspec.cpp:86-95`).
 
 ---
 
@@ -31,9 +34,13 @@ Returns an `int` — whatever value the target script passed to `SetResultValue(
 - **Activator context**: The calling actor (activator) is preserved and passed to the script. In `OPEN`/`ENTER`-style script contexts with no activator, the script receives `NULL` for its activator pointer.
 - **Line context**: If the action special is invoked from a UDMF line special (not from bytecode), the line pointer and backside flag are captured in the created script instance and are readable via `GetLineSpecial()`/`LineSide()` (though `LineSide()` only returns meaningful values for actual line-originated scripts; `ACS_ExecuteWithResult` invoked from bytecode sets `backSide` to `false`).
 
-## Known fork/wiki divergence
+## Wiki/engine divergence: ZScript return-value conversions
 
-**ZScript section inapplicable:** The wiki page includes an extensive "Return values in ZScript" section covering boolean conversion, fixed-point division (0.0–1.0 as `16/65536`), string table lookups, and texture/color conversions. **This fork has no ZScript at all** — these conversions are a ZDoom 4.x+ feature absent from Zandronum. The same limitation applies to the ZScript `CallACS` example. Only the DECORATE `A_JumpIf(1 == ACS_ExecuteWithResult(...))` example is applicable here.
+**ZScript section inapplicable (Zandronum):** The wiki page includes an extensive "Return values in ZScript" section covering boolean conversion, fixed-point division (0.0–1.0 as `16/65536`), string table lookups, and texture/color conversions. **The Zandronum engine fork has no ZScript at all** — these conversions are a ZDoom 4.x+ feature absent from Zandronum. The same limitation applies to the ZScript `CallACS` example. Only the DECORATE `A_JumpIf(1 == ACS_ExecuteWithResult(...))` example is applicable there. On UZDoom, which does have ZScript, the wiki's ZScript section applies as described (not independently re-verified here beyond confirming UZDoom's `ACS_ExecuteWithResult`/`CallACS` return the same raw `int` this doc already describes).
+
+## Engine-family divergence: CLIENTSIDE dispatch
+
+UZDoom's `IsClientSideScript()` (the UZDoom source's `src/playsim/p_acs.cpp`) is hardcoded to always return `false`. A source comment beside it indicates this is a deliberate, temporary stub — the real per-script clientside check was pulled out because it broke too many existing `CLIENTSIDE` scripts, pending a replacement mechanism. As a result, a script's `CLIENTSIDE` flag has **no effect at all** on `ACS_ExecuteWithResult` dispatch in this UZDoom checkout: the target script always runs through the normal (non-clientside) script thinker and `P_StartScript` always calls `RunScript()` directly and returns whatever result value the script actually computed — there is no analogue of Zandronum's silent `false`/`0` clientside carve-out described above. A script written expecting Zandronum's carve-out (e.g. treating a `0` return as "this ran client-side, no result available") will instead get a real computed result value on this UZDoom checkout.
 
 ## Comparison to siblings
 

@@ -1,8 +1,10 @@
 # `void SetActorAngle(int tid, fixed angle)`
 
 **Tier:** A.
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master`/`3.3-alpha` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`).
-**Provenance:** wiki page `SetActorAngle - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `oldid=36012`) + source-verified against `p_acs.cpp:5839-5867, 4445-4453, 12594-12597`, `p_mobj.cpp:3941-3951`, and `zt-bcc/src/builtin.c:133`. The angle-encoding table and `fixed` parameter typing both check out against source with no wiki/fork divergence found; the multi-actor-vs-single-actor TID asymmetry with `GetActorAngle`, the always-`false` interpolate flag, and the server-to-client angle broadcast are real fork/engine details the wiki doesn't mention, recorded above.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `SetActorAngle - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=SetActorAngle&oldid=36012`) + source-verified against `p_acs.cpp:5839-5867, 4445-4453, 12594-12597`, `p_mobj.cpp:3941-3951`, and `zt-bcc/src/builtin.c:133`. The angle-encoding table and `fixed` parameter typing both check out against source with no wiki/fork divergence found; the multi-actor-vs-single-actor TID asymmetry with `GetActorAngle`, the always-`false` interpolate flag, and the server-to-client angle broadcast are real fork/engine details the wiki doesn't mention, recorded above.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 
 Sets the facing angle of actor(s) by TID. Compiler builtin (`PCD_SETACTORANGLE`,
@@ -18,7 +20,7 @@ with `interpolate` hardcoded to `false`.
   value (`1.0` = `65536`), so left-shifting 16 more places lands it in the engine's 32-bit BAM
   space (`angle_t`, full turn = `2^32`) at exactly the same fraction — `0.25` (`16384`) becomes
   `0x40000000`, a quarter turn. No divergence from the wiki here, unlike some other angle
-  builtins in this fork (`Sin`/`VectorAngle`) where the wiki mistypes the parameter as `int`; the
+  builtins in Zandronum (`Sin`/`VectorAngle`) where the wiki mistypes the parameter as `int`; the
   wiki's `SetActorAngle` signature already says `fixed`, and `builtin.c:133`
   (`{ "setactorangle", ";if" }`, void return, one int, one fixed) agrees.
 - `tid` — **`0` means "the activator"**, applied directly and **guarded**: if `tid == 0` and
@@ -44,7 +46,7 @@ with `interpolate` hardcoded to `false`.
 
 ## Example (from the wiki)
 
-```c
+```acs
 script 1 (int spintime)
 {
     while (spintime-- > 0)

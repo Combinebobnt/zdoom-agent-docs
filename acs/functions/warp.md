@@ -1,8 +1,10 @@
 # Warp
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (verified against the `3.3-alpha` local checkout).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `Warp - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=Warp&oldid=51056`), verified 2026-07-29 against the Zandronum source's `src/p_acs.cpp`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 `bool Warp(int tid, fixed xofs, fixed yofs, fixed zofs, fixed angle, int flags [, str success_state [, bool exact]])`
 
@@ -84,3 +86,29 @@ This is a server-side operation in multiplayer. The server handles the warp and 
 - `heightoffset` (ZDoom only) — Not available. Zandronum does not support height-relative offsets.
 - `radiusoffset` (ZDoom only) — Not available. Zandronum does not support radius-relative offsets.
 - `pitch` (ZDoom only) — Not available as a parameter. `WARPF_COPYPITCH` copies pitch from the reference actor but cannot add an offset.
+
+## Engine-family divergence: `heightoffset`/`radiusoffset`/`pitch` are implemented on UZDoom, and there is no cross-client sync command
+
+UZDoom's `case ACSF_Warp:` (`src/playsim/p_acs.cpp:6482-6533`) implements the full 11-argument
+signature the ZDoom Wiki describes, not the truncated 8-argument one Zandronum accepts. With
+`argCount > 8`/`9`/`10`, it reads `heightoffset`, `radiusoffset`, and `pitch` and forwards them to
+`P_Thing_Warp` (`src/playsim/p_things.cpp:692-811`), where they have real effect:
+
+- `heightoffset` is multiplied by the *reference* actor's own height and added into the effective
+  `zofs` before any of the floor-relative or absolute-position branches run, so it behaves as
+  "offset in units of the reference actor's own height," not a raw map unit.
+- `radiusoffset` is multiplied by the reference actor's radius and added as an extra push along the
+  already-computed `angle`'s sine/cosine, on top of `xofs`/`yofs` — it applies in both the
+  floor-relative and absolute-position branches, unlike `WARPF_ABSOLUTEOFFSET` which only gates the
+  `xofs`/`yofs` rotation.
+- `pitch` is applied *after* `WARPF_COPYPITCH` (if that flag copied the reference actor's pitch
+  first): when the `pitch` argument is non-zero it is added on top of whatever pitch the caller
+  already has (copied or original), exactly as this doc's Fork/wiki notes above already predicted
+  the ZDoom-only behavior would work, now confirmed live on UZDoom. So on UZDoom, passing these
+  three parameters is not a no-op the way it is on Zandronum 3.2.1.
+
+Separately, the "Networking" section above describing `SERVERCOMMANDS_MoveThingIfChanged` is
+Zandronum-specific and does not apply to UZDoom at all: UZDoom's source tree has zero references to
+any `SERVERCOMMANDS_*` symbol anywhere (it doesn't use Zandronum's server-authoritative
+command-broadcast networking model), so there is no equivalent explicit sync call in `ACSF_Warp` or
+`P_Thing_Warp` to point to.

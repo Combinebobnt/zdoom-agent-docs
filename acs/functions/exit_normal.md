@@ -1,8 +1,10 @@
 # `int Exit_Normal(int pos)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (verified against the `3.3-alpha` local checkout; key behavior — `CheckIfExitIsGood`, player start position matching — predates 3.2.1).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `Exit_Normal - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=Exit_Normal&oldid=44667`), verified 2026-07-29 against the Zandronum source's `src/p_lnspec.cpp`, `p_spec.cpp` (`CheckIfExitIsGood`), and `p_mobj.cpp` (`P_SpawnMapThing`).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Action special, index 243 in `zcommon.bcs`'s `special` table.
 
 Exit the current level, moving to the next map defined in MAPINFO, and spawn the player at a player start whose `arg0` matches `pos`.
@@ -38,6 +40,12 @@ Exit the current level, moving to the next map defined in MAPINFO, and spawn the
 
 - **`CheckIfExitIsGood` applies to `Exit_Secret` and `Teleport_NewMap` identically** — all three action specials (243, 244, 74) share the same validation logic. `Exit_Normal` and `Exit_Secret` differ only in which MAPINFO field is consulted to find the next map (`nextmap` vs `secretmap`).
 
+## Engine-family divergence: `DF2_KILL_MONSTERS` gate and `DF_NO_EXIT` conditions
+
+UZDoom's `CheckIfExitIsGood` (`src/playsim/p_spec.cpp`) implements `DF2_KILL_MONSTERS` as a plain exact-kill gate: if `killed_monsters != total_monsters`, it returns `false` immediately, with no percentage threshold, no cooperative-only restriction, and no teleport-back-to-a-random-start consolation behavior. The percentage cvar and the teleport-back logic described above (under "false return cases" and "Zandronum divergences") are Zandronum-only additions not present in UZDoom at all — UZDoom has no equivalent of that cvar.
+
+UZDoom's `DF_NO_EXIT` check also only tests `deathmatch || alwaysapplydmflags`, with no `teamgame` clause and no lobby-map exemption (both Zandronum-specific concepts absent from UZDoom); the TELEFRAG_DAMAGE consequence when it triggers is otherwise identical between the two engines. The survival-countdown gate remains Zandronum-only and is absent entirely from UZDoom's version, consistent with what's already noted above.
+
 ## Contract with scripts using `null` activators
 
 If you call this as `ACS_ExecuteAlways(special, 0, ...)` with no activator (activator is the world), `CheckIfExitIsGood` **returns `true` immediately without checking game state or dmflags** — the null case is a blanket permission. This is sometimes exploited to force an exit that would otherwise be blocked (e.g., during a survival countdown). The cost is that the next map still won't load if `unloading` or `gameaction == ga_completed` is already true.
@@ -46,7 +54,7 @@ If you call this as `ACS_ExecuteAlways(special, 0, ...)` with no activator (acti
 
 Exit to the next map, spawning at player start whose `arg0` is 0 (the first/default player start):
 
-```
+```text
 script 1(void) {
     Exit_Normal(0);
     Print(s:"This prints (before the delay/tic end), then the map exits.");

@@ -1,8 +1,10 @@
 # `A_JumpIfArmorType`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1, UZDoom 4.15pre
-**Provenance:** ZDoom Wiki (retrieved 2026-08-01, oldid=42385) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:983-996` and `wadsrc/static/actors/actor.txt:216`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_JumpIfArmorType&oldid=42385) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:983-996` and `wadsrc/static/actors/actor.txt:216`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Action function (`DEFINE_ACTION_FUNCTION(AActor, A_JumpIfArmorType)` in `src/thingdef/thingdef_codeptr.cpp`).
 
 Checks whether the actor's equipped armor matches a specified type. If the armor type matches and the armor amount is at least the minimum threshold, the jump is performed.

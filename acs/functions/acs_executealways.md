@@ -1,8 +1,10 @@
 # ACS_ExecuteAlways
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (feature predates the fork; verified against the `3.3-alpha` local checkout).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-30)
 **Provenance:** `ACS_ExecuteAlways - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=ACS_ExecuteAlways&oldid=42554`), verified 2026-07-30 against the Zandronum source's `src/p_lnspec.cpp:1784-1813` and `p_acs.cpp:13234-13288`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Action special, index 226 in `zcommon.bcs`'s `special` table.
 
 `int ACS_ExecuteAlways(int script, int map [, int s_arg1, int s_arg2, int s_arg3])`
@@ -33,6 +35,24 @@ Per `P_StartScript` and `P_GetScriptGoing` (`p_acs.cpp:13234-13288, 13055-13072`
 - **Scripts started with ExecuteAlways are not registered in `RunningScripts`:** as a side effect of the `ACS_ALWAYS` flag, the script instance is not added to the `RunningScripts` map (`p_acs.cpp:13130-13131`). This is the source-level fact behind the wiki's claim that "any scripts started with this special cannot be suspended or terminated with ACS_Suspend or ACS_Terminate." An attempt to suspend or terminate one by number silently fails because `P_SuspendScript`/`P_TerminateScript` lookup the script by number in that map and find nothing. Similarly, `NamedScriptWait` waits by checking for script registration in the same map — so waiting on a script that was started only with `ACS_ExecuteAlways` deadlocks forever (the script is genuinely running, but the wait sees it as "never started"). See [acs_terminate.md](acs_terminate.md), [namedscriptwait.md](namedscriptwait.md), and [suspend.md](suspend.md) for downstream consequences.
 
 - **Clientside carve-out (Zandronum-only, not on ZDoom wiki):** on the server, if the target script is flagged `CLIENTSIDE` (e.g. a `CLIENTSIDE` script-type declaration), the server doesn't run it at all — instead it broadcasts `SERVERCOMMANDS_ACSScriptExecute(...)` and returns `true` unconditionally (`p_lnspec.cpp:1792-1798`), regardless of whether any client has or loads the script. This is the *same* polarity as plain `ACS_Execute` (both return `true`), but differs from `ACS_ExecuteWithResult`, which returns `false` in the same scenario.
+
+## Engine-family divergence: CLIENTSIDE carve-out
+
+Zandronum's clientside carve-out described above does not exist on UZDoom. `LS_ACS_ExecuteAlways`
+(the UZDoom source's `src/playsim/p_lnspec.cpp`) has no CLIENTSIDE branch at all — it calls
+`P_StartScript` unconditionally, the same as for any other target script. `P_StartScript`/
+`P_GetScriptGoing` (the UZDoom source's `src/playsim/p_acs.cpp`) do have their own, unrelated
+notion of a "clientside" script — one that runs on a separate `ClientSideACSThinker` instead of
+the main `ACSThinker` — but the helper that decides whether a script counts as clientside,
+`IsClientSideScript()`, is hard-coded to return `false` in the checked revision, with an inline
+comment explaining it was disabled because the old `CLIENTSIDE` semantics broke too many existing
+scripts, pending a UZDoom-specific replacement flag. Net effect in this checkout: a
+`CLIENTSIDE`-flagged script handed
+to `ACS_ExecuteAlways` runs exactly like any other script — no broadcast-and-skip-execution
+behavior, no early `true` return ahead of map resolution, and no polarity distinction from
+`ACS_ExecuteWithResult`. Since this hinges on disabled-but-present code rather than a genuinely
+absent feature, a later UZDoom revision could reinstate clientside-script handling under a
+different mechanism — don't assume this gap is permanent.
 
 ## Contrast with related functions
 

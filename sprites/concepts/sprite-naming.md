@@ -1,8 +1,10 @@
 # Sprite naming and rotation encoding
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki "Creating new sprite graphics" (retrieved 2026-07-31, oldid=54007), verified against the Zandronum source's sprite initialization code (`src/r_data/sprites.cpp`, `src/r_data/sprites.h`).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki "Creating new sprite graphics" (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=Creating_new_sprite_graphics&oldid=54007), verified against the Zandronum source's sprite initialization code (`src/r_data/sprites.cpp`, `src/r_data/sprites.h`).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 A sprite lump name encodes the actor's sprite identity, animation frame, and rotation angle in a fixed binary format. This format is read directly by the engine at wad-load time; understanding it is necessary to create multi-frame or rotating sprite sets.
 
@@ -10,7 +12,7 @@ A sprite lump name encodes the actor's sprite identity, animation frame, and rot
 
 Every sprite lump name has this exact structure:
 
-```
+```text
 XXXXYRD[FRD]
 ```
 
@@ -84,4 +86,15 @@ In a DECORATE `States{}` block, frame letters are references to these sprite fra
 ## Open questions (unverified in this checkout — don't guess past these)
 
 - **Frame letter quoting in DECORATE**: The ZDoom wiki states that if you use frame letters `[`, `\`, or `]` in a DECORATE state line, the frame string must be wrapped in quotes (e.g., `SPRITE "[" 4 A_SomeAction` instead of `SPRITE [ 4 A_SomeAction`). The 0–28 index range and mapping are verified in the source; this specific lexer requirement was not independently traced in the Zandronum checkout and should be verified against `src/sc_man.cpp` or `src/sc_man_scanner.re` if needed.
-- **GZDoom/UZDoom divergence**: This page documents Zandronum 3.2.1 specifically. The GZDoom family may have extended sprite naming or rotation conventions not yet catalogued here. Consult the GZDoom engine source if targeting that fork.
+
+## Engine-family divergence
+
+The lump-name format and rotation/frame encoding described above were checked against the UZDoom
+source's `src/r_data/sprites.cpp` and found identical to Zandronum's: the same `XXXXYRD[FRD]`
+seven/eight-character structure, the same 0–28 frame-letter range, and the same rotation-slot
+arithmetic — an 8-way digit `1`–`8` still maps to the even internal slots via `(rotation-1)*2`,
+and the 16-way extension `9`/`A`–`G` still maps to the odd slots via `(rotation-9)*2+1`, with the
+same 0 (non-rotating, fills all slots) and out-of-range-rejects-as-invalid behavior. No extended or
+GZDoom-family-only sprite-naming convention was found beyond what this page already documents; the
+mechanism is shared, unmodified, ZDoom-family infrastructure that predates the Zandronum/UZDoom
+split.

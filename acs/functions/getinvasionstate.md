@@ -1,10 +1,12 @@
 # GetInvasionState
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (opcode and behavior present verbatim since the original Skulltag 0.97c2 import commit `bc562a817` — this is not a recent addition, no 3.2.1-vs-3.3-alpha gate applies).
-**Provenance:** `GetInvasionState - Zandronum Wiki.html` (intake), verified against the Zandronum source's `src` on 2026-07-29.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-07)
+**Provenance:** `GetInvasionState - Zandronum Wiki.html` (intake, `https://wiki.zandronum.com/w/index.php?title=GetInvasionState&oldid=1289`), verified against Zandronum source (`src/p_acs.cpp:11277–11283`, `src/invasion.h:60–70`, `src/invasion.cpp:1271–1274`) on 2026-08-07.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 
-```
+```text
 int GetInvasionState(void)
 ```
 
@@ -40,3 +42,16 @@ exist as raw literals) — safe to use directly instead of magic numbers:
   file even though the two are closely related** — a sibling intake pass is handling it
   separately. If a `families/invasion.md` gets created later to cover both together, this file's
   content should fold into it.
+
+## Engine-family divergence
+
+`GetInvasionState` is a base PCD opcode (`PCD_GETINVASIONSTATE`, index 130), not a CALLFUNC/ACSF
+extension — a different name space from the 100–199 reserved-and-silent CALLFUNC range most other
+Zandronum-only functions fall into (see
+[Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md)). UZDoom's interpreter
+has no `case` for this opcode at all, so a Zandronum-compiled object calling it under UZDoom hits
+UZDoom's unknown-PCD path: the interpreter prints `"Unknown P-Code %d in %s"` naming the script
+and **terminates that script outright** — loud and fatal, the opposite failure mode from the
+silent-0 return most other Zandronum-only functions produce (including this function's sibling
+`GetInvasionWave`, index 129, same failure mode). There is no return value or `IS_*` constant to
+misread because the script never continues past the call.

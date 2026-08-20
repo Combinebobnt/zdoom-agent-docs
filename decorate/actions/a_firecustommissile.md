@@ -1,8 +1,10 @@
 # `void A_FireCustomMissile(class<Actor> missiletype, angle angle = 0, bool useammo = false, int spawnofs_xy = 0, fixed spawnheight = 0, bool aimatangle = false, angle pitch = 0)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_FireCustomMissile` (retrieved 2026-07-31, oldid=45025) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1739–1815`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_FireCustomMissile` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_FireCustomMissile&oldid=45025) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1739–1815`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_FireCustomMissile)` on `AActor` class (callable from any actor's state table).
 
 Fires a projectile from a player's weapon or a CustomInventory. **This action is player-only** — it silently does nothing when called from non-player actors. **Fork divergence note:** This page describes the ZDoom Wiki, which documents GZDoom/UZDoom. Zandronum's signature and behavior differ significantly from the wiki: parameter 5 is a single boolean (`aimatangle`), not a flags field; the wiki's `FPF_*` flag constants do not exist in Zandronum and produce incorrect behavior if passed as integers. The wiki also describes a deprecation warning (recommending `A_FireProjectile`); this warning is GZDoom-family only and does not apply to Zandronum, where `A_FireCustomMissile` is the standard weapon-variant projectile action.
@@ -40,7 +42,7 @@ None.
 
 ## Examples
 
-```
+```text
 // Simple missile attack
 Fire:
     WGUN A 0 A_FireCustomMissile("MyMissile")
@@ -65,6 +67,14 @@ Fire:
     WGUN A 6
     Goto Ready
 ```
+
+## Engine-family divergence: deprecated compatibility wrapper, flags-based signature, and useammo default
+
+In UZDoom, `A_FireCustomMissile` (`wadsrc/static/zscript/compatibility.zs`) is a `deprecated("2.3", "Use A_FireProjectile() instead")` compatibility function, not a native action in its own right. It forwards directly to `A_FireProjectile(missiletype, angle, useammo, spawnofs_xy, spawnheight, flags, -pitch)`. Its actual declared signature takes `int flags = 0` (enum `EFireCustomMissileFlags`: `FPF_AIMATANGLE = 1`, `FPF_TRANSFERTRANSLATION = 2`, `FPF_NOAUTOAIM = 4`) rather than Zandronum's single `bool aimatangle` — confirming, from direct verification of the UZDoom source rather than the wiki page alone, the existing "Fork divergence note" above. `useammo`'s default also differs: `true` in UZDoom vs. `false` in Zandronum. UZDoom's ammo-depletion check additionally requires the call to come from an actual weapon pspr state (`stateinfo.mStateType == STATE_Psprite`) in addition to `weapon` being non-null; Zandronum's check (documented in "Ammo depletion" above) only requires a ready weapon.
+
+## Engine-family divergence: no client/server split, no spread cheat, different spectral-missile mechanism
+
+UZDoom has no client/server authority split anywhere in its source tree (no `NETWORK_InClientMode`/`SERVERCOMMANDS_*`-style construct exists at all) — the "Network handling" behavior note above (`NETWORK_ShouldActorNotBeSpawned()` gate, `SERVERCOMMANDS_SpawnMissileExact()` broadcast) is Zandronum-only; on UZDoom the call goes straight through `A_FireProjectile` to the native `P_SpawnPlayerMissile` with no server-authoritative branch to trace. UZDoom also has no `CF2_SPREAD` cheat-flag handling anywhere in its source — the "Spread cheat" behavior note above is likewise Zandronum-only, so exactly one projectile fires per call regardless of player cheats. Spectral-missile handling is mechanically different too: Zandronum's `A_FireCustomMissileHelper` sets `health = -1` directly on a spawned `MF4_SPECTRAL` missile (per "Spectral (friendly) missiles" above), while UZDoom's native `P_SpawnPlayerMissile` instead calls `SetFriendPlayer(source.player)` on `MF4_SPECTRAL` missiles — the friendly-fire-avoidance intent is preserved, but through the actor's friend-player association rather than a health-value hack.
 
 ## See also
 

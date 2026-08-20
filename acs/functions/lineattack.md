@@ -1,8 +1,10 @@
 # `void LineAttack(int tid, fixed angle, fixed pitch, int damage [, str pufftype [, str damagetype [, fixed range [, int flags [, int pufftid]]]]])`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master`/`3.3-alpha` HEAD — see ../../shared/AUTHORING.md "Engine scope").
-**Provenance:** Wiki page `LineAttack (ACS) - ZDoom Wiki.html` (ZDoom wiki, `oldid=53708`, retrieved 2026-07-29). The wiki page does **not** document the angle/pitch encoding or state that they are fractions-of-turn, but the actual implementation matches the wiki in all tested details. Verified against the Zandronum source's `src/p_acs.cpp:6435-6475`, `p_map.cpp:4188-4556`, `p_local.h:30`, `p_local.h:499-506`, and `zt-bcc/lib/zcommon.bcs:1688, 1057-1058`. **Fork divergences found**: (1) `LineAttack(0, ...)` from a script with no activator crashes (unguarded NULL dereference), unlike the similar-looking `SetActorAngle(0, ...)` which silently no-ops; (2) `pufftid` is silently dropped (never assigned, no error) whenever the hit doesn't produce a persistent puff — most notably the default case of hitting a normal, bleeding actor with a puff class that lacks `MF3_PUFFONACTORS`. Both are documented above.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** Wiki page `LineAttack (ACS) - ZDoom Wiki.html` (ZDoom wiki, `https://zdoom.org/w/index.php?title=LineAttack_%28ACS%29&oldid=53708`, retrieved 2026-07-29). The wiki page does **not** document the angle/pitch encoding or state that they are fractions-of-turn, but the actual implementation matches the wiki in all tested details. Verified against the Zandronum source's `src/p_acs.cpp:6435-6475`, `p_map.cpp:4188-4556`, `p_local.h:30`, `p_local.h:499-506`, and `zt-bcc/lib/zcommon.bcs:1688, 1057-1058`. **Fork divergences found**: (1) `LineAttack(0, ...)` from a script with no activator crashes (unguarded NULL dereference), unlike the similar-looking `SetActorAngle(0, ...)` which silently no-ops; (2) `pufftid` is silently dropped (never assigned, no error) whenever the hit doesn't produce a persistent puff — most notably the default case of hitting a normal, bleeding actor with a puff class that lacks `MF3_PUFFONACTORS`. Both are documented above.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
 
 Fires a hitscan attack (raycast). Extension function, index `-60` in `zcommon.bcs` (`case ACSF_LineAttack:` at the Zandronum source's `src/p_acs.cpp:6435-6475`).
@@ -35,3 +37,24 @@ Fires a hitscan attack (raycast). Extension function, index `-60` in `zcommon.bc
 ## Network note
 
 The fork adds no ACS-level client synchronization for this function. Hitscan attacks inherently client-predict on both server and clients per the engine's netcode; this function has no `[AK]`-tagged server-sync code like `ACSF_PlaySound` does immediately below it in the source. The client-side decal/puff behavior is engine-level, not ACS-specific.
+
+## Engine-family divergence: ZScript event handler can silently cancel the attack
+
+UZDoom's `P_LineAttack` (the UZDoom source's `src/playsim/p_map.cpp`) opens with a call to
+`t1->Level->localEventManager->WorldHitscanPreFired(t1, angle, distance, pitch, damage, damageType, pufftype, flags, sz, offsetforward, offsetside)`
+and returns `nullptr` immediately, before doing any tracing, damage, or puff spawning, if that
+call returns true. This routes through UZDoom's ZScript `EventHandler` system: any loaded mod can
+override `WorldHitscanPreFired` and veto the hitscan outright. Zandronum has no ZScript event-handler
+system and no equivalent call — its `P_LineAttack` always performs the attack. From the calling ACS
+script's point of view this is invisible either way (`LineAttack` has no return value to check), but
+on UZDoom a mod's event handler can make the call a silent no-op — no damage, no puff, no decal —
+in a way that has no counterpart on Zandronum.
+
+Aside from this addition, the rest of `ACSF_LineAttack`'s behavior — the unguarded NULL dereference
+when `tid` is `0` and there is no activator, the angle/pitch fraction-of-turn encoding (translated via
+`DAngle::fromQ16`, which resolves to the same fraction-of-a-full-turn semantics), positive pitch aiming
+downward, the `range`-argument-0-treated-as-omitted caveat, the `2048.0` (`MISSILERANGE`) default range,
+the `"BulletPuff"`/`"None"` defaults, the guarded `pufftid` assignment, and the silent `pufftid` drop when
+hitting a normal bleeding actor with a puff class lacking `MF3_PUFFONACTORS` — all agree with the
+Zandronum-verified description above (the UZDoom source's `src/playsim/p_acs.cpp:5958-5997` and
+`src/playsim/p_map.cpp:4648-4978`).

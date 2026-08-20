@@ -1,8 +1,10 @@
 # CheckActorClass
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (verified against 3.3-alpha checkout)
-**Provenance:** `CheckActorClass - ZDoom Wiki` (oldid=37309), verified against Zandronum source 2026-07-29
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** `CheckActorClass - ZDoom Wiki` (https://zdoom.org/w/index.php?title=CheckActorClass&oldid=37309), verified against Zandronum source 2026-07-29
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Extension function (`zcommon.bcs` index -27, dispatches to `case ACSF_CheckActorClass` in `p_acs.cpp:6202`)
 
 **Syntax:** `bool CheckActorClass(int tid, str class)`
@@ -57,7 +59,7 @@ The wiki page is feature-complete and accurate in its core description. However,
 
 ## Family note
 
-`CheckActorClass` and `GetActorClass` (index -68) are adjacent in the engine's `EACSFunctions` enum (positions 27 and 68) and are both type-related actor queries dispatching through the same `SingleActorFromTID` helper. However, they are **not a mandatory-sequence pair** — each is independently usable without the other, so they are documented separately in `functions/` rather than consolidated into a `families/` file. A family file would be justified only if they were mutually dependent (e.g., Open/Read/Close lump operations) or if divergence on an edge case (like `GetActorClass` returning `"None"` vs. `CheckActorClass` returning `false` on NULL) warranted shared documentation. See `CLAUDE.md` for layout rationale.
+`CheckActorClass` and `GetActorClass` (index -68) are adjacent in the engine's `EACSFunctions` enum (positions 27 and 68) and are both type-related actor queries dispatching through the same `SingleActorFromTID` helper. However, they are **not a mandatory-sequence pair** — each is independently usable without the other, so they are documented separately in `functions/` rather than consolidated into a `families/` file. A family file would be justified only if they were mutually dependent (e.g., Open/Read/Close lump operations) or if divergence on an edge case (like `GetActorClass` returning `"None"` vs. `CheckActorClass` returning `false` on NULL) warranted shared documentation. See `AGENTS.md` for layout rationale.
 
 ---
 

@@ -1,6 +1,6 @@
 # MAPINFO doc index
 
-Router only. See `CLAUDE.md` for where MAPINFO parsing lives in engine source,
+Router only. See `AGENTS.md` for where MAPINFO parsing lives in engine source,
 `../shared/AUTHORING.md` for tiers/engine-scope/licensing.
 
 ## Concepts
@@ -20,7 +20,11 @@ Router only. See `CLAUDE.md` for where MAPINFO parsing lives in engine source,
   survey: Zandronum lacks ~13 GZDoom-family properties (renderer features like `EnableShadowmap`,
   cutscene blocks `Intro`/`Outro`, ZScript `EventHandlers`, metadata keys `Author`/`Label`, and
   others); GZDoom-family lacks Zandronum-specific multiplayer/campaign properties. Spot-checked
-  against both engines; see file for full list.
+  against both engines; see file for full list. Also covers the `monsterfallingdamage`/
+  `nomonsterfallingdamage` keys' HexenHack retraction gap — a numeric-header (`map 1 "..."`) map
+  declaration re-applies `LEVEL2_MONSTERFALLINGDAMAGE` after the `defaultmap`/`gamedefaults`
+  baseline copy, defeating an inherited `nomonsterfallingdamage`, including on every IWAD hexen.wad
+  map declaration.
 - [Cluster block definition](concepts/cluster-block.md) — tier A. Defines cluster-scope MAPINFO
   block for intermission messages, hub state retention, and cutscene blocks; comprehensive
   engine-family divergence survey (GZDoom-family `AllowIntermission`, `Intro`, `Outro`, `GameOver`

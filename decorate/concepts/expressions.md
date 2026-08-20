@@ -1,10 +1,15 @@
 # DECORATE expressions
 
-**Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `DECORATE_expressions` (retrieved 2026-07-31, oldid=55359) + verified against Zandronum source (`src/thingdef/thingdef_exp.cpp`, `src/thingdef/thingdef_expression.cpp`, `src/thingdef/thingdef_function.cpp`).
+**Tier:** A (original content below); B (the "Correction" sentence in the intro, added from
+direct source reading with no wiki starting point — see `constants.md` for the full finding)
+**Applies to:** UZDoom=yes, Zandronum=yes — UZDoom's DECORATE expression parser supports a wider
+built-in function set than Zandronum's, see "Engine-family divergence" below; the expression
+language and grammar described in this file otherwise apply to both
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `DECORATE_expressions` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=DECORATE_expressions&oldid=55359) + verified against Zandronum source (`src/thingdef/thingdef_exp.cpp`, `src/thingdef/thingdef_expression.cpp`, `src/thingdef/thingdef_function.cpp`). The intro's tier-B correction is verified against `src/thingdef/thingdef_parse.cpp:649-651` and `:1261-1265` (see `constants.md`'s Provenance for the same citation).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
-Numeric expressions can be used as parameters to action functions and other dynamic contexts in DECORATE (e.g., in `A_SetHealth(health + 50)`, `A_CustomMissile(..., random(0, 360))`). Expressions combine literals, variables, operators, and function calls following standard operator precedence. **Note:** Expressions may not be used as static values in the `Default` block — that context requires compile-time constants only (see [`constants.md`](constants.md) for `const`/`enum`/user variables in actor definitions).
+Numeric expressions can be used as parameters to action functions and other dynamic contexts in DECORATE (e.g., in `A_SetHealth(health + 50)`, `A_CustomMissile(..., random(0, 360))`). Expressions combine literals, variables, operators, and function calls following standard operator precedence. **Note:** Expressions may not be used as static values in the `Default` block. **Correction (source-verified, tier B):** a plain `'I'`/`'F'`-typed property value in the `Default` block is not "a compile-time constant expression" in the sense of accepting a named `const`/`enum` symbol either — it is parsed by `sc.MustGetNumber()`/`sc.MustGetFloat()`, which only ever reads a bare numeric literal token and never consults the symbol table `const`/`enum` names are registered in. A same-named `const int`/`enum` that resolves fine as an action-function argument one line later will fail to compile as a plain property value. See [`constants.md`](constants.md#named-constants-are-not-accepted-as-plain-property-values-verified) for the full trace and the distinction from `'X'`-type (expression-in-parens) properties, where a named constant does resolve.
 
 ## Precedence and operators
 
@@ -14,12 +19,14 @@ Operators follow C-like precedence, highest to lowest (within the same level, le
 2. Multiplicative: `*`, `/`, `%` (modulo)
 3. Additive: `+`, `-` (binary)
 4. Shift: `<<`, `>>`, `>>>` (unsigned right shift)
-5. Bitwise: AND (`&`), XOR (`^`), OR (`|`)
-6. Relational: `<`, `>`, `<=`, `>=`
-7. Equality: `==`, `!=`
-8. Logical AND: `&&`
-9. Logical OR: `||`
-10. Ternary conditional: `? :`
+5. Relational: `<`, `>`, `<=`, `>=`
+6. Equality: `==`, `!=`
+7. Bitwise AND: `&`
+8. Bitwise XOR: `^`
+9. Bitwise OR: `|`
+10. Logical AND: `&&`
+11. Logical OR: `||`
+12. Ternary conditional: `? :`
 
 All operators work on numeric types (int and float); bitwise operators truncate to integers. Floating-point and integer operands are coerced as needed, following C rules (explicit cast not required).
 
@@ -33,7 +40,7 @@ All operators work on numeric types (int and float); bitwise operators truncate 
 
 ## Actor variables accessible in expressions
 
-The following actor member variables can be read and, where noted, written in expressions:
+The following actor member variables can be read and, where noted, written in expressions. This list applies to Zandronum; UZDoom's GZDoom-derived `AActor` class carries the same variables with some semantic differences (e.g. angles/pitches as doubles rather than fixed-point, and position components as explicit doubles). A full type/range comparison for UZDoom has not been traced here — see the engine source if precision/range matters to your DECORATE code.
 
 **Position and velocity:**
 - `x`, `y`, `z` — actor position
@@ -66,7 +73,7 @@ The following actor member variables can be read and, where noted, written in ex
 - `special`, `special1`, `special2` — map special and auxiliary values
 - `score` — score value
 
-*Note: The wiki's ZScript-era reference lists `pos`, `vel` with component access (e.g., `pos.x`, `vel.z`) — Zandronum DECORATE does not support that syntax (dot-member access is disabled). Use the flat variable names (`x`/`y`/`z`, `velx`/`vely`/`velz`) instead. Similarly, `threshold`, `defthreshold`, `waterdepth`, `roll`, and `species` are not accessible in Zandronum DECORATE.*
+*Note: The wiki's ZScript-era reference lists `pos`, `vel` with component access (e.g., `pos.x`, `vel.z`) — neither Zandronum nor UZDoom DECORATE supports that syntax (dot-member access is disabled via preprocessor guard in both engines). Use the flat variable names (`x`/`y`/`z`, `velx`/`vely`/`velz`) instead. Similarly, `threshold`, `defthreshold`, `waterdepth`, `roll`, and `species` are not accessible in Zandronum DECORATE.*
 
 ## Built-in functions
 
@@ -108,7 +115,7 @@ Actor variables that are arrays (e.g., `args`, `user_myarray`) can be indexed wi
 
 ## Examples
 
-```
+```text
 // Health that scales with difficulty
 health = 100 * (2 - skill / 4)
 
@@ -124,6 +131,12 @@ checkclass(DoomImp, AAPTR_TARGET, true) ? 10 : 20  // return 10 for Imps or subc
 // Call ACS script and branch on result
 ACS_NamedExecuteWithResult("CheckObjective", args[0], args[1]) == 1
 ```
+
+## Engine-family divergence
+
+**Random and math functions:** UZDoom's DECORATE expression parser supports several functions absent from Zandronum DECORATE. Confirmed directly in UZDoom's `src/scripting/decorate/thingdef_exp.cpp`: `min(a, b)`, `max(a, b)`, `clamp(x, lo, hi)`, `atan2(y, x)`, `VectorAngle(x, y)`, and the client-side random variants `crandom`/`cfrandom`/`randompick`/`frandompick`/`crandompick`/`cfrandompick` (available in UZDoom DECORATE itself, not only ZScript as the wiki suggests). The shared core set (`random`/`frandom`/`random2` with optional RNG-isolation identifier `[name]`, `abs`, `sqrt`, `sin`, `cos`, `ACS_NamedExecuteWithResult`/`CallACS`) works identically on both. Extended math functions the wiki lists (`exp`, `log`, `log10`, `ceil`, `floor`, `round`, `tan`, `acos`, `asin`, `atan`, `cosh`, `sinh`, `tanh`) resolve via UZDoom's generic function-lookup mechanism in expressions; their availability in DECORATE specifically is not documented separately here.
+
+**Assignment and mutation operators:** UZDoom's expression parser supports assignment (`=`) and compound-assignment operators (`+=`, `-=`, `*=`, `/=`, `%=`, `<<=`, `>>=`, `>>>=`, `&=`, `^=`, `|=`), and pre/post increment/decrement (`++`, `--`) as operators within expressions. Zandronum's DECORATE expression parser does not support any of these; only standalone `random`/`frandom`/`random2` keywords, simple identifiers, literals, and function calls are available.
 
 ## See also
 

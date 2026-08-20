@@ -1,8 +1,10 @@
 # `bool KickFromGame(int player, str reason)` — wiki name `ForceToSpectate`
 
 **Tier:** A.
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD; the `ACSF_ForceToSpectate` naming and behavior predate the 3.2.1 version-bump commit `28f736fb3` by about nine years — see "Why the names disagree" above).
-**Provenance:** wiki page `ForceToSpectate - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `oldid=2375`) + source-verified (`p_acs.cpp:5451-5458,7206-7215`, `sv_main.cpp:3942-3965`, `p_interaction.cpp:2441-2453,3006-3014`, `network.cpp:1552-1554`, commit `7791e2d44`). The wiki's signature and pass/fail semantics hold; the client-mode guard, the dead-spectator carve-out, the broadcast-not-private `reason`, and — most importantly — the **wrong callable name for this toolchain** are this doc's source-verified additions.
+**Applies to:** N/A — zt-bcc-declared, neither engine implements it
+**Verified against:** none
+**Provenance:** wiki page `ForceToSpectate - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=ForceToSpectate&oldid=2375`) + source-verified (`p_acs.cpp:5451-5458,7206-7215`, `sv_main.cpp:3942-3965`, `p_interaction.cpp:2441-2453,3006-3014`, `network.cpp:1552-1554`, commit `7791e2d44`). The wiki's signature and pass/fail semantics hold; the client-mode guard, the dead-spectator carve-out, the broadcast-not-private `reason`, and — most importantly — the **wrong callable name for this toolchain** are this doc's source-verified additions.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function (`ACSF_ForceToSpectate`, index -106), implementation at the Zandronum source's `src/p_acs.cpp:7206-7215`.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
@@ -12,7 +14,7 @@ enum name (`ACSF_ForceToSpectate`, index 106 → -106 in the extension-function 
 `zt-bcc`'s `zcommon.bcs` (`lib/zcommon.bcs:1739`) exposes the same index under a different,
 older name:
 
-```
+```text
 -106:KickFromGame(int,str):bool,
 ```
 

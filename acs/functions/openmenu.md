@@ -1,10 +1,12 @@
 # OpenMenu
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (added in commit `9fd1b90e1`, 2024-01-22, "Added ACS functions: OpenMenu and CloseMenu" — the same commit that added [CloseMenu](closemenu.md); this predates the 3.2.1 version-bump commit `28f736fb3`, 2025-08-04, so it is confirmed present in 3.2.1).
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** [OpenMenu - Zandronum Wiki](https://wiki.zandronum.com/w/index.php?title=OpenMenu&oldid=2261), verified against the Zandronum source on 2026-07-29.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 
-```
+```text
 int OpenMenu (str name)
 ```
 
@@ -52,3 +54,26 @@ the fork source.
 
 - [CloseMenu](closemenu.md) — added in the same commit; note that function's return-value
   behavior diverges from its own wiki page in ways `OpenMenu`'s does not.
+
+## Engine-family divergence
+
+`OpenMenu` is ACSF (CALLFUNC) index 170, inside the 100–199 range UZDoom reserves for Zandronum's
+extensions and implements none of. Its `CallFunction` dispatcher is a `switch` with no `case` for
+this index, falling to `default: break;` and returning `0` — no error, no log line, execution just
+continues.
+
+That silent `0` return happens to line up with one of this function's two genuine Zandronum
+failure returns (invalid menu name, no player activator) — but the side effect doesn't happen
+either way: there's no `M_IsValidMenu()` check, no `SERVERCOMMANDS_OpenMenu(...)`/
+`M_StartControlPanel(true)`+`M_SetMenu(...)` call, nothing, since the dispatcher never reaches this
+function's implementation. A script that calls `OpenMenu` expecting the named menu to appear for
+the activating player gets a `0` back indistinguishable from "invalid menu name" and no visible
+failure — the menu simply never opens, exactly as if the call were never made. Unlike `CloseMenu`,
+whose Zandronum-side `0` is rare enough that a UZDoom `0` is already a strong tell something's
+wrong, `OpenMenu` returning `0` is unremarkable on both engines, so this divergence is easy to miss
+by reading return values alone. See [CloseMenu](closemenu.md) for the counterpart call this pairs
+with — same reserved-range mechanism, same silent-no-op shape under UZDoom.
+
+See [Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md) for the general
+mechanism (reserved ACSF range, `default: break;` dispatcher, why this differs from an unknown-PCD
+failure).

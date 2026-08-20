@@ -1,8 +1,10 @@
 # `fixed GetActorFloorZ(int tid)`
 
 **Tier:** A.
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master`/`3.3-alpha` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`).
-**Provenance:** wiki page `GetActorFloorZ - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `oldid=46774`) + source-verified against `p_acs.cpp:12018-12023, 4445-4456`, `builtin.c:121` signature, `p_map.cpp:1461-1493` 3D-floor handling, and `p_mobj.cpp:4957` spawn-time floor initialization. The function's 3D-floor awareness and the specific midpoint-based selection rule are verified directly from source and represent a **wiki/fork divergence**: the wiki's description "highest floor point underneath the actor" omits the midpoint test and `FF_SOLID` gate, which means a 3D floor only raises `floorz` if the actor is actually standing on it (or partially inside it), not unconditionally if it's above the actor. All other claims (fixed-point return, `tid=0` activator fallback, silent-0 failure conflation, blockmap timing) check out or are consistent with the source.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `GetActorFloorZ - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=GetActorFloorZ&oldid=46774`) + source-verified against `p_acs.cpp:12018-12023, 4445-4456`, `builtin.c:121` signature, `p_map.cpp:1461-1493` 3D-floor handling, and `p_mobj.cpp:4957` spawn-time floor initialization. The function's 3D-floor awareness and the specific midpoint-based selection rule are verified directly from source and represent a **wiki/fork divergence**: the wiki's description "highest floor point underneath the actor" omits the midpoint test and `FF_SOLID` gate, which means a 3D floor only raises `floorz` if the actor is actually standing on it (or partially inside it), not unconditionally if it's above the actor. All other claims (fixed-point return, `tid=0` activator fallback, silent-0 failure conflation, blockmap timing) check out or are consistent with the source.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 
 Gets an actor's floor contact height (the highest solid surface it's resting on or intersecting with). Compiler builtin (`PCD_GETACTORFLOORZ`, the Zandronum source's `src/p_acs.cpp:12018-12023`), implementation via the file-local `SingleActorFromTID(int, AActor*)` helper (`p_acs.cpp:4445-4456`), which resolves the actor and returns its `floorz` member — a fixed-point world coordinate updated whenever the engine calls `P_CheckPosition`/`P_TryMove`/`P_FindFloorCeiling`.
@@ -15,7 +17,7 @@ Gets an actor's floor contact height (the highest solid surface it's resting on 
 
 ## Example (adapted from the wiki)
 
-```c
+```acs
 script 124 ENTER
 {
     while (TRUE)

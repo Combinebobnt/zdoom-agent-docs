@@ -1,10 +1,12 @@
 # AmbientSound
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** `AmbientSound - ZDoom Wiki.html` (zdoom.org, oldid=35962), verified against the Zandronum source on 2026-07-29.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** `AmbientSound - ZDoom Wiki.html` (zdoom.org, https://zdoom.org/w/index.php?title=AmbientSound&oldid=35962), verified against the Zandronum source on 2026-07-29.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
-```
+```text
 void AmbientSound(str sound, int volume);
 ```
 

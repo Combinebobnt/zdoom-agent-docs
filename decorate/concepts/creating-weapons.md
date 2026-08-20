@@ -1,8 +1,10 @@
 # Creating weapons
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki "Creating new weapons" (retrieved 2026-07-31, oldid=52274), cross-checked against the Zandronum source's weapon-state handlers (`src/g_shared/a_weapons.cpp:827-890`), action-function implementations (`src/p_pspr.cpp:907-1275`), property definitions (`src/thingdef/thingdef_properties.cpp:1777-1990`), and the generic state-machine machinery. Per `../../shared/AUTHORING.md`'s engine-scope caveats, the local checkout used to verify this is a `master` HEAD reporting `3.3-alpha`, not a pristine 3.2.1 checkout; none of the files cited here are touched by the applied ZandronumMCP patch. The wiki page describes ZDoom/GZDoom-family engines, where DECORATE is currently deprecated in favor of ZScript; for Zandronum, DECORATE is the only scripting surface available for weapon definitions.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki "Creating new weapons" (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=Creating_new_weapons&oldid=52274), cross-checked against the Zandronum source's weapon-state handlers (`src/g_shared/a_weapons.cpp:827-890`), action-function implementations (`src/p_pspr.cpp:907-1275`), property definitions (`src/thingdef/thingdef_properties.cpp:1777-1990`), and the generic state-machine machinery. Per `../../shared/AUTHORING.md`'s engine-scope caveats, the local checkout used to verify this is a `master` HEAD reporting `3.3-alpha`, not a pristine 3.2.1 checkout; none of the files cited here are touched by the applied ZandronumMCP patch. The wiki page describes ZDoom/GZDoom-family engines, where DECORATE is currently deprecated in favor of ZScript; for Zandronum, DECORATE is the only scripting surface available for weapon definitions.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 This page covers what distinguishes a weapon from other inventory items in DECORATE, the states that make one work, and how to define variations (alternate fire, hold sequences). It does not cover action-function semantics themselves — see the `actions/` directory for those — or the state-machine model (label/state-line grammar, control flow, duration semantics, special sprite tokens), which is already covered in `state-machine.md`.
 
@@ -13,7 +15,7 @@ The only requirement to create a new weapon is to inherit from the `Weapon` clas
 - **Class membership**: only the `Weapon` class and its descendants have states that the engine looks up by weapon-specific label names (`Ready`, `Select`, `Deselect`, `Fire`, `Hold`, `AltFire`, `AltHold`, `Flash`, `AltFlash`), so non-weapons cannot use them. See "Weapon-specific states" below.
 - **Ammunition handling**: the `AmmoType1`/`AmmoType2`, `AmmoUse1`/`AmmoUse2`, and `AmmoGive1`/`AmmoGive2` properties specific to the `Weapon` class (shorthand forms `AmmoType`, `AmmoUse`, `AmmoGive` map to the `1` variants — `thingdef_properties.cpp:1777-1855`). Non-weapons cannot hold or fire ammunition.
 - **Selection priority**: the `Weapon.SelectionOrder` property, which governs weapon-cycling and auto-switch behavior (lower values have higher priority; a new weapon picked up will auto-switch to it if its `SelectionOrder < ` the currently-held weapon's — `g_shared/a_weapons.cpp:442`).
-- **Weapon-layer animation**: two-layer sprite rendering via the `ps_weapon` (player sprite layer 0, the weapon grip/hand) and `ps_flash` (player sprite layer 1, the muzzle flash) — the engine manages both layers for weapons but only the `ps_weapon` for other inventory items (`p_pspr.cpp:46-47`). The `Flash`/`AltFlash` states run in the `ps_flash` layer independently from `Fire`/`AltFire` sequences in the weapon layer.
+- **Weapon-layer animation**: two-layer sprite rendering — a weapon layer (the weapon grip/hand) and a flash layer (the muzzle flash) — the engine manages both layers for weapons but only the weapon layer for other inventory items. The `Flash`/`AltFlash` states run in the flash layer independently from `Fire`/`AltFire` sequences in the weapon layer. See "Engine-family divergence" below for how these layers are referenced in each engine.
 
 Inheriting from an existing weapon (e.g. `Shotgun`, `PlasmaRifle`) is simpler than reimplementing every property from scratch, since the parent provides defaults for all of the above — you can override only what you need to customize.
 
@@ -41,8 +43,8 @@ Every weapon (and only weapons) recognizes a set of reserved label names looked 
 ### Core weapon sequence
 
 - **`Spawn:`** The idle animation when the weapon lies on the ground as a pickup. Optional; if omitted, the weapon is invisible on pickup.
-- **`Ready:`** The default animation when the weapon is selected and the player is not firing. Must call `A_WeaponReady` (or an equivalent idle action) to allow the weapon to fire, be deselected, and bob naturally. `A_WeaponReady` is defined on the `AInventory` class (`p_pspr.cpp:907`), so it's callable from any inventory item's state, not just weapons.
-  - `A_WeaponReady` takes optional flags (e.g. `WRF_NOPRIMARY`, `WRF_NOALTERNATE`) to disable specific fire modes and prevent the weapon from being used in certain circumstances. The specific `WRF_*` constants defined in Zandronum are determined at compile time from `src/thingdef/thingdef_codeptr.cpp` and may differ from upstream ZDoom/GZDoom-family engines.
+- **`Ready:`** The default animation when the weapon is selected and the player is not firing. Must call `A_WeaponReady` (or an equivalent idle action) to allow the weapon to fire, be deselected, and bob naturally.
+  - `A_WeaponReady` takes optional flags (e.g. `WRF_NOPRIMARY`, `WRF_NOSECONDARY`) to disable specific fire modes and prevent the weapon from being used in certain circumstances. See "Engine-family divergence" below for differences in where this action is defined and which `WRF_*` flag variants are available.
 - **`Select:`** Entered when the player switches to this weapon. Typically calls `A_Raise` repeatedly in a loop to slide the weapon up from the bottom of the screen. Must eventually enter the `Ready` state (via `Goto Ready` or by running out of tics/actions); the engine does not automatically transition.
 - **`Deselect:`** Entered when the player switches away from this weapon. Typically calls `A_Lower` repeatedly in a loop to slide the weapon off the bottom of the screen. After `A_Lower` determines the weapon is fully lowered, it internally calls the next weapon's `Select` sequence or the previous weapon's `Ready` state, so `Deselect` need not explicitly `Goto` anything.
 
@@ -64,7 +66,7 @@ The engine distinguishes primary and alternate fire through internal flags (`bAl
 
 ### Flash sequences
 
-- **`Flash:`** (optional) A special state that runs *simultaneously* in a separate sprite layer (`ps_flash`) while the weapon-layer state (`Fire`, `Hold`, etc.) is executing. When a fire sequence calls `A_GunFlash`, the engine looks up the `Flash` state (or `AltFlash` if alternate fire is active) and runs it in the flash layer in parallel with the weapon layer (`p_pspr.cpp:1272-1275`). The flash state typically shows a muzzle-flash sprite and then stops; while it's running, the weapon layer continues its animation independently.
+- **`Flash:`** (optional) A special state that runs *simultaneously* in a separate sprite layer while the weapon-layer state (`Fire`, `Hold`, etc.) is executing. When a fire sequence calls `A_GunFlash`, the engine looks up the `Flash` state (or `AltFlash` if alternate fire is active) and runs it in the flash layer in parallel with the weapon layer. The flash state typically shows a muzzle-flash sprite and then stops; while it's running, the weapon layer continues its animation independently.
   - **Note on wiki inconsistency**: The ZDoom Wiki page's top-level code example shows `Flash: USGF A 6 A_FireBullets(...)`, calling a firing action in the flash state, which would cause a second volley. The same page's prose section correctly describes `Flash: USGF A 6 BRIGHT` with no action, letting the BRIGHT keyword render the flash at full brightness regardless of lighting. The correct pattern is the latter — the flash state should show the muzzle-flash sprite, optionally with BRIGHT, but should never call attack actions, as those run in the weapon layer already (called by the primary `Fire` sequence).
 - **`AltFlash:`** (optional) Analog of `Flash` for alternate-fire sequences; looked up and run in parallel when `A_GunFlash` is called during an `AltFire` sequence with `bAltFire` set.
 
@@ -72,7 +74,7 @@ If no `Flash` state is defined, calling `A_GunFlash` has no visible effect (the 
 
 ## Example: a basic custom weapon
 
-```
+```text
 actor ExampleCannon : Shotgun 9990
 {
   Weapon.SelectionOrder 350
@@ -123,7 +125,7 @@ This weapon:
 
 To create a weapon with a hold-fire mode (e.g. semi-auto vs. full-auto):
 
-```
+```text
 actor ExampleRifle : Pistol 9991
 {
   States
@@ -153,8 +155,7 @@ Alternate fire works the same way: define `AltFire` and optionally `AltHold`, an
 
 ## Open questions (unverified in this checkout — don't guess past these)
 
-- The exact list of `WRF_*` flags accepted by `A_WeaponReady` in Zandronum's `thingdef_codeptr.cpp` was not exhaustively cross-checked against the GZDoom-family upstream — it's possible Zandronum has a subset or superset of these constants relative to a particular GZDoom version, and upstream constant names/values may have evolved since this fork's baseline.
-- Whether calling `A_GunFlash` (which reads the `bAltFire` flag) outside of a weapon's own state sequence (e.g. from a monster's action, or from a non-weapon actor) has any meaning in this fork — the implementation assumes a weapon context and may fail or behave unexpectedly otherwise.
+- Whether calling `A_GunFlash` (which reads the `bAltFire` flag) outside of a weapon's own state sequence (e.g. from a monster's action, or from a non-weapon actor) has any meaning in either engine — the implementation assumes a weapon context and may fail or behave unexpectedly otherwise.
 
 ## Cross-references
 
@@ -162,3 +163,13 @@ Alternate fire works the same way: define `AltFire` and optionally `AltHold`, an
 - `actor-definition-syntax.md` — covers actor-definition header syntax and inheritance basics.
 - `actions/a_look.md` — `A_Look` semantics for monsters; not weapon-specific but illustrates action-function documentation pattern.
 - The `actions/` directory — `A_WeaponReady`, `A_Raise`, `A_Lower`, `A_ReFire`, `A_GunFlash`, `A_FireBullets`, `A_CheckReload`, etc. when documented individually.
+
+## Engine-family divergence
+
+**`A_WeaponReady` and `A_GunFlash` class scope.** On Zandronum, both functions are defined on the `AInventory` class (`src/p_pspr.cpp:907` and `1234`), so they are callable from any inventory item's state sequence. On UZDoom, both are defined on the `Weapon` class only (`wadsrc/static/zscript/actors/inventory/weapons.zs:220` and `458`), and are not available to non-weapon actors or inventory items. This means Zandronum code that calls `A_WeaponReady` or `A_GunFlash` from a `CustomInventory` item's state sequence will not work in UZDoom — those calls simply have no effect.
+
+**`WRF_*` flag availability.** Both engines support `WRF_NOBOB`, `WRF_NOSWITCH`, `WRF_NOPRIMARY`, `WRF_NOSECONDARY`, `WRF_NOFIRE`, `WRF_ALLOWRELOAD`, `WRF_ALLOWZOOM`, and `WRF_DISABLESWITCH`. UZDoom adds four additional flags — `WRF_ALLOWUSER1`, `WRF_ALLOWUSER2`, `WRF_ALLOWUSER3`, `WRF_ALLOWUSER4` (defined in `wadsrc/static/zscript/constants.zs`) — which have no Zandronum equivalent. Zandronum's `A_WeaponReady` implementation explicitly acts on `WRF_AllowReload` and `WRF_AllowZoom` (calling `DoReadyWeaponToReload` and `DoReadyWeaponToZoom` respectively); UZDoom's does not have those branches, instead setting internal weapon-state flags via `GetButtonStateFlags()`.
+
+**Sprite layers: nomenclature and constants.** Zandronum uses C++ enum names `ps_weapon` (layer 0) and `ps_flash` (layer 1) in its internal code. UZDoom's ZScript-based implementation uses `PSP_WEAPON` and `PSP_FLASH` constants (defined in `wadsrc/static/zscript/constants.zs`). DECORATE syntax is identical on both — a `Fire:` sequence and a `Flash:` sequence are looked up by label name, not by layer constant — so this divergence only matters when reading engine source, not when writing DECORATE.
+
+**`A_Raise` and `A_Lower` speed argument.** `A_Raise` and `A_Lower` take an optional speed argument on UZDoom (defaulting to the same rate Zandronum uses, so existing DECORATE that calls them with no arguments behaves the same), letting a weapon override the raise/lower rate per call. Zandronum's implementations take no parameters at all — the per-call increment described above is fixed, with no DECORATE-visible way to change it. This page doesn't cover whether Zandronum's parameterless implementation errors or silently ignores an argument if one is passed anyway; that wasn't checked.

@@ -1,8 +1,10 @@
 # `A_SeekerMissile`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_SeekerMissile` (retrieved 2026-08-01, oldid=48951) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:638-658`, `src/p_mobj.cpp` (`P_SeekerMissile` implementation), and `wadsrc/static/actors/actor.txt:204`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_SeekerMissile` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_SeekerMissile&oldid=48951) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:638-658`, `src/p_mobj.cpp` (`P_SeekerMissile` implementation), and `wadsrc/static/actors/actor.txt:204`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_SeekerMissile)` in `src/thingdef/thingdef_codeptr.cpp`.
 
 A parameterized homing function for seeking missiles. Adjusts the calling actor's angle and velocity each call to steer toward its `tracer` target, with optional target acquisition. Unlike the simpler `A_Tracer`/`A_Tracer2`, this function exposes the turning thresholds and acquisition parameters as configurable arguments.
@@ -69,6 +71,14 @@ When called, `A_SeekerMissile` performs the following steps:
 - **Target acquisition** (`SMF_LOOK` branch) is **not** gated on server mode. Clients perform the RNG roll and blockmap search, consuming resources and burning random numbers, even though only the server's acquired target matters. This can lead to subtle desynchronization if the RNG sequence is expected to match between client and server for networked logic elsewhere.
 - **Steering** (`P_SeekerMissile`) is **server-only**. Clients receive the resulting position/angle/velocity updates via `SERVERCOMMANDS_MoveThingExact(...)`, but do not steer independently.
 
+## Engine-family divergence: no client-mode execution gate
+
+UZDoom's `P_SeekerMissile` has no equivalent of Zandronum's `NETWORK_InClientMode()` early return, and no corresponding `SERVERCOMMANDS_MoveThingExact` broadcast afterward — neither `NETWORK_InClientMode`-style client/server branch nor any server-command dispatch exists anywhere in the UZDoom source tree. The steering step (angle turn, velocity/pitch recalculation) runs to completion on every machine, not just an authoritative server. The target-acquisition step (`SMF_LOOK`'s RNG roll and `P_RoughMonsterSearch` call inside `A_SeekerMissile` itself) was already ungated on Zandronum too, so that half of the behavior is unchanged; the divergence is specifically in `P_SeekerMissile`'s steering half, which goes from server-only to unconditional.
+
+## Engine-family divergence: floating-point steering math
+
+Zandronum's `P_SeekerMissile` computes turning and vertical velocity with fixed-point primitives: `angle_t` values, `finesine`/`finecosine` lookup tables for the turn and pitch, and `P_AproxDistance` (an octagonal distance approximation, not true Euclidean distance) to derive the vertical-seek divisor. UZDoom's version is fully floating-point: angles are `DAngle` (`DAngle::fromDeg` for the clamped threshold/turnmax), horizontal facing still uses `P_FaceMobj`, but the non-precise vertical-velocity divisor comes from `AActor::DistanceBySpeed`, which is `max(1., Distance2D(dest) / speed)` — true Euclidean 2D distance, not the table-based approximation — and the precise-mode pitch comes from `DVector2(dist, ...).Angle()`, a true `atan2`-based angle rather than `R_PointToAngle2`'s fixed-point arctangent table. The two engines should steer toward the same general trajectory, but exact per-tic turn amounts and vertical-seek pitch can differ slightly, most noticeably at short range or steep vertical offsets where the octagonal approximation's error is largest.
+
 ## Comparison with A_Tracer / A_Tracer2
 
 | Feature | A_SeekerMissile | A_Tracer | A_Tracer2 |
@@ -80,7 +90,7 @@ When called, `A_SeekerMissile` performs the following steps:
 | **Smoke trail** | No | Yes (RevenantTracerSmoke) | No |
 | **Speed preservation** | Configurable (SMF_CURSPEED) | Recalcs from Speed property | Recalcs from Speed property |
 
-## Fork/wiki divergences
+## Wiki/engine divergence: distance-unit arithmetic and MaxTargetRange conflation
 
 **Distance unit arithmetic in wiki:** The wiki's examples state "a value of 4 means a range of 512 map units (4 * 64 = 512)" and "distance=10 ... roughly 1080 map units". Both are incorrect. The distance parameter is in blockmap blocks (128 map units each), so:
 - distance=4 → 512 map units (4 × 128)

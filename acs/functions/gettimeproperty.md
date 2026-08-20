@@ -1,8 +1,10 @@
 # `int GetTimeProperty(int timestamp, int which [, bool utc])`
 
 **Tier:** A.
-**Engine:** Zandronum 3.2.1 (confirmed predates the 3.2.1 version-bump commit).
-**Provenance:** wiki page `GetTimeProperty - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `oldid=1775`) + source-verified against `p_acs.cpp:7378-7401`, `zt-bcc/lib/zcommon.bcs:1219-1227,1761`, and version-gated against `f614049b4`/`28f736fb3` per shared/AUTHORING.md's "Engine scope" section.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `GetTimeProperty - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetTimeProperty&oldid=1775`) + source-verified against `p_acs.cpp:7378-7401`, `zt-bcc/lib/zcommon.bcs:1219-1227,1761`, and version-gated against `f614049b4`/`28f736fb3` per shared/AUTHORING.md's "Engine scope" section.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
 
 Localizes a Unix timestamp (as returned by `SystemTime()`) into calendar/clock fields and returns
@@ -60,7 +62,7 @@ indistinguishable from a real zero value.
 
 ## Example
 
-```
+```text
 script 1 OPEN
 {
     if (GetTimeProperty(SystemTime(), TM_WEEKDAY) == 4 && GetTimeProperty(SystemTime(), TM_DAY) == 20)
@@ -75,3 +77,26 @@ instead of extracting one field) — related but documented in their own files p
 batch's collision guard; not merged into a shared family file here even though the three are
 closely related. A future pass may want to consolidate `SystemTime`/`GetTimeProperty`/`Strftime`
 into `families/time.md` since none is very useful without `SystemTime` supplying the timestamp.
+
+## Engine-family divergence
+
+`GetTimeProperty` is bound as ACSF (CALLFUNC) index 128 (the zt-bcc source's
+`lib/zcommon.bcs:1761`, `-128:GetTimeProperty(int, int, bool):int`) — inside the 100–199 range
+UZDoom's own ACSF enum reserves for Zandronum's extensions and implements none of (see
+[Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md)). UZDoom's
+`CallFunction` dispatcher has no `case` for index 128, so its `default: break;` path fires and the
+call silently returns `0` — no error, no log line, script execution just continues with `0` in
+place of whatever calendar field was requested.
+
+That `0` is a real trap here, not just a lost value: `TM_SECOND`, `TM_MONTH`, and `TM_WEEKDAY` are
+all zero-valued constants in this function's own `TM_*` enum, and each has a legitimate in-range
+meaning at `0` (`:00` seconds, January, Sunday) — the same "indistinguishable from a genuinely-zero
+field" ambiguity this file's own Parameters/Return value sections already document for an
+out-of-range `which` on Zandronum itself, except under UZDoom every `which` hits it, including the
+in-range ones. A script checking `GetTimeProperty(SystemTime(), TM_WEEKDAY) == 0` for Sunday, or
+`TM_MONTH == 0` for January, gets a coincidentally-plausible `0` back on every call under UZDoom
+regardless of the real date — nothing looks wrong until the result is cross-checked against another
+source. `TM_MINUTE`, `TM_HOUR`, `TM_DAY`, and `TM_YEAR` don't share this trap the same way (their
+real ranges either exclude a meaningful `0` or, for `TM_YEAR`, make a `0` obviously wrong), so a
+caller using only those fields would at least see an implausible result rather than a silently
+plausible one.

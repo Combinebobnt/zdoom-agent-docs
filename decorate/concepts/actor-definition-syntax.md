@@ -1,20 +1,22 @@
 # Actor definition syntax
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-16)
 **Provenance:** ZDoom Wiki "DECORATE format specifications" (retrieved 2026-07-31,
-oldid=52163), verified against the Zandronum source's top-level actor-header parser
+https://zdoom.org/w/index.php?title=DECORATE_format_specifications&oldid=52163), verified against the Zandronum source's top-level actor-header parser
 (`src/thingdef/thingdef_parse.cpp:1018-1118`, `ParseActorHeader`). Per
 `../../shared/AUTHORING.md`'s engine-scope caveats, the local checkout used to verify this is a
 `master` HEAD reporting `3.3-alpha`, not a pristine 3.2.1 checkout, though this specific file
 isn't touched by the applied ZandronumMCP patch.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 This page covers the actor-declaration line and the overall lump structure a `States{}` block (see
 `state-machine.md`) sits inside — not the state machine itself.
 
 ## Grammar
 
-```
+```text
 actor classname [: parentclassname] [replaces replaceclassname] [doomednum] [native]
 {
   properties
@@ -61,10 +63,21 @@ actor classname [: parentclassname] [replaces replaceclassname] [doomednum] [nat
   common project layout keeps a single root `decorate.txt`/`DECORATE` lump that does nothing but
   `#include` every actor file under an `actors/` subfolder, which also lets the includes fix a
   precise load order for actors that reference each other. This directive's own parsing wasn't
-  independently re-traced against this fork's source for this page — flagged as unverified below.
+  independently re-traced against Zandronum's source for this page — flagged as unverified below.
 
 ## Open questions (unverified in this checkout)
 
 - The exact `#include` directive's parse-time behavior (e.g. path resolution rules, whether a
   missing file is a hard error) wasn't traced against Zandronum's source for this page — only the
   wiki's description is recorded above.
+
+## Engine-family divergence
+
+The `native` keyword behaves differently between the two engines. On Zandronum, it's accepted
+silently and marks the actor as backed by a native C++ class — the mechanism the engine's own
+bundled actor definitions use internally, not something a mod author is expected to write. On
+UZDoom, the DECORATE parser still recognizes the `native` token after the doomednum, but only to
+reject it with a script error ("Cannot define native classes in DECORATE") — native class
+declarations live in ZScript there instead, not in DECORATE. A DECORATE lump that uses `native`
+(deliberately or by copying an engine-internal example) compiles on Zandronum and fails to load on
+UZDoom.

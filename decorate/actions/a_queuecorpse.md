@@ -1,15 +1,17 @@
 # `void A_QueueCorpse()`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_QueueCorpse` (retrieved 2026-08-01, oldid=32300) + verified against the Zandronum source's `src/g_shared/a_action.cpp:448-451` and UZDoom's `src/playsim/a_action.cpp:94-99`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_QueueCorpse` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_QueueCorpse&oldid=32300) + verified against the Zandronum source's `src/g_shared/a_action.cpp:448-451` and UZDoom's `src/playsim/a_action.cpp:94-99`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_QueueCorpse)` in `src/g_shared/a_action.cpp` — callable from any actor's state table.
 
 Adds the calling actor to the engine's corpse queue, subject to a configurable size limit set by the `sv_corpsequeuesize` console variable (default: 64). When this limit is reached, the oldest corpse in the queue is destroyed to make room. This action is typically placed in a monster's death state to enable persistent corpse cleanup for engines or mods that produce many dead bodies (Hexen uses it extensively for this purpose).
 
 ## Signature
 
-```
+```text
 void A_QueueCorpse()
 ```
 
@@ -34,7 +36,7 @@ The queue itself is a first-in-first-out list of `DCorpsePointer` thinkers. A `C
 
 Place this action in the death state of a monster that should participate in corpse queue management:
 
-```
+```text
 Death:
     MONS A 0 A_QueueCorpse;
     MONS ABCD 5;
@@ -65,9 +67,19 @@ Hexen relies heavily on corpse queuing to prevent dead monster accumulation. The
 
 This is the primary use case the wiki refers to: "Hexen uses this to limit the amount of dead items in the game."
 
-## Engine availability
+## Engine-family divergence: corpse queue implementation
 
-This action is available in both Zandronum and UZDoom/GZDoom-family engines — a portable action across the ZDoom-family.
+This action is available in both Zandronum and UZDoom/GZDoom-family engines — a portable action across the ZDoom-family — but the underlying corpse-queue mechanism is implemented completely differently between them:
+
+- **Zandronum** backs the queue with a `DCorpsePointer : DThinker` object per queued corpse, iterated via `TThinkerIterator<DCorpsePointer>` (stat `STAT_CORPSEPOINTER`). Only the oldest (first) thinker's `Count` field is meaningful; it tracks the total queue size and is handed off to the new first thinker whenever the old one is destroyed.
+- **UZDoom** backs the queue with a plain `TArray<TObjPtr<AActor*>>` field (`FLevelLocals::CorpseQueue`, declared in `src/g_levellocals.h`) owned directly by the level — no per-corpse thinker object, no `Count` field at all; the array's own size is the count.
+
+This mechanism difference has two behavior-visible consequences:
+
+- **Eviction-on-push bound.** Zandronum's `DCorpsePointer` constructor only ever evicts **one** entry per `A_QueueCorpse` call (an `if`, not a loop), even if the queue is somehow already over its cap when the call happens. UZDoom's push path uses a `while (corpsequeue.Size() >= (unsigned)sv_corpsequeuesize)` loop that evicts as many entries as needed to bring the queue back under the cap in a single call, then pushes the new corpse. In ordinary play (queue only ever grows by one corpse at a time) both converge on the same steady state, but an oversized queue drains in one call on UZDoom versus needing several `A_QueueCorpse` calls to fully drain on Zandronum.
+- **No dequeue-vs-eviction asymmetry on UZDoom.** The "Critical asymmetry with overflow" note above describes Zandronum-specific plumbing: because both overflow-eviction and `A_DeQueueCorpse` funnel through the same `DCorpsePointer::Destroy()`, `A_DeQueueCorpse` has to null out `Corpse` first to stop that shared destructor from also destroying the actor. UZDoom has no shared destroy path to work around: `A_DeQueueCorpse` is a plain array removal (`corpsequeue.Delete(index)`) that never calls `AActor::Destroy()` on anything, and overflow eviction (`corpse->Destroy()`) is a separate, explicit call made only in the push path. The observable outcome is the same either way (dequeuing never destroys the corpse, overflow eviction always does) — the "nullify-before-destroy" mechanism the Zandronum note describes simply has nothing to work around on UZDoom.
+
+`sv_corpsequeuesize`'s runtime-lowering trim also differs slightly in scope on UZDoom: its `CUSTOM_CVAR` callback loops over every currently-loaded level (`for (auto Level : AllLevels())` in `src/g_cvars.cpp`), not just the active one — a consequence of UZDoom/GZDoom-family's multi-level (hub) support, which Zandronum's single-level architecture doesn't have.
 
 ## See also
 

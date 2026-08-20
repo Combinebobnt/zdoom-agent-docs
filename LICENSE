@@ -6,8 +6,9 @@ and with short verbatim excerpts of third-party engine/compiler source code, eac
 license. Read this file before assuming a single license covers everything here — it does not.
 
 Every doc file that contains one of the two kinds of third-party material below says so in a
-`**Source excerpt:**` header field, pointing back to the relevant section here. If a file has no
-such field, it falls under section 1.
+header field pointing back to the relevant section here — `**Wiki license:**` for section 2
+(wiki-derived material) or `**Source excerpt:**` for section 3/4 (verbatim engine/compiler
+source). If a file has neither field, it falls under section 1.
 
 1. Original material
 ---------------------
@@ -15,9 +16,9 @@ such field, it falls under section 1.
 Everything not called out by section 2, 3, or 4 below — including every `CLAUDE.md`, `README.md`,
 `INDEX.md`, `shared/`, `tools/`, `sources.example.md`, and every doc file whose
 `Provenance:` line does **not** cite a wiki page and whose body contains no `**Source excerpt:**`
-field (i.e. tier-B/C entries written directly from engine/compiler source without quoting it
-verbatim, and any tier-A entry the maintainer has since rewritten from scratch) — is original work
-by the repo's contributors.
+field (i.e. entries written directly from engine/compiler source without quoting it verbatim,
+which is most tier-B and all tier-C entries, plus any formerly wiki-derived entry the maintainer
+has since rewritten from scratch) — is original work by the repo's contributors.
 
     MIT License
 
@@ -46,29 +47,64 @@ excerpt covered by section 3 or 4 below — the MIT grant in this section covers
 analysis, not any quoted third-party source sitting inside the same file. Check for a
 `**Source excerpt:**` field before assuming a whole file is unencumbered.
 
-2. Wiki-derived material (tier-A entries)
-------------------------------------------
+2. Wiki-derived material (wiki-citing entries)
+------------------------------------------------
 
-Tier-A doc files (`**Tier:** A`) are enriched from a saved page on one of two wikis, recorded in
-each file's `**Provenance:**` line. Those source wikis publish their own content under terms this
-repo does not have the authority to override, regardless of how much the doc file's prose has been
-rewritten and re-verified against engine source:
+Any doc file whose `**Provenance:**` field cites a wiki page — every tier-A entry by definition,
+plus the tier-B entries that started from a wiki page without reaching tier-A's verification bar
+— is derived from a saved page on one of two wikis. Those source wikis publish their own content
+under terms this repo does not have the authority to override, regardless of how much the doc
+file's prose has been rewritten and re-verified against engine source:
 
-- Files citing a `... - ZDoom Wiki.html` provenance are derived from content published on the
-  ZDoom Wiki (`zdoom.org/wiki`) under the **GNU Free Documentation License, version 1.2** (per that
-  wiki's own footer notice). Redistribution/modification of that material must comply with GFDL
-  1.2's terms. A verbatim copy of the license text is included in this repo at
+- Files whose `Provenance:` cites the ZDoom Wiki (`zdoom.org/wiki`, whether by page title or URL)
+  are derived from content published there under the **GNU Free Documentation License, version
+  1.2**. Verified 2026-08-07 against the wiki's own footer as served on its front page ("Content
+  is available under GNU Free Documentation License 1.2 unless otherwise noted"); the wiki's
+  General disclaimer page is empty, so the footer is the sole site-wide notice, and the same
+  "unless otherwise noted" per-page caveat and intake check apply as for the Zandronum Wiki
+  below. Redistribution/modification of that material must comply with GFDL 1.2's terms. A verbatim copy of the license text is included in this repo at
   [licenses/GFDL-1.2.txt](licenses/GFDL-1.2.txt) per GFDL 1.2's own requirement that copies of
   licensed material be accompanied by the license text.
-- Files citing a `... - Zandronum Wiki.html` provenance are derived from content published on the
-  Zandronum Wiki (`wiki.zandronum.com`) under **Creative Commons
-  Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)** (per that wiki's own
-  footer notice). **Note the NonCommercial clause** — this restricts commercial reuse of that
-  subset of files beyond what the MIT grant in section 1 would otherwise allow, independent of how
-  this repo itself is licensed. Full legal text: https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+- Files whose `Provenance:` cites the Zandronum Wiki (`wiki.zandronum.com`, whether by page title
+  or URL) are derived from content published there under **Creative Commons
+  Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)**. Verified 2026-08-07
+  against the wiki's own footer ("Content is available under Attribution-NonCommercial-ShareAlike
+  4.0 International unless otherwise noted") and its `ZandronumWiki:General_disclaimer` page
+  (https://wiki.zandronum.com/w/index.php?title=ZandronumWiki:General_disclaimer&oldid=1919),
+  which reaffirms that license as the sole terms governing use and modification of the wiki's
+  content. The footer's "unless otherwise noted" leaves room for an individual page to carry
+  different terms - the intake process checks each saved page for a per-page license notice
+  (none found to date; see `maintainer/PROCESS_INTAKE_FILE.md`). **Note the NonCommercial
+  clause** — this restricts commercial reuse of that subset of files beyond what the MIT grant in
+  section 1 would otherwise allow, independent of how this repo itself is licensed. Full legal
+  text: https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
 
-Every tier-A file's `**Provenance:**` line is the authoritative record of which of the two source
-licenses applies to that specific file; check it before reusing a tier-A file outside this repo.
+Every wiki-derived file's `**Provenance:**` field is the authoritative record of which of the two
+source licenses applies to that specific file; check it before reusing such a file outside this
+repo.
+
+Accordingly, each wiki-derived file is licensed **as a whole - including this repo's own
+contributions to it -** under its source wiki's license: GFDL 1.2 for ZDoom-Wiki-derived files,
+CC BY-NC-SA 4.0 for Zandronum-Wiki-derived files. This is what those licenses' modified-version
+(GFDL 1.2 §4) and ShareAlike (CC BY-NC-SA 4.0 §3(b)) terms require of shared adaptations, and it
+is the affirmative grant for the rewritten prose in those files - the MIT grant in section 1
+never applies to them. Every wiki-derived entry here is substantially rewritten, restructured,
+and re-verified against engine/compiler source relative to the wiki revision its `Provenance:`
+cites: treat all wiki-derived material in this tree as modified from its source, never as a
+verbatim mirror. As with section 1, this whole-file grant covers the file's prose, structure,
+and analysis - not any verbatim engine/compiler source excerpt sitting inside it, which remains
+under its own section 3 or 4 terms (permissive, which is why it can lawfully sit inside a
+GFDL/CC-licensed file at all; check for a `**Source excerpt:**` field). Downstream reusers who copy a wiki-derived `.md` file out of this tree should
+carry this section (or an equivalent notice) along with it, the same way section 3 asks for
+excerpt-bearing files - and, for a GFDL file, a copy of
+[licenses/GFDL-1.2.txt](licenses/GFDL-1.2.txt) as well.
+
+**No single file may derive from both wikis.** GFDL 1.2 carries no "or any later version" clause
+and CC BY-NC-SA 4.0 is a different copyleft with a NonCommercial term on top; the two cannot both
+be satisfied at once, so a file drawing on both would be unlicensable and no section here could
+rescue it. Where one topic needs material from both, it is split into one file per wiki, each
+citing only its own. `tools/lint_docs.py` rejects a `**Provenance:**` field naming both, and
+`shared/AUTHORING.md`'s "Wiki provenance" states the rule for authors.
 
 3. Verbatim Zandronum engine source excerpts
 -----------------------------------------------
@@ -146,10 +182,13 @@ a hard lint error for the same reason.
   a non-wiki `Provenance:`, section 1's MIT terms cover you outright.
 - If a file's `Provenance:` cites a wiki page, check section 2 and comply with the corresponding
   wiki's license — in particular, verify NonCommercial compliance before using a
-  Zandronum-Wiki-derived (CC BY-NC-SA 4.0) file in a commercial context.
+  Zandronum-Wiki-derived (CC BY-NC-SA 4.0) file in a commercial context, and carry section 2's
+  notice (plus, for a GFDL file, [licenses/GFDL-1.2.txt](licenses/GFDL-1.2.txt)) along with any
+  copy you make.
 - If a file carries a `**Source excerpt:**` field, comply with section 3 or 4 as indicated — in
   practice this just means keeping this LICENSE file (or the relevant section of it) alongside any
   copy you make, since neither excerpt source imposes copyleft or commercial restrictions.
 - A single file can be subject to more than one of the above at once (e.g. a tier-A,
   Zandronum-Wiki-derived file that also quotes engine source) — check every applicable field before
-  assuming only one section applies.
+  assuming only one section applies. The one combination that never occurs is both of section 2's
+  wikis in the same file; see that section for why it can't.

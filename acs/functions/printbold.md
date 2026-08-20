@@ -1,5 +1,16 @@
 # `PrintBold`
 
+**Tier:** A.
+**Applies to:** N/A — zt-bcc-declared, neither engine implements it
+**Verified against:** none
+**Provenance:** `PrintBold - ZDoom Wiki.html`
+(`https://zdoom.org/w/index.php?title=PrintBold&oldid=47031`), verified against
+the Zandronum source's `src/p_acs.cpp` (`PCD_ENDPRINT`/`PCD_ENDPRINTBOLD` shared case block, lines
+10932-10970), the Zandronum source's `src/c_console.cpp` (`C_MidPrint`/`C_MidPrintBold`, lines
+2231-2280; `PrintColors[]` table, line 293), the Zandronum source's `src/p_mobj.cpp`
+(`AActor::CheckLocalView`, lines 1257-1272), and a repo-wide grep for `CorrectPrintBold` (zero
+hits anywhere in the Zandronum source) on 2026-07-29.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin — one of the five names in `zt-bcc/src/builtin.c`'s dedicated
 "Format functions" block (`builtin.c:167-174`: `print`, `printbold`, `hudmessage`,
 `hudmessagebold`, `log`, `strparam`), sharing [`Print`](#see-also)/[`Log`](#see-also)/
@@ -12,20 +23,9 @@ misleading `void PrintBold()` (zero-arg) signature. `printbold` never appears in
 `PCD_ENDPRINT` — they are not literally the same opcode, but see "Wiki's core claim" below for why
 they render identically anyway.
 
-**Tier:** A. **Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD —
-see "Engine scope" in `../../shared/AUTHORING.md`).
-
-**Provenance:** `PrintBold - ZDoom Wiki.html`
-(`https://zdoom.org/w/index.php?title=PrintBold&oldid=47031`), verified against
-the Zandronum source's `src/p_acs.cpp` (`PCD_ENDPRINT`/`PCD_ENDPRINTBOLD` shared case block, lines
-10932-10970), the Zandronum source's `src/c_console.cpp` (`C_MidPrint`/`C_MidPrintBold`, lines
-2231-2280; `PrintColors[]` table, line 293), the Zandronum source's `src/p_mobj.cpp`
-(`AActor::CheckLocalView`, lines 1257-1272), and a repo-wide grep for `CorrectPrintBold` (zero
-hits anywhere in the Zandronum source) on 2026-07-29.
-
 ## Syntax
 
-```
+```text
 PrintBold( <format-item-list> );
 ```
 
@@ -34,13 +34,13 @@ PrintBold( <format-item-list> );
 `a:`) — identical to `Print`'s. There is no plain-argument tail (unlike `HudMessage`); the
 compiled text is the only payload.
 
-## Wiki's core claim — confirmed true, and unfixable in this fork
+## Wiki's core claim — confirmed true, and unfixable in Zandronum
 
 The ZDoom wiki page opens with: *"due to an oversight, the engine executes `Print` when this
 function is called. The function still prints to all player screens, but its default color is
 different. To rectify that, the `CorrectPrintBold` MAPINFO property must be set to true."*
 
-This is **verified accurate for the "same visual as Print" half, on this fork, with no way to opt
+This is **verified accurate for the "same visual as Print" half, on Zandronum, with no way to opt
 out**:
 
 - `PCD_ENDPRINT` and `PCD_ENDPRINTBOLD` share one `case` block (`p_acs.cpp:10932-10970`). Both
@@ -53,11 +53,11 @@ out**:
   whether the opcode was `PCD_ENDPRINT` or `PCD_ENDPRINTBOLD`. `C_MidPrintBold`'s own distinct
   default, `PrintColors[PRINTLEVELS+1]` = `PrintColors[8]` = `CR_ORANGE`, is never reached by ACS
   `PrintBold` at all. So the wiki's "different default color" claim does **not** hold here either
-  — on this fork, `PrintBold` and `Print` render in the identical default color (gold) unless the
+  — on Zandronum, `PrintBold` and `Print` render in the identical default color (gold) unless the
   script overrides it with a `\c` color escape in the string itself.
 - **`CorrectPrintBold` does not exist anywhere in the Zandronum source** (confirmed by a
   repo-wide grep, zero hits) — it's a ZDoom-only `MAPINFO` compatibility flag that was never
-  ported to this fork. There is no MAPINFO property, CVar, or compile flag that restores a
+  ported to Zandronum. There is no MAPINFO property, CVar, or compile flag that restores a
   visually distinct "bold" style for ACS `PrintBold` in Zandronum 3.2.1. The wiki frames this as a
   fixable historical oversight; on this engine it is a permanent characteristic with no opt-out.
 

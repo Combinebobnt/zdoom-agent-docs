@@ -1,12 +1,23 @@
 # `void SetLineBlocking(int lineid, int setting)`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `SetLineBlocking - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
+`https://zdoom.org/w/index.php?title=SetLineBlocking&oldid=52803`) + source-verified against `p_acs.cpp:11441-11478`, `p_spec.cpp:281-288`,
+`doomdata.h:118,143-146`, and `zt-bcc/lib/zcommon.bcs:21-22,70-76`/`src/builtin.c:54,202`. One
+undocumented-by-wiki behavior found (out-of-range `setting` silently aliasing to
+`BLOCK_CREATURES` via the engine's own `default:` case) plus one Zandronum-only addition (server
+→ client flag replication); no outright wiki/fork contradiction on the five documented `setting`
+values themselves.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** compiler builtin.
+
 Sets/clears the blocking-related line flags on every line sharing `lineid`, replacing whichever
 blocking mode was previously set (not additive — each `setting` value maps to a fixed
 flag *state*, not a flag to OR in). Compiler builtin (`PCD_SETLINEBLOCKING`,
 the zt-bcc source's `src/builtin.c:54`/`:202`); implementation is `case PCD_SETLINEBLOCKING:` in
 `DLevelScript::RunScript`'s main switch (the Zandronum source's `src/p_acs.cpp:11441-11478`).
-
-**Bucket:** compiler builtin.
 
 - **Applies to every line with a matching ID, not just one.** `lineid` is looked up via
   `P_FindLineFromID(id, start)` (`p_spec.cpp:281-288`), a hash-chain walk (`lines[id %
@@ -41,17 +52,8 @@ the zt-bcc source's `src/builtin.c:54`/`:202`); implementation is `case PCD_SETL
   Zandronum-clientside functions do.
 - **Deprecation note carried over from the wiki, not independently re-verified here:** the wiki
   page states this function is deprecated upstream in favor of `Line_SetBlocking` and warns
-  future GZDoom compatibility isn't guaranteed. That's an upstream-GZDoom concern; this fork
-  (Zandronum, forked pre-deprecation) still implements `SetLineBlocking` as a normal, undeprecated
+  future GZDoom compatibility isn't guaranteed. That's an upstream-GZDoom concern; Zandronum
+  (forked pre-deprecation) still implements `SetLineBlocking` as a normal, undeprecated
   compiler builtin with no engine-side warning/removal — it isn't going away in this codebase.
 - No unusual failure/no-op behavior found: an id matching zero lines is simply a zero-iteration
   loop (no error), and the stack is popped (`sp -= 2`) unconditionally regardless of match count.
-
-**Provenance:** wiki page `SetLineBlocking - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
-`oldid=52803`) + source-verified against `p_acs.cpp:11441-11478`, `p_spec.cpp:281-288`,
-`doomdata.h:118,143-146`, and `zt-bcc/lib/zcommon.bcs:21-22,70-76`/`src/builtin.c:54,202`. One
-undocumented-by-wiki behavior found (out-of-range `setting` silently aliasing to
-`BLOCK_CREATURES` via the engine's own `default:` case) plus one Zandronum-only addition (server
-→ client flag replication); no outright wiki/fork contradiction on the five documented `setting`
-values themselves.
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.

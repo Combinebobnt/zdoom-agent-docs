@@ -1,8 +1,10 @@
 # `void ThingSound(int tid, str sound, int volume)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (checked out source reports 3.3-alpha; `PCD_THINGSOUND` and the `bSoundOnClient` addition are long-standing, not netcode-gated additions postdating 3.2.1, so this is not expected to be version-sensitive).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `ThingSound - ZDoom Wiki` (https://zdoom.org/w/index.php?title=ThingSound&oldid=37263), verified 2026-07-29 against fork source.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 
 Plays a sound positioned at every actor matching `tid`. Compiler builtin (`PCD_THINGSOUND`,
@@ -10,14 +12,17 @@ the zt-bcc source's `src/builtin.c:56,204`), implementation in `p_acs.cpp:11583-
 
 - `tid` — **not just one actor.** The engine runs a full `FActorIterator(tid)` and calls `S_Sound`
   once for *every* matching actor (`p_acs.cpp:11587-11595`), not just the first hit. If multiple
-  actors share the same `tid`, the sound plays from each of them. `tid == 0` follows the standard
-  ZDoom `FActorIterator` convention of matching actors that have no TID assigned (untagged
-  actors) — it is not a special-case for "no actor"/"activator" the way some other TID-taking
-  specials treat 0.
+  actors share the same `tid`, the sound plays from each of them. **Correction (2026-08-15):**
+  `tid == 0` does **not** match untagged actors — `FActorIterator::Next()` short-circuits to a
+  null return immediately whenever `id == 0` (Zandronum `actor.h:1289-1290`; UZDoom
+  `actor.h:1732-1733`; identical `if (id == 0) return ...;` check in both engines), so
+  `ThingSound(0, sound, volume)` matches zero actors and is a silent no-op, the same outcome as an
+  unresolved `sound` string. The prior text here claiming a "matches untagged actors" convention
+  was wrong in both engines, not just newly wrong in UZDoom.
 - `sound` — looked up via `FBehavior::StaticLookupString` (`p_acs.cpp:11584`); if the string index
   doesn't resolve, `lookup` stays `NULL` and the whole loop is skipped — a silent no-op, same
-  pattern as the other sound builtins in this fork (`ActivatorSound`, `AmbientSound`, etc.), not
-  an error.
+  pattern as the other sound builtins in the Zandronum fork (`ActivatorSound`, `AmbientSound`,
+  etc.), not an error.
 - `volume` — matches the wiki's 0-127 int range; the engine divides by 127 to get the float
   `0.0`-`1.0` scale `S_Sound` expects (`(float)(STACK(1))/127.f`, `p_acs.cpp:11594`). No clamping
   is done here, so a value outside 0-127 is passed straight through as a proportionally

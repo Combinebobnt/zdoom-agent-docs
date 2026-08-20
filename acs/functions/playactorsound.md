@@ -1,8 +1,10 @@
 # `void PlayActorSound(int tid, int sound [, int channel, fixed volume, bool looping, fixed attenuation])`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (checked out source reports 3.3-alpha; `ACSF_PlayActorSound` shares long-standing Hexen-era ACS plumbing with `ACSF_PlaySound`, not a netcode-gated addition, so this is not expected to be version-sensitive).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `PlayActorSound - ZDoom Wiki` (https://zdoom.org/w/index.php?title=PlayActorSound&oldid=50241), verified 2026-07-29 against fork source.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
 
 Plays one of an actor's built-in DECORATE sound properties (SeeSound, AttackSound, etc.) as
@@ -51,7 +53,8 @@ covers what's specific to `PlayActorSound`.
   Because `GetActorSound` is called once per matched actor (not once for the whole call), the
   actual sound played can differ per actor if the fan-out (nonzero `tid` matching multiple
   actors of different classes) is in play.
-  - **Wiki/fork divergence: `SOUND_Push` does not exist in this fork.** The wiki lists an 11th
+  - **Wiki/fork divergence: `SOUND_Push` does not exist in the Zandronum engine or the zt-bcc
+    compiler.** The wiki lists an 11th
     identifier, `SOUND_Push`, but `zt-bcc/lib/zcommon.bcs:736-746`'s anonymous `SOUND_*` enum
     only defines 10 values (`SOUND_SEE` through `SOUND_HOWL`, i.e. 0-9), and `GetActorSound`'s
     `switch` (`p_acs.cpp:5334-5347`) has no `case` for a value of 10 — it falls through to
@@ -82,3 +85,33 @@ covers what's specific to `PlayActorSound`.
   `args[5]` — no gap between declared and read params for this function.
 - Looping/server-channel bookkeeping (`SERVER_IsChannelLooping`/`SERVER_UpdateLoopingChannels`)
   is identical to `PlaySound`'s — see that doc, not repeated here.
+
+## Engine-family divergence: `SOUND_Push` support
+
+Unlike Zandronum, UZDoom's `GetActorSound` (`src/playsim/p_acs.cpp`) defines an 11th case,
+`SOUND_Push` (value `10`), returning the actor's `PushSound` — read through the same named
+meta-property mechanism as `SOUND_Howl`→`HowlSound` (`SoundVar(NAME_PushSound)`, not a plain
+struct field), and played by `AActor::PlayPushSound()` when a sector current/wind pushes the
+actor. So on UZDoom, calling `PlayActorSound` with a literal `sound` value of `10` is **not** a
+no-op — it looks up and plays `PushSound` like any other `SOUND_*` identifier, instead of falling
+through to `default: return NO_SOUND`.
+
+This doesn't change the practical BCS-level story above: zt-bcc's `zcommon.bcs` still has no
+`SOUND_Push` compile-time constant regardless of target engine, so there's still no *named* way to
+reach this from BCS source on either engine — only an explicit literal `10` would exercise it on
+UZDoom. The wiki's `SOUND_Push` claim turns out to be accurate for UZDoom's engine implementation;
+it's specifically the Zandronum engine (no `case 10`) and the zt-bcc compiler (no constant, on
+either target) that lack it.
+
+**The crash bug is not a Zandronum divergence — it reproduces on UZDoom.** Aside from the extra
+`SOUND_Push` case, the rest of the description above holds on UZDoom (the UZDoom source's
+`src/playsim/p_acs.cpp`, shared `ACSF_PlaySound`/`ACSF_PlayActorSound` case): the `args[0] == 0`
+branch assigns `spot = activator` and jumps straight into the play path with no NULL check, and
+the `funcIndex == ACSF_PlayActorSound` branch there calls `GetActorSound(spot, args[1])`
+unconditionally, which dereferences the actor in every case but `default`. So
+`PlayActorSound(0, <valid SOUND_* constant>, ...)` from a script with no activator
+null-dereferences and crashes on UZDoom exactly as it does on Zandronum, and the same
+`IsPointerEqual(AAPTR_DEFAULT, AAPTR_NULL, 0, 0)` guard is the fix on both. The accidental safety
+of an out-of-range `sound` value (falling to `default:`, which returns without touching the actor)
+also carries over — as does `PlaySound`'s own immunity, its NULL check still sitting downstream of
+this path rather than on it.

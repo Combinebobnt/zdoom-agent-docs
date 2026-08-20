@@ -1,5 +1,26 @@
 # `int ThingCountName(str classname, int tid)`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `ThingCountName - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
+`https://zdoom.org/w/index.php?title=ThingCountName&oldid=26428`) + source-verified against the Zandronum source (`p_acs.cpp:10526-10529` for the
+builtin dispatch, `DLevelScript::ThingCount` at `p_acs.cpp:3894-3988` for the actual counting
+logic) and `zt-bcc/src/builtin.c:142,290`. The wiki's dead-monster-exclusion and
+tid-zero-means-ignore-tid claims both hold exactly against Zandronum's source. Everything else in
+this doc (inventory-ownership exclusion, DECORATE-replacement counting, the two Zandronum-only
+`[AK]`/`[RK]` exclusions for hidden actors and spectating players, and the silent-0-on-bad-class-
+name failure mode) is this doc's source-verified addition, not present on the wiki page — this is
+exactly the kind of fork-specific/deeper-than-wiki behavior the ZDoom-wiki intake caveat in
+`../../shared/AUTHORING.md` warns to check for.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** compiler builtin. `ThingCountName(classname, tid)` is sugar for
+`ThingCount`'s string-lookup path with `tag` hardcoded to `-1` (no sector-tag filter) — see
+`DLevelScript::ThingCount` at `p_acs.cpp:3894-3988`. `ThingCountNameSector` (`PCD_THINGCOUNTNAMESECTOR`,
+`p_acs.cpp:10531-10534`) is the same worker with a real `tag` argument instead of `-1`; that's a
+separate builtin, not covered here.
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+
 Counts live actors of a given DECORATE class name, optionally restricted to a TID. Compiler
 builtin (`PCD_THINGCOUNTNAME` in `zt-bcc/src/builtin.c`), implemented at
 the Zandronum source's `src/p_acs.cpp:10526-10529`, which just forwards into the shared `ThingCount`
@@ -11,12 +32,6 @@ case PCD_THINGCOUNTNAME:
     sp--;
     break;
 ```
-
-**Bucket:** compiler builtin. `ThingCountName(classname, tid)` is sugar for
-`ThingCount`'s string-lookup path with `tag` hardcoded to `-1` (no sector-tag filter) — see
-`DLevelScript::ThingCount` at `p_acs.cpp:3894-3988`. `ThingCountNameSector` (`PCD_THINGCOUNTNAMESECTOR`,
-`p_acs.cpp:10531-10534`) is the same worker with a real `tag` argument instead of `-1`; that's a
-separate builtin, not covered here.
 
 - **Class name resolution can silently return 0, not error.** `stringid` is looked up via
   `FBehavior::StaticLookupString`; if that fails (bad string index), or if `PClass::FindClass
@@ -55,7 +70,7 @@ separate builtin, not covered here.
 **Example** (from the wiki, verified consistent with the source above — a `tid` of `0` counts
 every instance of the class map-wide, ignoring TID):
 
-```
+```text
 // Map has: Imp(tid 5) x2, Imp(tid 5), Imp(tid 0), Baron(tid 5) x2, Baron(tid 4), Baron(tid 0),
 // Demon(tid 5), Demon(tid 4), Demon(tid 0)
 ThingCountName("DoomImp", 0)     // 3  (tid 0 == "ignore tid", counts all Imps)
@@ -72,17 +87,3 @@ ThingCountName("DoomImp", 4)     // 0  (no tid-4 Imps)
 **See also:** [`IsTidUsed`](istidused.md) for a cheaper existence-only check; `ThingCount` (by
 spawnable-type ID rather than class name string) and `ThingCountNameSector`/`ThingCountSector`
 (same worker with a sector-tag filter) share this implementation but aren't documented here.
-
-**Provenance:** wiki page `ThingCountName - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
-`oldid=26428`) + source-verified against the Zandronum source (`p_acs.cpp:10526-10529` for the
-builtin dispatch, `DLevelScript::ThingCount` at `p_acs.cpp:3894-3988` for the actual counting
-logic) and `zt-bcc/src/builtin.c:142,290`. The wiki's dead-monster-exclusion and
-tid-zero-means-ignore-tid claims both hold exactly against this fork's source. Everything else in
-this doc (inventory-ownership exclusion, DECORATE-replacement counting, the two Zandronum-only
-`[AK]`/`[RK]` exclusions for hidden actors and spectating players, and the silent-0-on-bad-class-
-name failure mode) is this doc's source-verified addition, not present on the wiki page — this is
-exactly the kind of fork-specific/deeper-than-wiki behavior the ZDoom-wiki intake caveat in
-`../../shared/AUTHORING.md` warns to check for. **Engine:** Zandronum 3.2.1 (verified against
-the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.
-
-**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.

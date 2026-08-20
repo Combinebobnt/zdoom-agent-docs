@@ -1,6 +1,6 @@
 # Console commands (CCMDs)
 
-**Generated:** by `python3 tools/gen_inventory.py console-ccmds` from every `CCMD` declaration tree-wide in the Zandronum source's `src/`, cross-referenced against the UZDoom source's `src/` tree by name for the `UZD` column. See `zandronum/docs/commands.txt` for first-party prose on what a given command does -- the preferred source for `notes/` entries over re-deriving behavior from each command's own (often large) implementation function; a `../notes/<name>.md` file's `Tier`/`Notes` cell is picked up automatically on the next regen. Do not hand-edit rows. **Engine:** Zandronum 3.2.1 confirmed present for every row; UZDoom presence per the `UZD` column only. **Tier:** per row.
+**Generated:** by `python3 tools/gen_inventory.py console-ccmds` from every `CCMD` declaration tree-wide in the Zandronum source's `src/`, cross-referenced against the UZDoom source's `src/` tree by name for the `UZD` column. See `zandronum/docs/commands.txt` for first-party prose on what a given command does -- the preferred source for `notes/` entries over re-deriving behavior from each command's own (often large) implementation function; a `../notes/<name>.md` file's `Tier`/`Notes` cell is picked up automatically on the next regen. Do not hand-edit rows. Extraction reads the Zandronum source as its base (confirmed present for every row); UZDoom presence is a name cross-reference only (the `UZD` column). **Tier:** per row.
 
 | Command | Zan | UZD | Tier | Notes |
 |---|---|---|---|---|
@@ -85,7 +85,7 @@
 | demo_skiptonextmap | yes | — | C |  |
 | demo_spectatefreely | yes | — | C |  |
 | demo_ticsplayed | yes | — | C |  |
-| dir | yes | — | C |  |
+| dir | yes | yes | C |  |
 | disconnect | yes | — | C |  |
 | doublebind | yes | yes | C |  |
 | drop | yes | yes | C |  |
@@ -215,7 +215,7 @@
 | menu_joingamewithclass | yes | — | C |  |
 | menu_joystick | yes | yes | C |  |
 | menu_keys | yes | yes | C |  |
-| menu_load | yes | yes | C |  |
+| menu_load | yes | yes | B | [notes](../notes/menu_load.md) |
 | menu_login | yes | — | C |  |
 | menu_main | yes | yes | C |  |
 | menu_mapcolors | yes | yes | C |  |
@@ -226,7 +226,7 @@
 | menu_player | yes | yes | C |  |
 | menu_quit | yes | yes | C |  |
 | menu_rconlogin | yes | — | C |  |
-| menu_save | yes | yes | C |  |
+| menu_save | yes | yes | B | [notes](../notes/menu_save.md) |
 | menu_scoreboard | yes | yes | C |  |
 | menu_sound | yes | yes | C |  |
 | menu_spectate | yes | — | C |  |
@@ -274,8 +274,8 @@
 | pukename | yes | yes | C |  |
 | pullin | yes | yes | C |  |
 | querymaster | yes | — | C |  |
-| quickload | yes | yes | C |  |
-| quicksave | yes | yes | C |  |
+| quickload | yes | yes | B | [notes](../notes/quickload.md) |
+| quicksave | yes | yes | B | [notes](../notes/quicksave.md) |
 | quit | yes | yes | C |  |
 | r_visibility | yes | — | C |  |
 | rcon | yes | — | C |  |
@@ -394,7 +394,7 @@
 | vote_yes | yes | — | C |  |
 | wads | yes | — | C |  |
 | warp | yes | yes | C |  |
-| wdir | yes | yes | C |  |
+| wdir | yes | — | C |  |
 | weapdrop | yes | yes | C |  |
 | weapnext | yes | yes | C |  |
 | weaponsection | yes | yes | C |  |

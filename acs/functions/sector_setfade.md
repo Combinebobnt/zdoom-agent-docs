@@ -1,13 +1,15 @@
 # Sector_SetFade
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2025-07-29)
 **Provenance:** ZDoom Wiki (https://zdoom.org/w/index.php?title=Sector_SetFade&oldid=36174), verified against Zandronum source 2025-07-29.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Action special, index 213
 
 ## Signature
 
-```
+```text
 int Sector_SetFade (int tag, int r, int g, int b)
 ```
 
@@ -47,6 +49,19 @@ UDMF maps can set a static fade color at map load time without invoking this spe
 - **Tag 0 semantics:** Unlike some sector specials (e.g., `Floor_MoveToValue`), tag 0 does not refer to the triggering line's back sector. It searches for sectors literally tagged with 0.
 - **Dynamic changes:** The fade can be changed mid-level. If you need to test fade colors interactively, the `testfade` console command is available (cheats must be enabled for non-host players in multiplayer).
 
-## Wiki/fork divergence
+## Wiki/engine divergence
 
 The wiki states the function "works inside CLIENTSIDE scripts," implying CLIENTSIDE-only behavior. **Zandronum actually allows any ACS script to set fades client-side** (checked via `ACS_IsCalledFromScript()`, not `CLIENTSIDE` flag). This is the broader condition intended for purely visual effects (the fade is rendered-only and has no gameplay impact).
+
+## Engine-family divergence: no client/server replication step on UZDoom
+
+The entire "Multiplayer and Client-side Behavior" section above is specific to Zandronum's
+client/server network architecture and does not carry over to UZDoom. UZDoom's implementation of
+this special does the sector lookup and applies the new fade color directly and unconditionally —
+there is no equivalent of Zandronum's `bExecuteOnClient` parameter, no `ACS_IsCalledFromScript()`
+check, and no network command sent to propagate the change to other participants. UZDoom (a
+GZDoom-family engine) doesn't split ACS execution between an authoritative server and replicated
+clients the way Zandronum's netcode does, so there's simply no separate "did this run on the
+client" question for this special to answer: wherever the owning script runs, the fade is set
+there, full stop. `CLIENTSIDE` still exists as a script-type concept in UZDoom for other purposes,
+but it has no bearing on how this particular special behaves.

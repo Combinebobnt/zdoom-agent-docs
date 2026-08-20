@@ -1,12 +1,15 @@
 # TeleportGroup
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki (verified against Zandronum fork implementation)
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-06)
+**Provenance:** ZDoom Wiki `TeleportGroup` (retrieved 2026-08-06, https://zdoom.org/w/index.php?title=TeleportGroup&oldid=42518) + verified against the Zandronum source's `src/p_lnspec.cpp` and `src/p_teleport.cpp`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** action special (index 77; dispatched as `LS_TeleportGroup`).
 
 ## Signature
 
-```
+```text
 int TeleportGroup(int group_tid, int source_tid, int dest_tid, int movesource, int fog)
 ```
 

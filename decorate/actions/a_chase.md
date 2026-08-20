@@ -1,15 +1,17 @@
 # `A_Chase` (monster pursuit and attack decision)
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_Chase` (retrieved 2026-07-31, oldid=54054) + verified against the Zandronum source's `src/p_enemy.cpp:3049-3067` and the shared `A_DoChase` implementation (`src/p_enemy.cpp:2438-2868`).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_Chase` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_Chase&oldid=54054) + verified against the Zandronum source's `src/p_enemy.cpp:3049-3067` and the shared `A_DoChase` implementation (`src/p_enemy.cpp:2438-2868`).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_Chase)` in `src/p_enemy.cpp`.
 
 The core monster chase-and-attack action: handles target acquisition, decision-making between melee and ranged attacks, and pathing. Called once per state tic (e.g., `MONS ABCD 4 A_Chase;` runs once per 4 tics), not every game tic.
 
 ## Signature
 
-```
+```text
 void A_Chase(state melee = NULL, state missile = NULL, int flags = 0)
 ```
 
@@ -53,6 +55,26 @@ The following flags appear in the ZDoom wiki but are **not exported in Zandronum
 - `CHF_DONTTURN`
 
 If you are targeting Zandronum, do not use these; they are likely ZDoom/GZDoom additions not backported to Zandronum 3.2.1. If the exact behavior they provide is needed, it may require a custom action function or a design workaround.
+
+## Engine-family divergence: wiki-only flags are real and functional in UZDoom
+
+The "Flags listed in the wiki but NOT present in Zandronum" list above is Zandronum-specific. All six of those flags (`CHF_NORANDOMTURN`, `CHF_NODIRECTIONTURN`, `CHF_NOPOSTATTACKTURN`, `CHF_STOPIFBLOCKED`, `CHF_DONTIDLE`, `CHF_DONTTURN`) are defined and functional on UZDoom, confirmed against the `EChaseFlags` enum (`wadsrc/static/zscript/constants.zs:153-168`) and their use in `A_DoChase` (`src/playsim/p_enemy.cpp`):
+
+- `CHF_NORANDOMTURN` (32) — skips the `movecount`-expired random chase-direction reroll.
+- `CHF_NODIRECTIONTURN` (64) — skips the per-tic turn-toward-movement-direction step.
+- `CHF_NOPOSTATTACKTURN` (128) and `CHF_STOPIFBLOCKED` (256) — alter the post-attack `P_NewChaseDir`/movecount-reset behavior (the "do not attack twice in a row" step).
+- `CHF_DONTIDLE` (512) — makes non-friendly actors fall back to `A_Wander` instead of `SetIdle()` when no target is found, the same as friendly actors already do.
+- `CHF_DONTTURN` — a combo constant (`CHF_NORANDOMTURN | CHF_NOPOSTATTACKTURN | CHF_STOPIFBLOCKED`), not an independent bit.
+
+UZDoom also defines one further flag this file doesn't mention at all (it isn't in either the "Zandronum-only flags" or the "listed in the wiki but not present" lists above): `CHF_DONTLOOKALLAROUND` (1024), which suppresses all-around target-reacquisition checks (passed as the second argument to `P_LookForPlayers`) in both the initial and unseen-target reacquisition steps.
+
+If targeting Zandronum only, the existing "do not use these" guidance above still holds; if targeting UZDoom, all of the flags above are usable.
+
+## Engine-family divergence: omitted melee/missile arguments do fall back on UZDoom
+
+The "Note on defaults" under the `melee` parameter above, and this file's "Open questions" section (below), leave it unresolved whether omitting both `melee` and `missile` triggers automatic fallback to the actor's own `MeleeState`/`MissileState`, the way the wiki's ZScript sentinel implies. On UZDoom this is resolved: `A_Chase`'s native declaration (`wadsrc/static/zscript/actors/actor.zs:1287`) really does default both parameters to the `'_a_chase_default'` state-label sentinel, and `A_ChaseNative` (`src/playsim/p_enemy.cpp:2933-2951`) checks whether *either* resolved name still equals that sentinel. If both `melee` and `missile` are left at their defaults — a bare `A_Chase;` or `A_Chase();` — it takes the "old default A_Chase" branch and automatically uses `self->MeleeState`/`self->MissileState`. Passing an explicit `NULL` (or any other explicit value) for either parameter takes it out of the sentinel branch, and both parameters are then resolved via `StateLabels.GetState()` instead — matching the "NULL means no attack of that kind" behavior already documented above.
+
+Zandronum's own DECORATE binding (`src/p_enemy.cpp:3049-3067`, already cited in this file's Provenance) differs in shape: it gates the same "old default" fallback on the `melee` parameter's sentinel (`(FState*)-1`) alone, not on either parameter the way UZDoom's does.
 
 ## Decision flow
 
@@ -129,6 +151,14 @@ A_Chase conditionally calls several expensive operations:
 
 **Most calls are gated on specific conditions**, so A_Chase's actual cost varies widely depending on actor state and target presence. Calling it once per 4–8 tics (via state duration) is the intended usage; calling it every tic would incur significant overhead.
 
+## Engine-family divergence: chase movement uses P_SmartMove, not plain P_Move
+
+The "Movement" decision-flow step and the "Performance characteristics" section above both name `P_Move()` as the function `A_Chase` calls to advance the actor each tic — accurate for Zandronum's `A_DoChase` (`src/p_enemy.cpp`). UZDoom's `A_DoChase` (`src/playsim/p_enemy.cpp:2687`) calls `P_SmartMove()` instead, an MBF21-derived wrapper (`src/playsim/p_enemy.cpp:723`) that calls `P_Move()` internally but adds two extra behaviors gated on compatibility/actor flags with no Zandronum equivalent: staying on a lift the actor's target is also riding (`MF8_STAYONLIFT` / `COMPATF2_STAYONLIFT`), and steering away from damaging floor hazards or crushing ceilings (`MF8_AVOIDHAZARDS` / `COMPATF2_AVOID_HAZARDS`). Neither behavior is reachable unless the relevant flag or compatibility option is set, so a default-configured actor moves the same either way, but a UZDoom actor or map opting into either flag will see chase movement Zandronum has no equivalent for.
+
+## Engine-family divergence: no client/server authority split in UZDoom
+
+The "Network behavior (Zandronum multiplayer)" section above, and the "Server-side only" qualifiers on the `CHF_FASTCHASE` and `CHF_RESURRECT` flags earlier in this file, describe Zandronum's client/server authoritative model. UZDoom's `A_DoChase` (`src/playsim/p_enemy.cpp:2365-2717`) has no equivalent split: there is no `NETWORK_InClientMode()`-style check anywhere in the function, nor anywhere in UZDoom's source tree at all (GZDoom-family netcode does not use Zandronum's server-authoritative AI model), no forced-`NULL` of `target`/`goal` in a "client mode," and no `SERVERCOMMANDS_*`-style broadcast of state changes. `A_Chase` and its variants run identically on every machine in a UZDoom multiplayer session; the flags' "server-side only" qualifiers and the network-behavior bullets above do not apply.
+
 ## Open questions and untraced details
 
 - Exact behavior of `P_NewChaseDir` direction-selection algorithm (used to pick a new chase direction when movement fails).
@@ -137,7 +167,7 @@ A_Chase conditionally calls several expensive operations:
 
 ## Example (Zandronum DECORATE)
 
-```
+```text
 actor Scurymonster : Actor
 {
     Default

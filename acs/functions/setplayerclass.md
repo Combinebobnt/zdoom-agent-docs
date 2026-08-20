@@ -1,8 +1,10 @@
 # `bool SetPlayerClass(int player, str class, bool respawn)`
 
 **Tier:** A.
-**Engine:** Zandronum 3.2.1. `ACSF_SetPlayerClass` was added in commit `66c58271a` ("Added ACS function SetPlayerClass() to allow changing of a player's class.", 2020-10-28); confirmed via `git merge-base --is-ancestor 66c58271a 28f736fb3` (the 3.2.1 version-bump commit) that this predates the 3.2.1 target, so the function and the behavior described above are both present in 3.2.1, not a newer-than-3.2.1 addition.
-**Provenance:** wiki page `SetPlayerClass - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `oldid=1669`) + source-verified (`p_acs.cpp:7594-7676`, `p_interaction.cpp:3006-3023`, `team.cpp:1526-1538`, `network.cpp:1552-1555`, `d_netinfo.cpp:708-719`, `gi.h:147`, `gi.cpp:388`). The wiki's signature, parameter meanings, and general pass/fail framing hold; the missing true-spectator check (wiki says spectators are rejected, they aren't), the client-mode guard, the same-class-always-fails case, and the random-path's team-check bypass are this doc's source-verified additions/corrections, not from the wiki.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `SetPlayerClass - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=SetPlayerClass&oldid=1669`) + source-verified (`p_acs.cpp:7594-7676`, `p_interaction.cpp:3006-3023`, `team.cpp:1526-1538`, `network.cpp:1552-1555`, `d_netinfo.cpp:708-719`, `gi.h:147`, `gi.cpp:388`). The wiki's signature, parameter meanings, and general pass/fail framing hold; the missing true-spectator check (wiki says spectators are rejected, they aren't), the client-mode guard, the same-class-always-fails case, and the random-path's team-check bypass are this doc's source-verified additions/corrections, not from the wiki.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
@@ -57,7 +59,7 @@ case ACSF_SetPlayerClass:
 
 - **`player`** — validated by `PLAYER_IsValidPlayer` (`p_interaction.cpp:3006-3014`), which only
   checks `ulPlayer < MAXPLAYERS` and `playeringame[ulPlayer]`. **The wiki's claim that "the player
-  must exist and not a true spectator" is wrong for this fork** — there is no
+  must exist and not a true spectator" is wrong for Zandronum** — there is no
   `PLAYER_IsTrueSpectator` check anywhere in this case (contrast with `ForceToSpectate`, which
   does check it — see `forcetospectate.md`). A true spectator is a valid target here; their
   `userinfo` class cvar is changed the same as any other player's, it just has no visible effect
@@ -107,3 +109,28 @@ named class was found, is a `PlayerPawn` descendant, differs from the player's c
 passes the team check); `0` for: called from a client, invalid player, `"random"` forbidden by
 gameinfo, class not found / not a `PlayerPawn` / same as current class, or team-restricted named
 class.
+
+## Engine-family divergence
+
+Bound as ACSF (CALLFUNC) index 135 — inside the 100–199 range UZDoom's own ACSF enum reserves
+for Zandronum's extensions and implements none of. A Zandronum-compiled object calling
+`SetPlayerClass()` under UZDoom hits UZDoom's `CallFunction` dispatcher's `default: break;` case:
+no error, no log line, the interpreter stack stays balanced, and the call just returns `0` in
+place of the real success/failure result documented above — none of the checks described there
+(client-mode guard, player validity, `"random"`/named-class resolution, same-class rejection,
+team restriction) ever run, and neither does the `userinfo` cvar write that's supposed to record
+the change.
+
+The practical effect is that the class change never happens at all: the `PlayerClass` `userinfo`
+cvar is left untouched, so there's nothing for a later respawn to read back, and — if `respawn`
+was `true` — no force-respawn is triggered either. The player just keeps playing as their current
+pawn/class, with no distinguishable error from ACS: `0` is exactly the same return value the
+Zandronum implementation itself gives for an ordinary failure (invalid player, unknown class, or
+"already this class"), so a script can't tell "this build doesn't implement `SetPlayerClass`"
+from "the call legitimately failed." A class-select menu or roleplay-mode script that calls this
+once and assumes success (or that only checks the return value to retry/report an error) will
+silently leave every player on their starting class under UZDoom, with no diagnostic pointing at
+the real cause.
+
+See [Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md) for the general
+reserved-ACSF-range silent-failure mechanism.

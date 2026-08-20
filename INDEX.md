@@ -6,7 +6,8 @@ when the router table doesn't resolve your question, or you want the overall cov
 
 ## Major sections
 
-- **[acs/](acs/INDEX.md)** — ACS/BCS function semantics (Zandronum + `zt-bcc`/BCS superset). The
+- **[acs/](acs/INDEX.md)** — ACS/BCS function semantics for UZDoom/GZDoom-family (primary target)
+  and Zandronum + `zt-bcc`/BCS superset where they diverge. The
   most mature section — functions, families, and concepts are well-populated with tier-A/B prose,
   with a long tail of compiler/engine names still signature-only (tier C) until someone writes
   them up. See it for what a fully-populated section looks like. See the section's own `INDEX.md`
@@ -45,6 +46,17 @@ when the router table doesn't resolve your question, or you want the overall cov
     preprocessor artifact; DECORATE's is a real engine-parsed keyword with no preprocessor at
     all) — routes to `acs/concepts/constants.md` and `decorate/concepts/constants.md` for each
     side's own detail.
+  - [PK3 lump names drop the extension](shared/concepts/pk3-lump-naming.md) — tier A. A PK3
+    entry is named by its basename cut at the last dot and capped at 8 chars, so
+    `TEXTURES.tex`/`TEXTURES.hud`/`TEXTURES.cmap` are all one lump name `TEXTURES` — legal and
+    supported for formats the engine enumerates in a `FindLump` loop, silently lossy for ones
+    it looks up once. Searching an archive for an exact lump name gives false negatives.
+  - [Persistent storage: Zandronum's ACS database has no UZDoom/GZDoom-family
+    equivalent](shared/concepts/persistent-storage-engine-divergence.md) — tier B. Zandronum's
+    SQLite-backed ACS database family has no counterpart at all on UZDoom/GZDoom-family engines
+    (not even the dead `PCD_WRITETOINI`/`GETFROMINI` opcodes work) — closest analogue is
+    CVARINFO-declared archived cvars, meaningfully weaker on every axis (no dynamic keys, no
+    ranked queries, ZScript-only).
 
 ## Not yet covered
 

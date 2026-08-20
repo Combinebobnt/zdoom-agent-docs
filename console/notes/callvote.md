@@ -1,8 +1,10 @@
 # callvote
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-02)
 **Provenance:** Zandronum Wiki `Console commands` (https://wiki.zandronum.com/w/index.php?title=Console_commands&oldid=2437, saved 2026-08-02); verified against `src/callvote.cpp` (vote type enums).
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 
 Initiates a server vote. Syntax: `callvote <vote-type> [parameter] [reason]`
 
@@ -33,3 +35,19 @@ Only clients in an active level (not during intermission, pre-match, etc.) can c
 ## Permission model
 
 Calling a vote is subject to server-side permission checking. RCon-authenticated clients may have additional permissions. Flooding protection exists to prevent rapid successive vote calls by the same client.
+
+## Engine-family divergence
+
+`callvote` is confirmed absent from UZDoom's source entirely — no `CCMD`/`CVAR` declaration and no
+bare mention of the name anywhere in the tree. This isn't a documentation gap; UZDoom's netcode has
+no client-side voting surface at all for a command like this to drive. Invoking it under UZDoom —
+from the console, a config file, or ACS's `ConsoleCommand()` — hits the console dispatcher's
+command lookup, then its cvar-name fallback, and when neither matches prints `Unknown command
+"callvote"` to console/log and does nothing else: a visible failure at the console, but easy to
+miss if triggered from an unattended context like a server startup script or `autoexec.cfg` line
+nobody is watching.
+
+As a result, UZDoom clients have no console-driven way to initiate any of the vote types this file
+documents — kicking or force-spectating a player, changing or resetting the map, adjusting
+frag/time/win/duel/point limits, or toggling a DMFlag by vote — the entire vote-type table and
+permission/threshold mechanism simply does not run.

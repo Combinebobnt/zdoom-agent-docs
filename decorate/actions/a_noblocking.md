@@ -1,8 +1,10 @@
 # `A_NoBlocking` / `A_Fall` (actor unblocking and item drops)
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_NoBlocking` (retrieved 2026-07-31, oldid=53222) + verified against the Zandronum source's `src/p_enemy.h:60`, `src/g_shared/a_action.cpp:72-128` and `130-138`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Provenance:** ZDoom Wiki `A_NoBlocking` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_NoBlocking&oldid=53222) + verified against the Zandronum source's `src/p_enemy.h:60`, `src/g_shared/a_action.cpp:72-128` and `130-138`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_NoBlocking)` and `DEFINE_ACTION_FUNCTION(AActor, A_Fall)` in `src/g_shared/a_action.cpp` — both wrap `A_Unblock()` implemented at `src/g_shared/a_action.cpp:72-128`.
 
 Marks an actor as no longer blocking collision and spawns any items attached to the actor (dialogue-set drops and regular drop items). `A_Fall` is Doom's original name for this function; both names are equivalent in Zandronum.
@@ -11,7 +13,7 @@ Marks an actor as no longer blocking collision and spawns any items attached to 
 
 ## Signature
 
-```
+```text
 void A_NoBlocking()
 void A_Fall()
 ```
@@ -45,6 +47,14 @@ None. Unlike the ZDoom/UZDoom/GZDoom-family versions, Zandronum's `A_NoBlocking`
 **Zandronum multiplayer only.** The `A_Unblock` function (which both `A_NoBlocking` and `A_Fall` call) has a server-mode check: in client mode, it returns early without clearing the `MF_SOLID` flag locally. The server separately replicates the flag clear via `SERVERCOMMANDS_SetThingFlags`, and stealth-visibility changes via `SERVERCOMMANDS_FlashStealthMonster`.
 
 **Implication:** In a networked game, if a client-side pawn (a player's actor) calls `A_NoBlocking`, the client's local collision will remain solid until the server's replication arrives. For server-side monsters and projectiles, this is transparent (the server decides when to call the action), but in any `+CLIENTSIDEONLY` actor or a client-run state callback, items/projectiles can still collide with the actor briefly until the network catch-up.
+
+## Engine-family divergence: `drop` parameter support
+
+UZDoom's `A_NoBlocking` exposes an optional `bool drop = true` parameter — declared `native void A_NoBlocking(bool drop = true);` in `wadsrc/static/zscript/actors/actor.zs`, and thunked via `DEFINE_ACTION_FUNCTION_NATIVE(AActor, A_NoBlocking, A_Unblock)` in `src/scripting/vmthunks_actors.cpp`, which pulls a `PARAM_BOOL(drop)` from the DECORATE/ZScript call site and forwards it straight to `A_Unblock`. Calling `A_NoBlocking(false)` skips step 4 above (the regular `DropItem` list) while the `MF_SOLID` clear, stealth handling, and any dialogue-set drop (step 3) still happen unconditionally. `A_Fall` stays a plain wrapper with no exposed parameter of its own (`void A_Fall() { A_NoBlocking(); }` in `actor.zs`, always passing the default `true`). This confirms — rather than contradicts — what the "Parameters" section above already anticipated from the wiki: UZDoom is exactly the "ZDoom/UZDoom/GZDoom-family" upstream the wiki's optional-parameter description refers to, and it does support it. Zandronum does not: its `DEFINE_ACTION_FUNCTION(AActor, A_NoBlocking)` wrapper (`src/g_shared/a_action.cpp:130-133`) always calls `A_Unblock(self, true)` and never exposes a `drop` parameter to DECORATE, even though the underlying `A_Unblock` C++ function accepts one.
+
+## Engine-family divergence: no client/server authority split
+
+UZDoom's `A_Unblock` (`src/playsim/a_action.cpp:40-82`) unconditionally clears `MF_SOLID` and updates stealth alpha/`visdir` — there is no client-mode gate, and no equivalent of Zandronum's `NETWORK_InClientMode` check or `SERVERCOMMANDS_SetThingFlags`/`SERVERCOMMANDS_FlashStealthMonster` replication calls exists anywhere in the UZDoom source tree (confirmed by a tree-wide grep for both symbols). The entire "Network synchronization" section above, and the header's "Zandronum-specific" callout, are therefore Zandronum-only behavior: on UZDoom, `A_NoBlocking`/`A_Fall` take effect immediately and identically regardless of caller or connection role, with no server-replication lag for a client-side actor to catch up on.
 
 ## Alternatives
 

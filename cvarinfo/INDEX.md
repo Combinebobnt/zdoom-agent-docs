@@ -1,6 +1,6 @@
 # CVARINFO doc index
 
-Router only. See `CLAUDE.md` for where CVARINFO parsing lives in engine source (and how this
+Router only. See `AGENTS.md` for where CVARINFO parsing lives in engine source (and how this
 section differs from `../console/`), `../shared/AUTHORING.md` for tiers/engine-scope/licensing.
 
 ## Concepts

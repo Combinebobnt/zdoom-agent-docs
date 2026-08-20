@@ -1,8 +1,10 @@
 # `void SetMugShotState(str state)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1 (checked out source reports `3.3-alpha`; `PCD_SETMUGSHOTSTATE` and `FMugShot::SetState` carry no version-gating markers around them, so this is not expected to be version-sensitive — see "Engine scope" in `../../shared/AUTHORING.md`).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
 **Provenance:** `SetMugShotState - ZDoom Wiki.html` (https://zdoom.org/w/index.php?title=SetMugShotState&oldid=52901), verified 2026-07-29 against the Zandronum source's `src/p_acs.cpp`, `sv_commands.cpp`, `cl_main.cpp`, `g_shared/shared_sbar.cpp`, `g_shared/sbarinfo.cpp`, `g_doom/doom_sbar.cpp`, and `g_shared/sbar_mugshot.cpp`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
@@ -60,7 +62,7 @@ places:
   without a custom SBARINFO lump, contrary to what "as defined in SBARINFO" in the wiki's own
   wording might suggest.
 
-No override exists for Heretic/Hexen/Strife's native status bars in this fork — on those games,
+No override exists for Heretic/Hexen/Strife's native status bars in Zandronum — on those games,
 absent a SBARINFO lump, `SetMugShotState` silently does nothing at all (hits the base no-op),
 not a fallback to a default face.
 
@@ -94,9 +96,15 @@ immediately and resets the new state's animation — the ACS builtin only ever s
 does **not** restart its animation (`reset` is `false`), unlike what "sets the state" might
 suggest.
 
+## Engine-family divergence: activator-scoped and view-gated, not a client-broadcast, and inert on every stock status bar
+
+Where the section above describes Zandronum's `SetMugShotState` as "completely activator-independent, and not scoped to one player at all," broadcasting unconditionally to every connected client from server-side ACS, this engine's version of the same opcode works the opposite way. Its C++ opcode handler (UZDoom's `src/playsim/p_acs.cpp`) only forwards the call to the local status bar when either the current game isn't a multiplayer game at all, or the script's `activator` actor happens to be the one the local console player is actually viewing through right now (its own body, or whatever camera actor it's currently possessing). If neither holds — for example a multiplayer script whose activator is some other player's pawn, or a scope with no meaningful activator at all — the call is silently skipped for that execution, with no fallback and no broadcast. There is no "send to every connected client" counterpart in this engine's networking model: each client independently evaluates this same activator check against its own console player, so a single call only has any chance of affecting the mugshot belonging to whichever client is running as (or currently watching through) the activator, never any other client's view.
+
+Separately and more fundamentally, this engine dispatches the call through a scripting-language virtual method on the status bar object rather than the fixed pair of C++ subclass overrides Zandronum uses. Neither of the two status-bar implementations this engine ships by default — the native Doom status bar, nor the wrapper that backs SBARINFO-defined bars — actually overrides that virtual method, so for every stock game/status-bar configuration the call reaches no code that touches any stored mugshot state at all: it is a complete no-op regardless of whether the named state exists, not merely for an unknown/typo'd name as documented above for Zandronum. The face these built-in bars actually show is instead recomputed automatically every frame from the player's own pain/health/god-mode status, entirely independent of anything ever passed to this builtin. The only way this builtin could have any visible effect on this engine is if a mod supplies its own custom scripting-language status bar class that itself overrides that virtual method — something no stock configuration does.
+
 ## See also
 
-None of `List of default mug shots`, `A_SetMugshotState` (ZScript — **this fork has no ZScript at
+None of `List of default mug shots`, `A_SetMugshotState` (ZScript — **Zandronum has no ZScript at
 all**, see [Constants](../concepts/constants.md) and
 [Activation](../concepts/activation.md) for the same caveat elsewhere in this tree), or `SBARINFO`
 needed further verification for this doc.

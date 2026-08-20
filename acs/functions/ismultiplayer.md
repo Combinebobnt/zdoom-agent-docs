@@ -1,10 +1,32 @@
 # `bool IsNetworkGame()` (wiki name: `IsMultiplayer`)
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-15)
+**Provenance:** wiki page `IsMultiplayer - Zandronum Wiki.html` (`_intake/`, retrieved
+`https://wiki.zandronum.com/w/index.php?title=IsMultiplayer&oldid=1306`) + source-verified (`p_acs.h:685`, `p_acs.cpp:11202-11205`, `network.cpp:1552-1555`,
+`network.h:266-281`, `zt-bcc/src/builtin.c:60`, `zt-bcc/lib/zasm.bcs:131`). The wiki's behavioral
+description is accurate; this doc's additions are the demo-playback nuance and the
+wiki-name-vs-callable-name divergence, neither of which the wiki mentions.
+
+**Phase 5 correction, 2026-08-15: this file's own `Applies to:` previously read `Zandronum=no`,
+which contradicted its own body — every line below was already about a working Zandronum
+implementation.** `engine_matrix.py`'s automated cohort classifier resolves the doc name
+`ismultiplayer` to `zt-bcc`'s compiler-builtin table entry `isnetworkgame`
+(`zt-bcc/src/builtin.c:60`), then checks that name against each engine's own PCD enum by
+name-guessing `pcd_isnetworkgame` — which exists at UZDoom's index 118 but not at Zandronum's
+(Zandronum spells the same-position opcode `PCD_ISMULTIPLAYER`), so the automated pass reported
+`uzdoom-only` and never surfaced the mismatch against this file's own already-correct prose.
+Corrected here; worth teaching a future automated cohort pass to flag a doc-file-vs-classifier
+disagreement like this one, not just a classifier-vs-source one, but that's a tooling
+follow-up, not done as part of this fix.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
+**Bucket:** compiler builtin.
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+
 Compiler builtin. `PCD_ISMULTIPLAYER` (the Zandronum source's `src/p_acs.h:685`), implementation
 inline in the interpreter's opcode switch (`case PCD_ISMULTIPLAYER:`,
 the Zandronum source's `src/p_acs.cpp:11202-11205`).
-
-**Bucket:** compiler builtin.
 
 ```cpp
 case PCD_ISMULTIPLAYER:
@@ -69,14 +91,20 @@ enum
 connected as a client, including demo-of-a-network-game playback), as opposed to true
 single-player or bot-emulated "multiplayer".
 
-**Provenance:** wiki page `IsMultiplayer - Zandronum Wiki.html` (`_intake/`, retrieved
-`oldid=1306`) + source-verified (`p_acs.h:685`, `p_acs.cpp:11202-11205`, `network.cpp:1552-1555`,
-`network.h:266-281`, `zt-bcc/src/builtin.c:60`, `zt-bcc/lib/zasm.bcs:131`). The wiki's behavioral
-description is accurate; this doc's additions are the demo-playback nuance and the
-wiki-name-vs-callable-name divergence, neither of which the wiki mentions. **Engine:** Zandronum
-3.2.1 — `PCD_ISMULTIPLAYER`'s implementation traces back to the original Skulltag 0.97c2 import
-commit (`bc562a817`), confirmed via `git log -S` on `p_acs.cpp`/`network.cpp`, which is an
-ancestor of the 3.2.1 version-bump commit `28f736fb3`; this is long-standing base functionality,
-not a recent addition. **Tier:** A.
+## Engine-family divergence: netgame flag vs. live network-state check
 
-**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+UZDoom implements the same compiler-table entry (`isnetworkgame`, dispatched to `PCD_ISNETWORKGAME`
+— the same opcode position as Zandronum's `PCD_ISMULTIPLAYER`, just spelled differently in each
+engine's own enum) with a simpler mechanism: `case PCD_ISNETWORKGAME: PushToStack(netgame); break;`
+(`src/playsim/p_acs.cpp:8943-8945`) — a single global `bool netgame`, not a live
+`NETWORK_GetState()`/`NETWORK_InClientMode()` computation. `netgame` (together with `multiplayer`)
+is set `true` by normal multiplayer session setup (`src/g_game.cpp:2932`) and by demo playback with
+more than one recorded player (`src/g_game.cpp:2931`), and reset `false` at points including level
+load (`src/g_level.cpp:469`) and demo teardown (`src/d_net.cpp:403`).
+
+**Not independently re-verified for UZDoom:** whether a bot-emulated "multiplayer" console command
+sets `netgame` the way Zandronum's `NETSTATE_SINGLE_MULTIPLAYER` state deliberately does *not*
+count, and whether single-player-recording demo playback vs. network-recording demo playback are
+distinguished the same way Zandronum's `CLIENTDEMO_IsPlaying()` nuance documents above — treat
+UZDoom's exact edge-case behavior here as unconfirmed rather than assuming symmetry with
+Zandronum's documented nuances.

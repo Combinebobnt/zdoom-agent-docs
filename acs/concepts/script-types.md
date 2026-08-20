@@ -1,17 +1,19 @@
 # Script types
 
-**Tier:** B (wiki-sourced concept page, spot-checked against fork source for the load-bearing claims — existence of each type, the `REOPEN` gap, the two spectator-interaction notes, the `UNLOADING` execution-mode claim, the `KILL`/`NOKILLSCRIPTS` nuance — but the `ACS_Terminate`/ `ENTER` interaction and the closed-script compiler grammar were not traced to source, so this doesn't qualify as tier A).
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — a `3.3-alpha` development snapshot ahead of the 3.2.1 target; every `SCRIPT_*` type and call site checked here predates that gap and is unaffected by it — see "Engine scope" in `../../shared/AUTHORING.md`).
-**Provenance:** wiki page `Script types - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28, `oldid=50186`) + verified against the Zandronum source's `src/p_acs.h` (`SCRIPT_*` enum) and every `StaticStartTypedScripts(SCRIPT_*, ...)` call site across the Zandronum source's `src` (2026-07-28). The `ACS_Terminate`-vs-`ENTER` claim and the closed-script-grammar claim are wiki/observed-only, not traced through VM/parser source — see notes above. The `StaticStopMyScripts`-on-spectate finding under **ENTER** (added 2026-07-28) is fully source-verified (`p_interaction.cpp:2546,2781,2772`, `p_acs.cpp:3659-3679,13028-13030`).
+**Tier:** B (wiki-sourced concept page, spot-checked against Zandronum source for the load-bearing claims — existence of each type, the `REOPEN` gap, the two spectator-interaction notes, the `UNLOADING` execution-mode claim, the `KILL`/`NOKILLSCRIPTS` nuance — but the `ACS_Terminate`/ `ENTER` interaction and the closed-script compiler grammar were not traced to source, so this doesn't qualify as tier A).
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Provenance:** wiki page `Script types - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28, `https://zdoom.org/w/index.php?title=Script_types&oldid=50186`) + verified against the Zandronum source's `src/p_acs.h` (`SCRIPT_*` enum) and every `StaticStartTypedScripts(SCRIPT_*, ...)` call site across the Zandronum source's `src` (2026-07-28). The `ACS_Terminate`-vs-`ENTER` claim and the closed-script-grammar claim are wiki/observed-only, not traced through VM/parser source — see notes above. The `StaticStopMyScripts`-on-spectate finding under **ENTER** (added 2026-07-28) is fully source-verified (`p_interaction.cpp:2546,2781,2772`, `p_acs.cpp:3659-3679,13028-13030`).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
-What `SCRIPT_*` types actually exist in this fork, which of the ZDoom wiki's ten still apply,
-and which of the fork's own types (`EVENT`, plus the `CLIENTSIDE`/`NET` flags) the wiki page
-doesn't cover at all. Read this before assuming a ZDoom-documented script type "just works" here
-— the wiki page enumerates ZDoom's evolving list, not this fork's.
+What `SCRIPT_*` types actually exist in Zandronum and UZDoom, which of the ZDoom wiki's ten still apply,
+and which of Zandronum's own types (`EVENT`, plus the `CLIENTSIDE`/`NET` flags) the wiki page
+doesn't cover at all. Read this before assuming a ZDoom-documented script type "just works" in either fork
+— the wiki page enumerates ZDoom's evolving list, not Zandronum's or UZDoom's.
 
 ## The authoritative list (from the Zandronum source's `src/p_acs.h:338-352`)
 
-```
+```text
 SCRIPT_Closed      = 0
 SCRIPT_Open        = 1
 SCRIPT_Respawn     = 2
@@ -34,9 +36,9 @@ grep across the Zandronum source's `src`), so none of them are dead enum values 
 `SCRIPT_Lightning`, which does have a live call site** (`g_shared/a_lightning.cpp:192`), so scratch
 that concern; every declared type in this list actually fires.
 
-**`REOPEN` does not exist in this fork at all** — no enum value, no call site. If you're tempted
+**`REOPEN` does not exist in Zandronum at all** — no enum value, no call site. If you're tempted
 to use it because the ZDoom wiki lists it as one of the "special scripts," it will not compile as
-a script type in `bcc`/this engine. This is the single most important divergence from the wiki
+a script type in `bcc` targeting Zandronum. (UZDoom does have `SCRIPT_Reopen` — see "Engine-family divergence" below.) This is the single most important Zandronum-specific divergence from the wiki
 page: the page's own prose says "eight types are special" while its table lists ten — `KILL` and
 `REOPEN` are later ZDoom additions bolted onto an older page. Zandronum picked up `KILL` (as
 `SCRIPT_Kill`, independently, tagged `[JM]`) but never `REOPEN`.
@@ -53,23 +55,23 @@ and Skulltag/Zandronum CTF-flag-return hooks — `g_shared/a_teamitems.cpp:146,1
 wiki page doesn't document at all; out of scope for this pass, noted here only so their existence
 in the enum isn't mistaken for dead/vestigial values.
 
-## Per-type notes, verified against this fork
+## Per-type notes, verified against Zandronum
 
 - **OPEN** — world-activated, runs once per level load. Confirmed callers: `g_game.cpp:3294`,
   `p_spec.cpp:1796/1800`. Matches the wiki: don't rely on an activator in an `OPEN` script.
-- **ENTER** — player-activated, once per player per level. **Confirmed: spectators never trigger
+- **ENTER** — player-activated, once per player per level. **Confirmed in Zandronum: spectators never trigger
   it** — `g_game.cpp:4286` and `p_mobj.cpp:5763` both gate the `StaticStartTypedScripts(SCRIPT_Enter, ...)`
   call on `bSpectating == false`. This matches the wiki's "In Skulltag, spectators never trigger
-  an ENTER script" note, and it still holds in this fork.
+  an ENTER script" note, and it still holds in Zandronum. (UZDoom has no spectator system, so this note does not apply there.)
   The wiki's claim that an infinite-loop `ENTER` script can't be stopped by the `ACS_Terminate`
   action special (only by the `terminate` keyword from inside the script) is plausible given how
   `ACS_Terminate` works (`p_lnspec.cpp:1866` → `P_TerminateScript` → `SetScriptState(...,
   SCRIPT_PleaseRemove)`, a state flag rather than an immediate kill) but **was not traced through
   the VM's instruction-stepping loop to confirm** — treat as unverified wiki claim, not confirmed
   fork behavior.
-  **A genuine external kill *does* exist, though, and it's easy to hit if you write an
+  **In Zandronum, a genuine external kill mechanism exists** that's easy to hit if you write an
   `ENTER CLIENTSIDE` loop that re-binds its own activator every tic (e.g. via `SetActivator`) to
-  outlive a normal death/respawn cycle** (found and source-verified 2026-07-28, building a
+  outlive a normal death/respawn cycle (found and source-verified 2026-07-28, building a
   clientside input-queueing feature in a real project): manually turning
   a player into a *true* (not dead) spectator via `PLAYER_SetSpectator(..., bDeadSpectator=false)`
   keeps their `mo` alive but calls `FBehavior::StaticStopMyScripts(pPlayer->mo)`
@@ -88,12 +90,15 @@ in the enum isn't mistaken for dead/vestigial values.
   with zero opportunity to reset it. Design ownership as a token/generation counter that a fresh
   invocation always overwrites, not a flag that requires the old instance to clean up after
   itself — see [Client-side scripting](clientside-scripting.md) for the pattern. (Dying and
-  respawning normally, by contrast, does **not** go through this spectator path and does **not**
+  respawning normally in Zandronum, by contrast, does **not** go through the spectator path and does **not**
   call `StaticStopMyScripts` — a `CLIENTSIDE` loop that re-acquires its activator via `SetActivator`
-  survives an ordinary death/respawn cycle untouched.)
-- **RETURN** — confirmed real and hub-gated: `g_level.cpp:1993` only fires
-  `StaticStartTypedScripts(SCRIPT_Return, ...)` inside a `level.clusterflags & CLUSTER_HUB` block,
-  i.e. it only matters for maps using ZDoom-style hub clusters, same as upstream.
+  survives an ordinary death/respawn cycle untouched. UZDoom has no spectator system, so this entire mechanism does not apply there.)
+- **RETURN** — confirmed in both engines with different gating. Zandronum gates it on hub clusters:
+  `g_level.cpp:1993` only fires `StaticStartTypedScripts(SCRIPT_Return, ...)` inside a
+  `level.clusterflags & CLUSTER_HUB` block. UZDoom gates it on savegame restoration: `g_level.cpp:1521`
+  fires it when `fromSnapshot` is true, carrying the note that ENTER scripts are handled at
+  player-spawn time instead. Both approaches fire once per player per level transition, but the
+  gating condition differs between engines.
 - **RESPAWN** — confirmed, `p_mobj.cpp:5803`, coop/multiplayer respawn.
 - **DEATH** — confirmed, `p_interaction.cpp:742`, activator is the dying player.
 - **LIGHTNING** — confirmed live, `a_lightning.cpp:192`. Not dead despite being rare in practice.
@@ -102,19 +107,20 @@ in the enum isn't mistaken for dead/vestigial values.
   equivalent, single-instance, blocking-capable) execution path — this directly confirms the
   wiki's claim that `UNLOADING` runs like `ACS_Execute` and not `ACS_ExecuteAlways`, and therefore
   can genuinely block itself from re-running next unload if it hasn't finished.
-- **DISCONNECT** — confirmed, fired from `PLAYER_LeavesGame()` (`p_interaction.cpp:3447`, and
-  `d_net.cpp:650` for the network-disconnect path). **Confirmed: also fires when a player becomes
-  a true spectator**, not just on a real disconnect — `PLAYER_SetSpectator()`
+- **DISCONNECT** — confirmed in both engines, fired from `PLAYER_LeavesGame()` (Zandronum:
+  `p_interaction.cpp:3447`, `d_net.cpp:650` for network-disconnect; UZDoom: `g_game.cpp:1900`).
+  **Confirmed in Zandronum: also fires when a player becomes a true spectator**, not just on a real disconnect — `PLAYER_SetSpectator()`
   (`p_interaction.cpp:2463,2530`) calls `PLAYER_LeavesGame()` whenever `bDeadSpectator == false`.
   This matches the wiki's "In Skulltag, DISCONNECT scripts are also executed when a player turns
   into a spectator" note, and the EVENT-scripts page's own `GAMEEVENT_PLAYERLEAVESSERVER` note
   independently corroborates the same spectator-triggers-leave behavior from a different angle.
+  (UZDoom has no spectator system, so this spectator-specific behavior does not apply there.)
 - **KILL** — confirmed, `p_interaction.cpp:503-507`. Condition is
   `!(flags7 & MF7_NOKILLSCRIPTS) && ((flags7 & MF7_USEKILLSCRIPTS) || gameinfo.forcekillscripts)`
   (`actor.h:354-355`) — **one nuance beyond the wiki**: the per-actor `NOKILLSCRIPTS` flag
   overrides `forcekillscripts` from `GameInfo`, i.e. an actor can opt out of `KILL` scripts even
   when the map/gameinfo forces them on globally. The wiki only documents the opt-in side.
-- **REOPEN** — **does not exist in this fork.** See above.
+- **REOPEN** — **does not exist in Zandronum.** See above. (UZDoom has `SCRIPT_Reopen` — see "Engine-family divergence" section.)
 - **Closed scripts** — must declare an argument list, even `(void)`. Not independently traced
   through the `zt-bcc` grammar in this pass, but real-world BCS code has been observed to be
   fully consistent with it (every closed script in the observed codebase declares `(void)` or real
@@ -124,7 +130,22 @@ in the enum isn't mistaken for dead/vestigial values.
 
 ## Authoring rule note
 
-This page earns its cost specifically because the wiki page's type *list* is wrong for this fork
-in both directions (missing `EVENT`/`KILL` as Zandronum-native additions on top of the ZDoom set,
-wrongly including `REOPEN` which was never ported) — that's not a signature-only fact, it's a
-"don't trust the enumerated list" correction.
+This page earns its cost specifically because the wiki page's type *list* is wrong for both Zandronum and UZDoom
+in different ways. Zandronum is missing `EVENT`/`KILL` as Zandronum-native additions on top of the base ZDoom set,
+and wrongly includes `REOPEN` which Zandronum never had. UZDoom has all three but lacks the CTF types and has
+different script-firing conditions for `RETURN` and `REOPEN`. This isn't a signature-only fact — it's a
+"don't trust the wiki's enumerated list as complete or accurate" correction for either fork.
+
+## Engine-family divergence
+
+UZDoom's `SCRIPT_*` enum includes every value that Zandronum's has, plus one additional type — `SCRIPT_Reopen` (index 18), which fires when returning to an already-visited hub map via savegame restoration (tracked by the `FromSnapshot` flag in `g_level.cpp`). Zandronum lacks `SCRIPT_Reopen` entirely.
+
+The `EVENT` and `KILL` types, tagged above as Zandronum-native additions, do exist in UZDoom's enum at the same indices. However, `SCRIPT_Event` has no `StartTypedScripts` call site in UZDoom source — it is defined but never fired. `SCRIPT_Kill` does fire (confirmed at `p_interaction.cpp:400`), so KILL-script-relying code is portable to UZDoom, but EVENT-script code is not.
+
+The Skulltag/Zandronum CTF-flag types — `SCRIPT_Pickup`, `SCRIPT_BlueReturn`, `SCRIPT_RedReturn`, `SCRIPT_WhiteReturn` — have no call sites in UZDoom and do not fire there.
+
+Spectator-specific behavior is entirely Zandronum. UZDoom's codebase has no spectator system: the symbols `PLAYER_SetSpectator`, `bSpectating`, and `PLAYER_LeavesGame` do not exist. The Zandronum notes above about spectators not triggering ENTER, DISCONNECT scripts also firing on spectate, and `StaticStopMyScripts` terminating spectator scripts are Zandronum-only. UZDoom's `StopMyScripts` / `StopScriptsFor` mechanism for terminating an actor's scripts exists and works identically to Zandronum's, but it is never invoked by a spectator-transition path because UZDoom has no spectators.
+
+`SCRIPT_Return`'s gating differs between engines. Zandronum gates it on `level.clusterflags & CLUSTER_HUB` (per the hub-return path). UZDoom gates it on savegame restoration — it fires once per player via the `fromSnapshot` condition in `g_level.cpp:1521`, carrying the assumption that ENTER scripts are handled at player-spawn time instead.
+
+The `CLIENTSIDE` flag is a sharper divergence. Zandronum implements it as a real per-script bit routing a flagged script onto a separate client-only execution path (see [Client-side scripting](clientside-scripting.md)). UZDoom's script-flags enum has no equivalent bit — the same bit position (0x0002) is used for an unrelated `SCRIPTF_Ignored` flag instead. The internal check UZDoom would use to decide whether a script runs client-side is currently hardcoded to always return false, with an explicit TODO comment in `p_acs.cpp:651` noting that full client-side support is "disabled until a new flag can be created for UZDoom's specific type of client-side handling" — indicating it is a deliberate, temporary stand-in. The underlying client-script machinery (`ClientSideACSThinker`, savegame serialization) is intact in UZDoom but unreachable. A `CLIENTSIDE`-flagged script compiled for Zandronum and loaded under UZDoom does not error and does not crash — it simply runs as an ordinary, non-client-side script instead, silently losing the semantics the flag was meant to provide. See [Zandronum/UZDoom compatibility](zandronum-uzdoom-compat.md) for the general silent-divergence pattern across engine ports.

@@ -1,11 +1,21 @@
 # `int LineSide(void)`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `LineSide - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
+`https://zdoom.org/w/index.php?title=LineSide&oldid=35823`) + source-verified against `p_acs.cpp:10652-10654,13074-13094,3412-3413,1733,1769,1832`,
+`p_map.cpp:1863,1871,1875,2190-2208,5448,5459`, `p_lnspec.cpp:1759,1790,1840`, `p_spec.cpp:324-327`,
+`p_spec.h:1153` (`ACS_BACKSIDE` definition), and `zt-bcc/lib/zcommon.bcs:26-29`/`src/builtin.c:43,191`.
+No wiki/fork behavioral discrepancy found for the has-a-line case; the no-line-context default and
+the use/push/shoot applicability are both undocumented additions, not corrections.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** compiler builtin.
+
 Returns which side of the activating line special the actor was on when the special fired.
 Compiler builtin (`PCD_LINESIDE`, the zt-bcc source's `src/builtin.c:43`/`:191`), implementation is a
 one-line push of a per-script member variable in `DLevelScript::RunScript`'s main switch
 (the Zandronum source's `src/p_acs.cpp:10652-10654`: `case PCD_LINESIDE: PushToStack(backSide); break;`).
-
-**Bucket:** compiler builtin.
 
 - No parameters. Returns `LINE_FRONT` (0) or `LINE_BACK` (1) — both real named constants in
   `zt-bcc/lib/zcommon.bcs:26-29`, matching the wiki's claimed `zdefs.acs` defines exactly.
@@ -15,8 +25,8 @@ one-line push of a per-script member variable in `DLevelScript::RunScript`'s mai
   line/activator state when `LineSide()` executes — it's a snapshot taken when the script instance
   was created, for the lifetime of that instance.
 - **Not Cross-only.** The wiki's own example only demonstrates a walkover (`SPAC_Cross`-style)
-  corridor, which could read as "this only means something for line-crossing scripts." In this
-  fork `ACS_BACKSIDE` is set from a real geometric/traced `side` value for **every** line
+  corridor, which could read as "this only means something for line-crossing scripts." In both the
+  Zandronum and UZDoom engine forks, `ACS_BACKSIDE` is set from a real geometric/traced `side` value for **every** line
   activation type that can start an ACS script — cross (`p_map.cpp:2190-2208`, `SPAC_Cross`/
   `MCross`/`PCross`/`AnyCross`), use (`p_map.cpp:5448/5459`, `SPAC_Use`/`UseBack`), push/bump and
   shoot/impact (`p_map.cpp:1863/1871/1875`, `SPAC_Push`/`SPAC_Impact`) all flow through the same
@@ -45,11 +55,3 @@ one-line push of a per-script member variable in `DLevelScript::RunScript`'s mai
 - Argument order/count and the `LINE_FRONT`/`LINE_BACK` values themselves fully match the wiki;
   the only gap is the wiki's silence on the two points above (no-line default, and use/push/shoot
   activation types besides plain crossing).
-
-**Provenance:** wiki page `LineSide - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
-`oldid=35823`) + source-verified against `p_acs.cpp:10652-10654,13074-13094,3412-3413,1733,1769,1832`,
-`p_map.cpp:1863,1871,1875,2190-2208,5448,5459`, `p_lnspec.cpp:1759,1790,1840`, `p_spec.cpp:324-327`,
-`p_spec.h:1153` (`ACS_BACKSIDE` definition), and `zt-bcc/lib/zcommon.bcs:26-29`/`src/builtin.c:43,191`.
-No wiki/fork behavioral discrepancy found for the has-a-line case; the no-line-context default and
-the use/push/shoot applicability are both undocumented additions, not corrections.
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.

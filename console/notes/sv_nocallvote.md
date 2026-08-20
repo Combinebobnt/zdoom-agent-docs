@@ -1,8 +1,10 @@
 # `sv_nocallvote`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-02)
 **Provenance:** Zandronum Wiki "Server variables" (https://wiki.zandronum.com/w/index.php?title=Server_variables&oldid=2534, saved 2026-08-02), enum values verified against raw wiki HTML.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 
 Master control for whether any votes can be called on the server. This is distinct from `SV_ForbidVoteFlags`, which disables specific vote types; `sv_nocallvote` controls voting wholesale.
 
@@ -31,3 +33,9 @@ Marked `CVAR_SERVERINFO`, so the setting is replicated to clients. Clients need 
 - **`sv_minvoters`** — minimum number of players needed on server before any vote can be called.
 - **`sv_votecooldown`** — cooldown time in minutes between votes.
 - **`SV_VoteConnectWait`** — seconds a newly connected client must wait before being allowed to call votes.
+
+## Engine-family divergence
+
+`sv_nocallvote` does not exist in UZDoom at all — confirmed absent from source, not merely undocumented. Attempting to set it under UZDoom (via the console, a config file, or ACS's `ConsoleCommand()`) prints `Unknown command "sv_nocallvote"` to console/log and the write silently fails to apply — a visible failure if someone is watching the console at the time, but easy to miss in an unattended context such as a server startup script or an `autoexec.cfg` line.
+
+UZDoom's networking model has no server-side voting system at all, so the master on/off (and players-only) gate this cvar provides over vote-calling has nothing to control on that engine — the entire feature it governs is simply absent, not merely unconfigurable.

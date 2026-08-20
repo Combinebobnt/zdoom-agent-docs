@@ -1,8 +1,10 @@
 # `void A_Fire(float spawnheight = 0)`
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
-**Provenance:** ZDoom Wiki `A_Fire` (retrieved 2026-08-01, oldid=52463) + verified against the Zandronum source's `src/g_doom/a_archvile.cpp:44` and `wadsrc/static/actors/actor.txt:90`.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Provenance:** ZDoom Wiki `A_Fire` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_Fire&oldid=52463) + verified against the Zandronum source's `src/g_doom/a_archvile.cpp:44` and `wadsrc/static/actors/actor.txt:90`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_Fire)` at `src/g_doom/a_archvile.cpp:44`.
 
 Repositions the calling actor to orbit around its `tracer` pointer at a fixed 24 map units forward (along the tracer's facing direction) with an optional vertical offset. Primarily used by the Arch-Vile's flame attack (`ArchvileFire` actor) to keep flame sprites positioned on the attack target.
@@ -42,7 +44,7 @@ These sounds play **client-side** (not gated by the server-side check), making t
 
 From Zandronum's native `ArchvileFire` actor:
 
-```
+```text
 actor ArchvileFire
 {
     +NOBLOCKMAP +NOGRAVITY

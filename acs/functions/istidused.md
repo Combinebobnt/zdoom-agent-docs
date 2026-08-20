@@ -1,15 +1,26 @@
 # `bool IsTidUsed(int tid)`
 
-Returns whether any actor with the given TID currently exists, dead or alive. Extension function
-(`ACSF_IsTIDUsed`, index -47 in `zcommon.bcs`), implementation at
-the Zandronum source's `src/p_mobj.cpp:3626-3638` (called from `p_acs.cpp:6361-6362`).
-
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Provenance:** wiki page `IsTIDUsed - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28,
+`https://zdoom.org/w/index.php?title=IsTIDUsed&oldid=40891`) + source-verified against the Zandronum source (`p_mobj.cpp:3626-3638`,
+`p_acs.cpp:6361-6362`, `ThingCount`'s `health > 0` filter at `p_acs.cpp:3923-3934`) and
+`zt-bcc/lib/zcommon.bcs:1675`. The wiki's dead-or-alive and ThingCount-efficiency claims both hold
+exactly against the Zandronum engine fork's source; the `tid == 0` behavior is this doc's source-verified
+addition (not mentioned on the wiki page).
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function. Note the case mismatch between layers: BCS-side name in
 `zt-bcc/lib/zcommon.bcs:1675` is `IsTidUsed` (mixed case, matching the existing tier-C `INDEX.md`
 entry), the engine's enum/wrapper spell it `ACSF_IsTIDUsed`/`P_IsTIDUsed` (all-caps TID) — same
 function, just inconsistent capitalization across the compiler table and the C++ side. Use
 `IsTidUsed` in BCS source; ACS is case-insensitive for identifiers anyway so either spelling
 compiles, but `IsTidUsed` is what's actually declared.
+**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
+
+Returns whether any actor with the given TID currently exists, dead or alive. Extension function
+(`ACSF_IsTIDUsed`, index -47 in `zcommon.bcs`), implementation at
+the Zandronum source's `src/p_mobj.cpp:3626-3638` (called from `p_acs.cpp:6361-6362`).
 
 ```cpp
 bool P_IsTIDUsed(int tid)
@@ -48,7 +59,7 @@ bool P_IsTIDUsed(int tid)
 
 **Example:**
 
-```
+```text
 if (!IsTidUsed(TID_BOSS))
 {
     Log(s: "The boss is gone (dead or removed).");
@@ -57,13 +68,3 @@ if (!IsTidUsed(TID_BOSS))
 
 **Returns:** `bool` — `true` if any actor (alive or dead) currently holds `tid`, `false`
 otherwise (including `tid == 0`, which no actor can hold).
-
-**Provenance:** wiki page `IsTIDUsed - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28,
-`oldid=40891`) + source-verified against the Zandronum source (`p_mobj.cpp:3626-3638`,
-`p_acs.cpp:6361-6362`, `ThingCount`'s `health > 0` filter at `p_acs.cpp:3923-3934`) and
-`zt-bcc/lib/zcommon.bcs:1675`. The wiki's dead-or-alive and ThingCount-efficiency claims both hold
-exactly against this fork's source; the `tid == 0` behavior is this doc's source-verified
-addition (not mentioned on the wiki page). **Engine:** Zandronum 3.2.1 (verified against
-the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.
-
-**Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.

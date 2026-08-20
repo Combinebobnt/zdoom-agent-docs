@@ -1,8 +1,10 @@
 # `int GetGamemodeState(void)`
 
 **Tier:** A.
-**Engine:** Zandronum 3.2.1 (function predates the 3.2.1 version-bump commit, confirmed via git ancestry — see "Version note" above).
-**Provenance:** wiki page `GetGameModeState - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `oldid=1288`) + source-verified against `p_acs.cpp:7219-7222`, `gamemode.cpp:594-684, 1170-1184`, `gamemode.h:98-103`, `zt-bcc/lib/zcommon.bcs:1184-1188,1740`, and git ancestry check against `28f736fb3`.
+**Applies to:** UZDoom=no, Zandronum=yes
+**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Provenance:** wiki page `GetGameModeState - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetGameModeState&oldid=1288`) + source-verified against `p_acs.cpp:7219-7222`, `gamemode.cpp:594-684, 1170-1184`, `gamemode.h:98-103`, `zt-bcc/lib/zcommon.bcs:1184-1188,1740`, and git ancestry check against `28f736fb3`.
+**Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
 
 Returns the current game-mode's state as a `GAMESTATE_*` enum value. Extension function
@@ -62,3 +64,19 @@ LMS/Possession have an extra "next round countdown" sub-state folded into `COUNT
 Verified via `git merge-base --is-ancestor d30fce6ae 28f736fb3` (the "changed the version string
 to 3.2.1" commit) — it returns true, i.e. this function **predates and is present in 3.2.1**, not
 a post-3.2.1 addition from the `3.3-alpha` checkout.
+
+## Engine-family divergence
+
+`GetGamemodeState` is ACSF (CALLFUNC) index 107 — inside the 100–199 range UZDoom reserves for
+Zandronum's extensions and implements none of. A Zandronum-compiled object calling it under
+UZDoom hits the `default: break;` case in UZDoom's `CallFunction` dispatcher: no error, no log
+line, execution continues with a plain `0` pushed in place of the real `GAMESTATE_*` result.
+
+That `0` happens to equal `GAMESTATE_WAITFORPLAYERS` — one of the five legitimate return values
+this function documents above. A caller checking specifically for "waiting for players" gets a
+coincidentally correct answer on UZDoom and can look like it "just works," while any script
+distinguishing `COUNTDOWN`/`INPROGRESS`/`INRESULTSEQUENCE`/`UNSPECIFIED` — i.e. checking for
+anything past the waiting-room state, which is most of what this function is for — silently
+misreads a live or finished round as still waiting for players, with no diagnostic pointing at
+the cause. See [Zandronum/UZDoom compatibility](../concepts/zandronum-uzdoom-compat.md) for the
+general mechanism and its "coincidentally correct" framing.

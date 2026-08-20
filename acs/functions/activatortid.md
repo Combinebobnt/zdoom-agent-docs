@@ -1,10 +1,18 @@
 # `int ActivatorTID(void)`
 
+**Tier:** A.
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Provenance:** wiki page `ActivatorTID - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28,
+`https://zdoom.org/w/index.php?title=ActivatorTID&oldid=38982`) + source-verified against `p_acs.cpp:12414-12423`, `builtin.c:111/259`, and this
+tree's own `../concepts/script-types.md` for the OPEN-script no-activator case. No wiki/fork
+discrepancy found beyond the wiki simply omitting the NULL-activator behavior.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
+**Bucket:** compiler builtin.
+
 Returns the TID of the script's activator. Compiler builtin (`PCD_ACTIVATORTID`,
 the zt-bcc source's `src/builtin.c:111`/`:259`), implementation in `DLevelScript::RunScript`'s main
 switch (the Zandronum source's `src/p_acs.cpp:12414-12423`).
-
-**Bucket:** compiler builtin.
 
 - No parameters.
 - **If the script has no activator (`activator == NULL`), this returns `0`**, not a sentinel
@@ -24,12 +32,12 @@ switch (the Zandronum source's `src/p_acs.cpp:12414-12423`).
   dying, etc. do have a real activator pointer and behave as the wiki describes.
 - The wiki's example pattern (`Thing_ChangeTID(0, 999)` in an `ENTER` script to tag the player,
   then `ActivatorTID() == 999` elsewhere to test "is this activator that player") is valid and
-  matches this fork's `Thing_ChangeTID`/TID-zero-means-activator convention — but only works
-  because `ENTER` scripts do have a real player activator, unlike `OPEN`.
+  matches the Zandronum engine fork's `Thing_ChangeTID`/TID-zero-means-activator convention — but
+  only works because `ENTER` scripts do have a real player activator, unlike `OPEN`.
 
 **Example — safe pattern that accounts for the no-activator case:**
 
-```
+```text
 script "Check_Activator" (void)
 {
     int tid = ActivatorTID();
@@ -41,9 +49,3 @@ script "Check_Activator" (void)
     }
 }
 ```
-
-**Provenance:** wiki page `ActivatorTID - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28,
-`oldid=38982`) + source-verified against `p_acs.cpp:12414-12423`, `builtin.c:111/259`, and this
-tree's own `../concepts/script-types.md` for the OPEN-script no-activator case. No wiki/fork
-discrepancy found beyond the wiki simply omitting the NULL-activator behavior.
-**Engine:** Zandronum 3.2.1 (verified against the Zandronum source `master` HEAD — see "Engine scope" in `../../shared/AUTHORING.md`). **Tier:** A.

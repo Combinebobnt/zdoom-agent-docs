@@ -1,8 +1,10 @@
 # `void A_DamageTracer(int amount, name damagetype = "none", int flags = 0, class<Actor> filter = null, name species = "None", int src = AAPTR_DEFAULT, int inflict = AAPTR_DEFAULT)`
 
 **Tier:** A
-**Engine:** UZDoom 4.15pre / GZDoom-family — **does not exist in Zandronum**
-**Provenance:** ZDoom Wiki `A_DamageTracer` (retrieved 2026-08-01, oldid=46970) + verified against the UZDoom source's `src/playsim/p_actionfunctions.cpp:4009-4026`.
+**Applies to:** UZDoom=yes, Zandronum=no
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15)
+**Provenance:** ZDoom Wiki `A_DamageTracer` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_DamageTracer&oldid=46970) + verified against the UZDoom source's `src/playsim/p_actionfunctions.cpp:4009-4026`.
+**Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** No Zandronum implementation; UZDoom defines it in `src/playsim/p_actionfunctions.cpp:4009` as a `DEFINE_ACTION_FUNCTION`.
 
 Damages the calling actor's tracer actor by a specified amount. **This function does not exist in Zandronum** — the `tracer` pointer is available (used by `A_Tracer2` and other seeking-projectile functions), but Zandronum provides no damage-family action to target it. Negative amounts heal instead.
@@ -35,7 +37,7 @@ The calling actor's `tracer` pointer — assigned by homing-projectile functions
 
 The function delegates all damage calculation to an internal helper that processes the `flags` and filter parameters. It respects all standard damage mechanics: invulnerability checks, armor, damage factors, and `god2`/`buddha2` protections (the latter GZDoom/UZDoom-family only).
 
-## Zandronum non-availability
+## Engine-family divergence
 
 **Zandronum has no equivalent.** The `tracer` pointer is available for use by any actor, and `A_Tracer2` uses it for seeking behavior, but no Zandronum action function targets the tracer for damage. Code using `A_DamageTracer` will fail to compile in Zandronum with an "unknown identifier" error.
 

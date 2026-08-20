@@ -1,7 +1,8 @@
 # `opl_numchips` (console cvar)
 
 **Tier:** A
-**Engine:** Zandronum 3.2.1
+**Applies to:** UZDoom=yes, Zandronum=yes
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-16); Zandronum 3.2.1 @28f736fb3 (2026-08-02)
 **Provenance:** Zandronum source `src/sound/music_mus_opl.cpp`, verified 2026-08-02.
 
 Number of virtual OPL chips to emulate when rendering MUS (Doom-format) MIDI music via OPL synthesis.
