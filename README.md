@@ -21,7 +21,7 @@ See `CLAUDE.md`'s routing table for the full scope.
 
 ## Where to start
 
-- **`CLAUDE.md`** — the router. Routes by knowledge area (ACS, DECORATE, ZScript, MAPINFO, ...) to
+- **`AGENTS.md`** — the router. Routes by knowledge area (ACS, DECORATE, ZScript, MAPINFO, ...) to
   the right section, and to the shared rule files. Read this first.
 - **`INDEX.md`** — the full top-level map: every section, its coverage stats, and what's not
   covered yet.
