@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** wiki page `GetCurrentGameMode - Zandronum Wiki.html` (`_intake/`, retrieved
 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetCurrentGameMode&oldid=2308`) + source-verified (`p_acs.cpp:7582-7586`, `gamemode_enums.h:82-104`,
 `zt-bcc/lib/zcommon.bcs:1766`) and version-gated against `28f736fb3` per this repo's 3.2.1 check.
@@ -36,8 +36,9 @@ case ACSF_GetCurrentGamemode:
 - Pairs with `SetCurrentGamemode(str)` (`-132`, `p_acs.cpp:7516-7580`), which does the reverse
   lookup (`GetValueGAMEMODE_e` on `"GAMEMODE_" + name`, case-insensitive via `ToUpper()`) and has
   several failure/refusal conditions of its own (client-mode call, mid-result-sequence, no
-  matching starts for the target mode, etc.) — not covered here since this file is scoped to the
-  getter; see that function's own doc if/when written.
+  matching starts for the target mode, a level locked to a different `MAPINFO gamemode` since
+  `7aa633182` (added after 3.2.1, not an ancestor of `28f736fb3`), etc.) — not covered here since
+  this file is scoped to the getter; see that function's own doc if/when written.
 - This function and its `Set` counterpart were both added in the same commit, `c487ff0a5`
   ("Added new ACS functions: SetGamemodeLimit()... SetCurrentGamemode()... GetCurrentGamemode()
   ..."), which **is an ancestor of** the 3.2.1 version-bump commit `28f736fb3` (verified via

@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** `StopSound - ZDoom Wiki` (https://zdoom.org/w/index.php?title=StopSound&oldid=40903), verified 2026-07-29 against fork source.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
@@ -11,7 +11,7 @@ Stops a currently-playing sound on a given channel for the actor(s) matching `ti
 function (`ACSF_StopSound`, index `-62` in the zt-bcc source's `lib/zcommon.bcs:1690`), implementation
 in `DLevelScript::CallFunction`, the Zandronum source's `src/p_acs.cpp:6556-6591`.
 
-- `tid` — **`0` means "the script's activator"** (`p_acs.cpp:6560`: `if (args[0] == 0) S_StopSound(activator, chan);`), same zero-means-activator convention as other actor-targeting functions across both engines.
+- `tid` — **`0` means "the script's activator"** (`p_acs.cpp:6560-6562`: a zero `tid` calls `S_StopSound` on the activator), same zero-means-activator convention as other actor-targeting functions across both engines.
 - **`tid=0` with no activator is verified safe — no NULL guard needed.** `S_StopSound(activator,
   chan)` is called with no NULL check on `activator`, but `S_StopSound(AActor*, int)`
   (`s_sound.cpp:1582-1596`) only ever compares `chan->Actor == actor` for pointer identity — it
@@ -31,15 +31,19 @@ in `DLevelScript::CallFunction`, the Zandronum source's `src/p_acs.cpp:6556-6591
   difference worth knowing before assuming "the actor" (singular, as the wiki phrases it) is
   literal.
 - `channel` — optional; if the call omits it (`argCount == 1`), the engine defaults to
-  `CHAN_BODY` (`p_acs.cpp:6558`: `int chan = argCount > 1 ? args[1] : CHAN_BODY;`), matching the
+  `CHAN_BODY` (`p_acs.cpp:6558` picks `args[1]` only when a second argument was passed), matching the
   wiki's stated default. `CHAN_BODY` is declared in the zt-bcc source's `lib/zcommon.bcs:716`.
-- Both branches call `S_StopSound(actor, chan)` (`s_sound.cpp`), which is a no-op if nothing is
+- Both branches call `S_StopSound(actor, chan)` (`s_sound.cpp:1582-1596`), which is a no-op if nothing is
   currently playing on that channel for that actor — there's no error/failure return to check;
-  this function's return type is `void`.
+  this function's return type is `void`. Exception: with `compat_soundslots` on
+  (`COMPATF_MAGICSILENCE`, `s_sound.cpp:1590`), the channel is ignored and every sound playing on
+  the actor stops. UZDoom does the same.
 - **Zandronum netcode addition not in the ZDoom wiki's model:** when running as a network server
   (`NETWORK_GetState() == NETSTATE_SERVER`), both branches additionally call
   `SERVERCOMMANDS_StopSound(actor, chan)` to replicate the stop to clients, and
   `SERVER_UpdateLoopingChannels(actor, chan, 0, 0, 0, true)` to remove the channel from the
   server's tracked list of looping sounds for that actor (`p_acs.cpp:6564-6569` for the
-  activator case, `6581-6587` for the TID-iterator case). Vanilla ZDoom has no server/client
+  activator case, `6581-6587` for the TID-iterator case). The client message is skipped for an
+  actor with no NetID, such as a clientside-only actor (`sv_commands.cpp:3725-3735`). Clients run
+  their own `S_StopSound` on receipt. Vanilla ZDoom has no server/client
   split, so the wiki page has no equivalent of this step — it's purely a Zandronum-fork concern.

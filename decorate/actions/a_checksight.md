@@ -2,13 +2,13 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
-**Provenance:** ZDoom Wiki `A_CheckSight` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_CheckSight&oldid=45585) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3286-3329`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_CheckSight` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_CheckSight&oldid=45585) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3286-3329`, `DoJump` (`thingdef_codeptr.cpp:695-753`), jump-offset parsing (`src/thingdef/thingdef_states.cpp:377-397`), `SF_IGNOREVISIBILITY` (`src/p_sight.cpp:686`), and server-side CLIENTSIDEONLY suppression (`thingdef_codeptr.cpp:105-121`, `src/p_mobj.cpp:6195-6199`, `src/sv_main.cpp:5653-5668`).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Action function on `AActor` (`DEFINE_ACTION_FUNCTION_PARAMS` in `src/thingdef/thingdef_codeptr.cpp`).
 **Source excerpt:** This file quotes Zandronum engine source verbatim; see [LICENSE](../../LICENSE) §3 for Zandronum's license terms.
 
-Jumps to a target state if no player can see the calling actor. Unlike `A_JumpIf*` conditional jumps, this is a **sight-based check** that polls all active players' line-of-sight to the actor, accounting for player cameras and co-op spy.
+Jumps to a target state if no player can see the calling actor. Unlike `A_JumpIf*` conditional jumps, this is a **sight-based check** that polls all active players' line-of-sight to the actor, from each player's pawn and from any non-player camera they are viewing through.
 
 ## Signature
 
@@ -20,14 +20,15 @@ state A_CheckSight (int offset)
 ## Parameters
 
 **`target`** (state label or frame offset)  
-The jump destination. If a state label (e.g., `"Death"`, `"DeathFade"`), the name is resolved in the calling actor's derived class's state table (virtual resolution). If an integer, the offset counts **frames in the current state line**, not instruction lines.
+The jump destination. If a state label (e.g., `"Death"`, `"DeathFade"`), the name is resolved in the calling actor's derived class's state table (virtual resolution). If an integer, offset N targets the state N after the calling one. `0` means no jump. A negative offset is a parse error ("Negative jump offsets are not allowed"), and so is a positive offset on a multi-frame line such as `POSS AB 4 A_CheckSight(2)`.
 
 ## Behavior
 
 - Checks whether **any** non-spectating player can see the calling actor from their viewpoint.
 - If **at least one player has line of sight** to the actor, returns without jumping. Execution continues to the next action or frame in the current state.
 - If **no player has line of sight** to the actor, performs the jump to the target state.
-- The sight check uses `P_CheckSight(..., SF_IGNOREVISIBILITY)`, which means **the player does not have to be facing the actor** — only a potential line of sight must exist. If a player is positioned where they *could* see the actor if they turned, the check returns true.
+- The sight check is `P_CheckSight`, which is pure line of sight with no facing or FOV test. **The player does not have to be facing the actor.** If a player is positioned where they *could* see the actor if they turned, the actor counts as seen.
+- The `SF_IGNOREVISIBILITY` flag makes the check ignore the actor's own visibility. An actor that is `RF_INVISIBLE` or whose render style and alpha make it invisible (e.g. fully faded out) still counts as seen.
 - The jump does not set any result value for inventory-pickup state chains (`ACTION_SET_RESULT(false)` is always called, per the source).
 
 ## Network considerations
@@ -79,17 +80,17 @@ DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_CheckSight)
 }
 ```
 
-On network-authoritative actors (those without the `NETFL_CLIENTSIDEONLY` flag), the client-mode check returns *before* checking sight, so a client performs **no sight tests** for these actors at all — it only receives the server's already-decided outcome via the `CLIENTUPDATE_FRAME` state-change flag.
+On network-authoritative actors (those without the `NETFL_CLIENTSIDEONLY` flag), the client-mode check returns *before* checking sight, so a client performs **no sight tests** for these actors at all. The server decides, and `DoJump` (`thingdef_codeptr.cpp:695-753`) tells clients only in some cases. A jump from the actor's own current state sends a thing-frame update. A jump from a player's weapon or flash psprite state sends a weapon state jump. A jump inside a `CustomInventory` state chain sends nothing.
 
-For `+CLIENTSIDEONLY` actors, the client does check sight independently (using its own player's camera or pawn), and the server checks all active players. Since the client's world state and camera position may lag, there is a potential for divergence: a `+CLIENTSIDEONLY` actor might jump on one machine and not the other if the client's knowledge of actor position or camera state differs from the server's. This is acceptable because `NETFL_CLIENTSIDEONLY` is documented as "only spawned by the clients... don't affect the game in any way (visuals aside)" — each machine owns and simulates its own private copy of the actor with no cross-machine consistency requirement.
+For `+CLIENTSIDEONLY` actors, each client checks sight alone, from `players[consoleplayer].camera` only. That camera is normally the local pawn. There is no separate pawn test and no spectator test on this path. The server never runs this branch for such actors, because it does not hold them: it refuses to spawn them from map things and action functions, and destroys any it spawns for summon or ACS relay (`thingdef_codeptr.cpp:105-121`, `p_mobj.cpp:6195-6199`, `sv_main.cpp:5653-5668`). Each client simulates its own private copy, so the outcome can differ between clients.
 
 ## Engine-family divergence: network execution model
 
 The client/server authority split described above (the `NETWORK_InClientMode()` branch, the `NETFL_CLIENTSIDEONLY` special case, and the `CLIENTUPDATE_FRAME` cross-machine sync flag) is specific to Zandronum's netcode. UZDoom has no equivalent concept anywhere: a search of UZDoom's entire source tree turns up zero occurrences of `NETWORK_InClientMode`/`SERVERCOMMANDS_*`. UZDoom's `A_CheckSight` (`wadsrc/static/zscript/actors/checks.zs:151`, calling the native `CheckIfSeen()` in `src/playsim/p_actionfunctions.cpp:1729`) contains no client-mode branch, no server-authoritative early return, and no cross-machine state-sync flag — it is a single plain loop over all in-game players, evaluated identically regardless of network role. The entire "Network considerations" topology described above, including the source excerpt, does not apply to UZDoom.
 
-**Player cameras and co-op spy:** The sight check looks at both `players[i].mo` (each player's pawn) and `players[i].camera` if it is non-NULL and not a player pawn itself (e.g., a camera actor spawned by `Chasecam`/`Spectate` or other camera-switching mechanism). This means the check accounts for actors being viewed through free-floating cameras and co-op spy viewpoints.
+**Player cameras and co-op spy:** The sight check looks at both `players[i].mo` (each player's pawn) and `players[i].camera` if it is non-NULL and not a player pawn itself (e.g. a camera actor switched to with `ChangeCamera` or a security camera). Co-op spy points the camera at another player's pawn, so the camera test skips it. That pawn is still checked in its own player's iteration. The `chase` command does not change the camera actor at all.
 
-**Spectators excluded:** Spectating players are skipped (the `bSpectating` check), so they do not block a jump.
+**Spectators excluded:** On the server and offline, spectating players are skipped (the `bSpectating` check), so they do not block a jump. The client-side path for `+CLIENTSIDEONLY` actors has no such test.
 
 ## Engine-family divergence: spectator exclusion
 
@@ -141,5 +142,5 @@ actor FadingZombie : Zombieman
 ## See also
 
 - `A_CheckSightOrRange` — checks both sight *and* distance to a target range, useful for toggling actor behavior only when sufficiently far and out of sight.
-- `A_JumpIfInTargetLOS` — conditional jump when the *target* is in line of sight *from* the actor.
-- `CheckSight` (ACS) — the underlying Zandronum engine function for general line-of-sight queries.
+- `A_JumpIfInTargetLOS` — conditional jump when the calling actor is in its *target's* line of sight (FOV measured from the target's facing).
+- `CheckSight` (ACS) — separate ACS function for line-of-sight queries between tagged actors. `A_CheckSight` does not call it.

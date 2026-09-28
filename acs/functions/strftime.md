@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `Strftime - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=Strftime&oldid=1338`) + source-verified against `p_acs.cpp:7409-7426`, `zt-bcc/lib/zcommon.bcs:1762`, and version-gated against `f614049b4`/`28f736fb3` per shared/AUTHORING.md's "Engine scope" section.
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
@@ -44,11 +44,17 @@ f614049b4 28f736fb3`, verified true) — so this function predates and is presen
 
 The formatted string as a dynamic ACS string, built from a fixed `char buffer[1024]`
 (`p_acs.cpp:7411`). If the underlying `strftime()` call returns `0` — which happens both on
-genuine failure (formatted result plus NUL wouldn't fit in 1024 bytes) and on some libcs for a
-legitimately-empty result (e.g. an empty `format`) — the buffer is explicitly zeroed
-(`p_acs.cpp:7422-7423`) and an empty string `""` is returned either way. Unlike
+genuine failure (formatted result plus NUL wouldn't fit in 1024 bytes) and, on any conforming
+libc, for a legitimately-empty result (e.g. an empty `format`) — the buffer's first byte is set
+to NUL (`p_acs.cpp:7422-7423`) and an empty string `""` is returned either way. Unlike
 `GetTimeProperty`'s `0`-return ambiguity (real zero vs. unmatched case), this one has no
 practical ambiguity: both failure and legitimate-empty-format produce the same observable `""`.
+
+The formatted text is stored through `ACS_PushAndReturnDynamicString`, which runs it through
+`strbin1` first (`p_acs.cpp:439-442`). So backslash escape sequences present in the formatted
+text (`\c`, `\n`, `\x..` and so on) are converted to the characters they stand for. This is the
+same escape pass the engine applies to every module string literal at load time
+(`p_acs.cpp:3097,3107`).
 
 Per the wiki, and confirmed by the fact that ACS ints are 32-bit and `timestamp` is passed as a
 plain ACS `int`, this function (like `SystemTime`) is subject to the year-2038 problem regardless

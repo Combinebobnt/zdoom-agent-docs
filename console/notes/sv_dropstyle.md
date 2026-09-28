@@ -2,19 +2,19 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-16); Zandronum 3.2.1 @28f736fb3 (2026-08-02)
-**Provenance:** Zandronum Wiki "Server variables" (https://wiki.zandronum.com/w/index.php?title=Server_variables&oldid=2534, saved 2026-08-02), enum values verified against raw wiki HTML.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-16); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** Zandronum Wiki "Server variables" (https://wiki.zandronum.com/w/index.php?title=Server_variables&oldid=2534, saved 2026-08-02), enum values verified against raw wiki HTML. Zandronum source: `src/p_enemy.cpp:3461` (declaration), `src/p_enemy.cpp:3463-3533` (`P_DropItem` spawn height), `src/p_enemy.cpp:3541-3565` (`P_TossItem` velocities), `src/gi.cpp:367` and `wadsrc/static/mapinfo/*.txt` (`defaultdropstyle`), `src/gamemode.cpp:309-322` and `src/c_cvars.cpp:283` (`CVAR_GAMEPLAYSETTING`).
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 
-Controls how items dropped by defeated monsters are scattered on the floor. Affects both the initial trajectory and spread pattern of dropped items.
+Controls how dropped items are tossed when spawned: monster `DropItem` drops, player death drops, `A_DropItem` and ACS `DropItem` all go through the same engine drop routine. It sets both the spawn height and the initial velocity. Nothing is tossed at all when `compat_notossdrops` is on; the item then spawns at the dropper's feet.
 
 ## Value modes
 
 | Value | Behavior |
 |-------|----------|
-| 0 | Leave the game's default behavior. The item-drop style is determined by the IWAD or map DECORATE definitions. |
-| 1 | Standard Doom-style item drop. Items fall straight down or are scattered with moderate horizontal velocity. |
-| 2 | Strife-style item drop. Items are tossed farther away from the monster's death location, creating a wider spread pattern. |
+| 0 | Use the game's default style, the MAPINFO `GameInfo` key `defaultdropstyle` (2 for Strife, 1 for the other stock games). DECORATE has no say in it. |
+| 1 | Doom-style drop. The item spawns at half the dropper's height and pops upward (5 to about 9 units/tic) with under 1 unit/tic of random horizontal drift. |
+| 2 | Strife-style drop. The item spawns 24 units above the dropper's base and gets up to 7 units/tic of random horizontal velocity per axis, no upward push, so it lands farther from the death point. |
 
 Default is 0 (use game default).
 
@@ -25,13 +25,15 @@ Default is 0 (use game default).
 
 ## Network and storage
 
-Marked `CVAR_SERVERINFO | CVAR_GAMEPLAYSETTING`, so it is replicated to clients and affects gameplay balance.
+Declared `CVAR_SERVERINFO | CVAR_ARCHIVE`: replicated to clients and saved to the config file. In Zandronum, drops are spawned server-side only (clients return early), so the server's value is the one that matters.
 
 ## Wiki/engine divergence: storage/network flags
 
-The flag claim above doesn't hold on UZDoom: `sv_dropstyle` there is declared `CVAR_SERVERINFO | CVAR_ARCHIVE` (still replicated to clients, but auto-saved to the config file rather than tagged as a locked "gameplay setting"). UZDoom's cvar-flag set has no `CVAR_GAMEPLAYSETTING` equivalent at all — that flag is a Zandronum-only mechanism for locking specific settings during duel/Last Man Standing/Invasion modes. For context, current Zandronum source itself also declares this cvar `CVAR_SERVERINFO | CVAR_ARCHIVE`, not `CVAR_SERVERINFO | CVAR_GAMEPLAYSETTING` — so this flag claim doesn't match either engine's present-day source, not just UZDoom's. The value-mode semantics (0/1/2) and their trajectory/spread effects, covered elsewhere in this file, are identical between the two engines.
+The Zandronum Wiki lists this cvar as `CVAR_SERVERINFO | CVAR_GAMEPLAYSETTING`. Neither engine's source matches that. Both UZDoom and Zandronum declare it `CVAR_SERVERINFO | CVAR_ARCHIVE`. UZDoom's cvar-flag set has no `CVAR_GAMEPLAYSETTING` equivalent at all. In Zandronum that flag marks the cvars a GAMEMODE lump's `gamesettings`/`lockedgamesettings` blocks may set or lock, so `sv_dropstyle` cannot appear in those blocks.
+
+The value-mode semantics (1 and 2) are the same in both engines. One small difference at value 0: Zandronum picks the spawn height from whether the game is Strife, while UZDoom uses `defaultdropstyle` for both spawn height and velocity. They only differ for a custom `GameInfo` that sets `defaultdropstyle` against its game type.
 
 ## Related cvars and properties
 
 - **`sv_unlimited_pickup`** — allows picking up items beyond inventory limits (independent of drop style).
-- **Actor property `DropItem`** (DECORATE/ZScript) — mods can override per-actor drop behavior independently of this server-wide setting.
+- **Actor property `DropItem`** (DECORATE/ZScript) chooses what an actor drops and how often. It does not change the toss style, which still follows this cvar.

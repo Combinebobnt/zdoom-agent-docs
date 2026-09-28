@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
-**Provenance:** ZDoom Wiki `MAPINFO` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=MAPINFO&oldid=52570) + verified against the Zandronum source's `src/g_mapinfo.cpp` (`FMapInfoParser::ParseMapInfo`, `G_ParseMapInfo`) and the UZDoom source's `src/gamedata/g_mapinfo.cpp`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `MAPINFO` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=MAPINFO&oldid=52570) + verified against the Zandronum source's `src/g_mapinfo.cpp` (`FMapInfoParser::ParseMapInfo`, `G_ParseMapInfo`, `FMapInfoParser::ParseOpenBrace`, `FMapInfoParser::ParseEpisodeInfo`) and `src/sc_man_scanner.re` (comment handling per scanner mode), and the UZDoom source's `src/gamedata/g_mapinfo.cpp`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 ## Overview
@@ -22,8 +22,8 @@ Both lumps use identical parsing; the distinction is format enforcement:
 
 The parser detects format at the first brace-bearing construct (Zandronum source `src/g_mapinfo.cpp:462`):
 
-- **New format:** Begins with a `{` character. Enables all block types listed below except the Hexen-era blocks. Sets C-mode parsing (no bare identifiers). Can be inferred from the first block itself if it starts with `{`.
-- **Old format (Hexen-style):** Does not begin with a `{`. A legacy format supporting only `map`, `episode`, `skill`, `clusterdef` (not `cluster`), and a limited property set per block. Parsed in C-mode to allow full comment syntax.
+- **New format:** Begins with a `{` character. Enables every block type listed below; the old-format `clusterdef` keyword is still accepted too. Switches the scanner to C-mode, which also splits punctuation such as `,`, `(` and `;` into separate tokens (the Hexen scanner only splits `{`, `}`, `|` and `=`) and stops treating `;` as a comment. Can be inferred from the first block itself if it starts with `{`.
+- **Old format (Hexen-style):** Does not begin with a `{`. A legacy format without the new-format-only blocks (see "Top-level block types" below) and with a limited property set per block. Stays on the classic Hexen scanner, which accepts `//`, `/* */` and `;` comments (`src/sc_man_scanner.re:237-241`). Only `specialaction` switches to C-mode temporarily while it reads its arguments.
 
 Once the format is determined by the first `{`, it governs the entire lump. Additionally, certain new-format-only block types (`gameinfo`, `intermission`, `automap`, `automap_overlay`) can promote an indeterminate format to new format when encountered.
 
@@ -31,33 +31,35 @@ Once the format is determined by the first `{`, it governs the entire lump. Addi
 
 Block types available depend on format:
 
-### New format (requires `{` syntax)
+### New format only
+These are rejected with a script error once the lump has been detected as old format. Encountering `gameinfo`, `intermission`, `automap` or `automap_overlay` while the format is still undetermined promotes the lump to new format; `cluster` does not promote it.
+- `cluster <number> { ... }` — define cluster properties (see separate "MAPINFO_Cluster definition" page). Old format uses `clusterdef` instead.
+- `gameinfo { ... }` — configure engine-level properties like title screen, credit sequence, intermission defaults (see separate "MAPINFO_GameInfo definition" page).
+- `intermission <name> { ... }` — define a custom intermission sequence.
+- `automap { ... }` — set automap color scheme; only applied if `am_customcolors` cvar is enabled.
+- `automap_overlay { ... }` — like `automap`, but overlays settings on the default scheme instead of replacing it.
+
+### Both formats
+In the new format the blocks here that take properties are brace-delimited; in the old format a block ends at the first word that isn't one of its properties, normally the next top-level keyword.
 - `map <name>` — define or override a map's properties (e.g., `map E1M1 { ... }`). See the separate "MAPINFO_Map definition" page for property details.
 - `defaultmap { ... }` — set default properties that apply to all subsequently-defined `map` blocks in this file.
 - `adddefaultmap { ... }` — like `defaultmap`, but merges with existing defaults instead of replacing them.
-- `cluster <number> { ... }` — define cluster properties (see separate "MAPINFO_Cluster definition" page). Zandronum enforces the format gate; old format uses `clusterdef` instead.
-- `episode { ... }` — define or override an episode (see separate "MAPINFO_Episode definition" page).
-- `skill <name> { ... }` — define or override a skill level (see separate "MAPINFO_Skill definition" page).
-- `gameinfo { ... }` — configure engine-level properties like title screen, credit sequence, intermission defaults (see separate "MAPINFO_GameInfo definition" page). Unavailable in old format.
-- `intermission <name> { ... }` — define a custom intermission sequence.
-- `automap { ... }` — set automap color scheme; only applied if `am_customcolors` cvar is enabled. New format only.
-- `automap_overlay { ... }` — like `automap`, but overlays settings on the default scheme instead of replacing it. New format only.
-
-### Both formats
-- `episode { ... }` (both formats support the same keyword; see "MAPINFO_Episode definition" page for property differences).
+- `episode <map> { ... }` — define or override an episode (see "MAPINFO_Episode definition" page for property differences).
 - `clearepisodes` — clear all previously-defined episodes. If used, at least one episode must be defined somewhere across all loaded MAPINFO lumps afterward.
-- `skill <name> { ... }` (both formats).
+- `skill <name> { ... }` — define or override a skill level (see separate "MAPINFO_Skill definition" page).
 - `clearskills` — clear all previously-defined skills. If used, at least one skill must be defined somewhere across all loaded MAPINFO lumps afterward.
-- `clusterdef <number> { ... }` — old-format cluster syntax. See separate page. New format accepts `cluster` instead.
+- `clusterdef <number> { ... }` — old-format cluster syntax, still accepted in the new format alongside `cluster`. See separate page.
 
 ### Include statement
 - `include <filename>` — load another MAPINFO file. Path is relative to the WAD/PK3 directory structure. Includes are resolved recursively and can themselves contain `include` statements.
 
-### Zandronum-specific blocks
-- `botepisode { ... }` — define a bot skill selection screen episode-like menu (for bot bot selection in multiplayer). Zandronum extension not found in GZDoom-family engines.
-- `botskillname <name> "Title"` — define a custom bot skill menu title. Zandronum extension.
-- `botskillpicname <name> "Picname"` — define a bot skill menu picture. Zandronum extension.
-- Bot-related properties in `map` blocks: `islobby` (flag) is Zandronum-specific. `nobotnodes` exists in both engines but is only functional in Zandronum; UZDoom accepts and ignores it.
+### Zandronum-specific episode and map properties
+These are not top-level blocks. The three bot properties go inside an `episode` block (`FMapInfoParser::ParseEpisodeInfo`, `src/g_mapinfo.cpp:1759-1774`) and are not found in GZDoom-family engines.
+- `botepisode`: bare flag marking the episode as one that shows the bot skill selection menu.
+- `botskillname "Title"`: text title for that bot skill menu. Takes one string with no `=`.
+- `botskillpicname "Picname"`: graphic title for that menu instead of text. Takes one string with no `=`; whichever of the two comes last wins.
+- Either title property in an episode without `botepisode` is ignored with a script message (`src/g_mapinfo.cpp:1834-1835`).
+- Bot-related properties in `map` blocks: `islobby` (flag, alias `lobby`) is Zandronum-specific. `nobotnodes` exists in both engines but is only functional in Zandronum; UZDoom accepts and ignores it.
 
 ## Engine-family divergence
 
@@ -74,7 +76,7 @@ The following blocks exist in UZDoom/GZDoom but have no Zandronum implementation
 - `spawnnums { ... }` — map spawn numbers to actor classes.
 - `conversationids { ... }` — map conversation IDs to actor classes.
 
-These are new-format-only and documented in the UZDoom/GZDoom MAPINFO reference, but **do not parse in Zandronum and should not be used in a Zandronum-compatible MAPINFO**. A modder targeting both engines should use separate MAPINFO/ZMAPINFO lumps, or conditionally use these only in ZMAPINFO where they won't be loaded by Zandronum.
+These are new-format-only and documented in the UZDoom/GZDoom MAPINFO reference, but **do not parse in Zandronum and should not be used in a Zandronum-compatible MAPINFO**. Zandronum reads ZMAPINFO too (and prefers it over a MAPINFO in the same WAD, `src/g_mapinfo.cpp:2053-2069`), so moving these blocks into ZMAPINFO does not hide them from Zandronum. A modder targeting both engines should keep them out of every MAPINFO/ZMAPINFO lump that Zandronum loads, for example in a separate file loaded only on UZDoom.
 
 ### Per-lump defaults behavior
 
@@ -95,7 +97,7 @@ Generic block structure:
 - If a property takes no parameters, the property name alone is sufficient (no `=`).
 - String values must be quoted (e.g., `name = "E1M1: Entry Point"`).
 - Numeric values are not quoted.
-- Comments use `//` (to end of line) or `/* */` (block).
+- Comments use `//` (to end of line) or `/* */` (block). Old-format lumps also accept `;` to end of line (see "Format variants").
 
 ## See also
 

@@ -2,9 +2,9 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `PlayerCount - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28,
-`https://zdoom.org/w/index.php?title=PlayerCount&oldid=36033`) + source-verified (`p_acs.h:657`, `p_acs.cpp:4015-4025,11156-11158`). The wiki's
+`https://zdoom.org/w/index.php?title=PlayerCount&oldid=36033`) + source-verified (`p_acs.h:657`, `p_acs.cpp:4015-4025,11156-11158`, `bots.cpp:1773`). The wiki's
 basic description holds, but it documents vanilla ZDoom behavior; the spectator exclusion is this
 doc's source-verified addition and the reason this earns a tier-A file instead of staying
 signature-only.
@@ -32,7 +32,8 @@ int DLevelScript::CountPlayers ()
 ```
 
 - Iterates every player slot (`0..MAXPLAYERS-1`), counting a slot only if `playeringame[i]` is set
-  (the slot is occupied by a connected client) **and** `players[i].bSpectating` is false.
+  (the slot is occupied by a connected client or a bot; `bots.cpp:1773` sets it for bots, so
+  non-spectating bots are counted too) **and** `players[i].bSpectating` is false.
 - **Fork-specific divergence from the ZDoom wiki page:** the wiki page for this function (written
   for vanilla ZDoom/Hexen) describes it purely as "the number of players currently in the game,"
   with no mention of spectators — vanilla `PlayerCount` counts every `playeringame` slot

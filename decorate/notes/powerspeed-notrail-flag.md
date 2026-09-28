@@ -2,7 +2,7 @@
 
 **Tier:** B
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-17)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** Source-derived (no wiki page consulted) — verified against `src/thingdef/
 thingdef_data.cpp` (flag registration) and `src/g_shared/a_artifacts.cpp` (`APowerSpeed::
 DoEffect`).
@@ -20,21 +20,25 @@ wrong guess. UZDoom changes this — see "Engine-family divergence: property for
 
 ## Behavior
 
-On Zandronum, `APowerSpeed::DoEffect` spawns trail actors based purely on player velocity (>12
-map units/tic) — it never consults the `Speed` property at all. This means even a `Speed 1.0`
-subclass (a true no-op speed multiplier — see
+Neither engine's `DoEffect` ever reads the `Speed` property when deciding whether to spawn a
+trail. It spawns one on every other tic, and only while the owner moves faster than 12 map
+units/tic. This means even a `Speed 1.0` subclass (a true no-op speed multiplier, see
 [powerup-as-inert-timer](../concepts/powerup-as-inert-timer.md)) still spawns trails unless this
-flag is set. UZDoom's ZScript `PowerSpeed.DoEffect` agrees: it also gates purely on the owner's
-velocity magnitude (again a >12-unit threshold) and never reads `Speed` either — this part of the
-behavior is a clean cross-engine match, not a divergence.
+flag is set. The speed test itself differs. On Zandronum, `APowerSpeed::DoEffect` measures only
+horizontal velocity, with the `P_AproxDistance` approximation (`src/g_shared/a_artifacts.cpp:1276`), which
+over-estimates by up to about 11.8%. So a true horizontal speed a little under 12 can still draw a
+trail, and vertical motion never does. UZDoom's ZScript `PowerSpeed.DoEffect` tests the exact
+length of the owner's full 3D velocity, so falling or jumping fast also draws trails there.
 
-**Trail arbitration gotcha (Zandronum):** `DoEffect` walks the player's inventory for other active
-`PowerSpeed` instances, and only the *last* one **without** `PSF_NOTRAIL` set actually draws a
-trail. A `PowerSpeed` subclass without this flag therefore doesn't just draw its own (likely
-unwanted) trail — it can also participate in and disrupt the arbitration for a genuine, trail-
-bearing speed powerup (e.g. a turbosphere) the player is also holding, suppressing or replacing
-its trail. **This arbitration logic is not the same on UZDoom** — see "Engine-family divergence:
-trail arbitration" below.
+**Trail arbitration gotcha (Zandronum):** `DoEffect` walks the `PowerSpeed` items that come after
+it in the player's inventory chain, and only the *last* one **without** `PSF_NOTRAIL` set actually
+draws a trail. The trail actor copies its sprite, frame, translation, scale, angle and floorclip
+from the owner, never from the powerup, so which item wins the arbitration makes no visible
+difference: while a genuine speed powerup (e.g. a turbosphere) is also held, exactly one identical
+trail is drawn either way. The visible problem with a `PowerSpeed` subclass lacking this flag is
+that it draws that trail on its own, whenever the player moves fast enough, including when no
+genuine speed powerup is held. **This arbitration logic is not the same on UZDoom**. See
+"Engine-family divergence: trail arbitration" below.
 
 **Negative finding:** no `cl_speedtrails`-style client cvar exists anywhere in the Zandronum
 source (checked via a case-insensitive search for `speedtrail` across `src/`), nor anywhere in

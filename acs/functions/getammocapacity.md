@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** wiki page `GetAmmoCapacity (ACS) - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=GetAmmoCapacity_%28ACS%29&oldid=49110`) + source-verified against `p_acs.cpp:11814-11841`, `g_shared/a_pickups.h:250` (`AAmmo` field definition + backpack mutation path), `g_shared/a_pickups.cpp:2111-2125` (backpack `MaxAmount` mutation), `zt-bcc/src/builtin.c:131`. Wiki/fork divergence (direct-parent-only `Ammo` check, unheld-ammo fallback to class default, activator-only targeting) and indirection in backpack behavior recorded above rather than silently trusted or omitted. **Not consolidated into a family file with `SetAmmoCapacity`** because the two share the resolution check but diverge materially in the unheld-item behavior (getter returns class default, setter creates the item with `Amount` zeroed); a merged doc would have to caveat nearly every line per-direction.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.

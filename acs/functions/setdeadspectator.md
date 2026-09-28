@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-18)
-**Provenance:** Zandronum Wiki `SetDeadSpectator` (retrieved 2026-08-18, https://wiki.zandronum.com/w/index.php?title=SetDeadSpectator&oldid=1328) + verified against Zandronum source (`src/p_acs.cpp:7428-7501`). Note: local Zandronum checkout carries applied ZandronumMCP integration patch (+170 lines to `src/p_acs.cpp`); line numbers may shift relative to a clean upstream checkout. UZDoom absence confirmed by repo-wide grep: no `deadspectator`/`ACSF_SetDeadSpectator` in `src/playsim/p_acs.cpp` or `src/playsim/actionspecials.h`.
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** Zandronum Wiki `SetDeadSpectator` (retrieved 2026-08-18, https://wiki.zandronum.com/w/index.php?title=SetDeadSpectator&oldid=1328) + verified against Zandronum source (`src/p_acs.cpp:7428-7501`). UZDoom absence confirmed by repo-wide grep: no `deadspectator`/`ACSF_SetDeadSpectator` in `src/playsim/p_acs.cpp` or `src/playsim/actionspecials.h`.
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function (index -130; dispatched as `ACSF_SetDeadSpectator`).
 

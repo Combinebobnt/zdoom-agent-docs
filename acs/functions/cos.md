@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** wiki page `Cos - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
 `https://zdoom.org/w/index.php?title=Cos&oldid=35793`) + source-verified against the Zandronum source (`p_acs.cpp:12241-12243`,
 `tables.h:48-70`) and the zt-bcc source's `src/builtin.c:103`. The wiki's core "cosine of a

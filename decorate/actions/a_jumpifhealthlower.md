@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
-**Provenance:** ZDoom Wiki `A_JumpIfHealthLower` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_JumpIfHealthLower&oldid=44128) + verified against Zandronum source's `src/thingdef/thingdef_codeptr.cpp:792-808`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_JumpIfHealthLower` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_JumpIfHealthLower&oldid=44128) + verified against Zandronum source's `src/thingdef/thingdef_codeptr.cpp:792-808` (See also: `wadsrc/static/actors/actor.txt:205,238`, `src/thingdef/thingdef_codeptr.cpp:765-785`).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** AActor — callable from any actor's state table.
 
@@ -34,5 +34,5 @@ UZDoom's implementation has no server/client authority split anywhere in its sou
 
 ## See also
 
-- `A_JumpIf` — a more general conditional jump based on an ACS expression.
-- `A_Jump` — unconditional jump to a state or offset (no condition).
+- `A_JumpIf` — a more general conditional jump taking an arbitrary boolean expression (a DECORATE expression, not ACS).
+- `A_Jump` — random-chance jump: jumps with probability `chance`/256 (256 always jumps), choosing randomly among the listed labels if several are given.

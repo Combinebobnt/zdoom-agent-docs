@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-17)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** Zandronum source `src/d_netinfo.cpp:93` + verified against the implementation in `src/d_netinfo.cpp:HandicapChanged()` which shows clamping to `(0, deh.MaxSoulsphere)`.
 
 ## Zandronum-specific: conditional spawn-health reduction
@@ -56,8 +56,11 @@ This cvar is marked `CVAR_USERINFO | CVAR_ARCHIVE`, so it's part of the player's
 
 `handicap` does not exist on UZDoom at all — confirmed absent from the entire checkout (no
 `CVAR`/`CUSTOM_CVAR` declaration and no bare mention of the name anywhere in the tree, aside from an
-unrelated audio-related string in a translation file). Attempting to set it under UZDoom (console,
-config file, or ACS's `ConsoleCommand()`) hits the console dispatcher's unknown-command path
+unrelated audio-related string in a translation file). Attempting to set it under UZDoom from the
+console or a config file hits the console dispatcher's unknown-command path
 (`src/common/console/c_dispatch.cpp:324`) and prints `Unknown command "handicap"` — a visible
-failure at the console, easy to miss from an unattended context like a saved client config. UZDoom
+failure at the console, easy to miss from an unattended context like a saved client config. Via
+ACS's `ConsoleCommand()` it never reaches the dispatcher: UZDoom's `ConsoleCommand` p-codes only
+print a "doesn't support execution of console commands from scripts" error and discard their
+arguments. UZDoom
 has no self-handicapping spawn-health mechanism of any kind to substitute for it.

@@ -2,8 +2,8 @@
 
 **Tier:** B
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
-**Provenance:** ZDoom Wiki `MAPINFO/Map_definition` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=MAPINFO%2FMap_definition&oldid=55486) + verified against Zandronum engine source and spot-checked against UZDoom for engine-family divergence.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `MAPINFO/Map_definition` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=MAPINFO%2FMap_definition&oldid=55486) + verified against Zandronum engine source and spot-checked against UZDoom for engine-family divergence. The `include` baseline behavior under "Block forms and scoping" is from `FMapInfoParser::ParseMapInfo` in both engines' `g_mapinfo.cpp`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 The `map` definition block and its related default-setting variants (`defaultmap`, `adddefaultmap`, `gamedefaults`) form a hierarchical inheritance system. A map definition specifies per-level behavior (sky texture, music, next map, flags, etc.); the default blocks establish shared baseline properties to avoid repetition across many maps.
@@ -16,7 +16,7 @@ Defines a single level. The `<lump>` is the map marker name (conventionally `MAP
 
 **`defaultmap { properties }`**
 
-Resets the default baseline to the current `gamedefaults` state (see below), then applies properties to it. The new baseline applies to all subsequent `map` definitions *within the same file only* — `defaultmap` does not persist across `include` boundaries or into other MAPINFO lumps. `defaultmap` fully replaces any previous default state in the file; to add to an existing baseline without resetting it, use `adddefaultmap` instead.
+Resets the default baseline to the current `gamedefaults` state (see below), then applies properties to it. The new baseline applies to subsequent `map` definitions in the same lump. It never carries into another top-level MAPINFO lump, since each lump starts from the current `gamedefaults` baseline. An `include` is not a clean boundary, though. The included file shares the including file's baseline by reference and resets it to `gamedefaults` when it starts, so the including file's `defaultmap` does not reach the included file. Nothing restores it afterwards, so the including file's remaining maps continue from whatever baseline the included file left in effect (at minimum a reset to `gamedefaults`). `defaultmap` fully replaces any previous default state in the file; to add to an existing baseline without resetting it, use `adddefaultmap` instead.
 
 **`adddefaultmap { properties }`**
 
@@ -37,7 +37,7 @@ A map definition accepts approximately 150 properties total, covering:
 
 ### Significant engine-family divergence
 
-**Zandronum 3.2.1 supports** a subset of the ZDoom-family property surface, including most core properties (sky, music, next, gameplay flags, compatibility flags). **Zandronum does not support** several renderer-specific and modern properties that exist in GZDoom/UZDoom:
+**Zandronum supports** a subset of the ZDoom-family property surface, including most core properties (sky, music, next, gameplay flags, compatibility flags). **Zandronum does not support** several renderer-specific and modern properties that exist in GZDoom/UZDoom:
 
 - **Renderer features:** `EnableShadowmap`, `DisableShadowmap`, `AttenuateLights`, `EnableSkyboxAO`, `DisableSkyboxAO`, `NoFogOfWar`, `SkyMist`, `UseSkyMist`, `SkyMistYScale`, `ThickFogDistance`, `ThickFogMultiplier`, `ForceFakeContrast`, `ForceWorldPanning` — these are absent in Zandronum and will generate an "Unknown property" script warning.
 - **ZScript integration:** `EventHandlers` (assigns ZScript event handlers to a map) — not applicable in Zandronum, which does not support ZScript.
@@ -47,7 +47,7 @@ A map definition accepts approximately 150 properties total, covering:
 - **Monster behavior:** `ProperMonsterFallingDamage` (corrects monster falling-damage formula) — UZDoom supports this; Zandronum does not. Zandronum's monster falling damage is gated by a separate, older mechanism (the `monsterfallingdamage`/`nomonsterfallingdamage` keys below), not by this property.
 
 **Zandronum-specific properties:**
-- Multiplayer and campaign-mode properties (`IsLobby`, `NoSkirmish`, `NoBotNodes` at map level, and `BotEpisode` at episode level) — these are Zandronum/Skulltag extensions not present in UZDoom/GZDoom.
+- Multiplayer and campaign-mode properties (`IsLobby`, `NoSkirmish`, `NoBotNodes` at map level, and `BotEpisode` at episode level) — these are Zandronum/Skulltag extensions not present in UZDoom/GZDoom. `NoSkirmish` was added after 3.2.1 (commit `108604c5f`), so a 3.2.1 client does not recognize it and reports it as an unknown property. The other three exist at 3.2.1.
 
 The `pausemusicinmenus` property does exist in both Zandronum and UZDoom.
 
@@ -88,7 +88,7 @@ block silently discards every other global default property that isn't restated 
 
 Zandronum and UZDoom differ in how strictly they trigger the HexenHack retraction, with an important caveat about the HexenHack flag's persistence within a lump. When a numeric map name is encountered, Zandronum sets the HexenHack flag unconditionally; UZDoom gates it based on MAPINFO format — the flag is only set when the lump uses old-style (non-braced) syntax. UZDoom detects format by testing for an opening brace when beginning to parse each definition. In new-format (braced) MAPINFO, numeric map names in UZDoom are accepted literally and do not trigger HexenHack.
 
-**Critical limitation:** The HexenHack flag is set to false only when a new MAPINFO lump begins parsing (`ParseMapInfo` entry), not between individual map headers within the same lump. Once a numeric map name sets the flag to true in either engine, it remains true for all subsequent map definitions in that lump — including maps declared with named lumps rather than bare numbers. This means the practical mitigation from the HexenHack retraction section (declaring new maps with named lumps) works on Zandronum only if no preceding map in that lump used a numeric name. UZDoom's format gating provides better isolation: maps in new-format (braced) MAPINFO are never affected by HexenHack, regardless of what came before in the same lump.
+**Critical limitation:** The HexenHack flag is set to false only when a new MAPINFO lump begins parsing (`ParseMapInfo` entry), not between individual map headers within the same lump. Once a numeric map name sets the flag to true in either engine, it remains true for all subsequent map definitions in that lump — including maps declared with named lumps rather than bare numbers. One Zandronum exception: an `include` reuses the same parser object, so the included file's parse resets the flag and the including file resumes with whatever value the included file left. UZDoom parses an include with a separate parser object, so the including file's flag survives it. This means the practical mitigation from the HexenHack retraction section (declaring new maps with named lumps) works on Zandronum only if no preceding map in that lump used a numeric name. UZDoom's format gating provides better isolation: maps in new-format (braced) MAPINFO are never affected by HexenHack, regardless of what came before in the same lump.
 
 Zandronum's less-strict triggering means the gap described above can affect any map following a numeric-named map, even if declared with a named lump. UZDoom's limitation to old-format lumps means the gap is specific to legacy (non-braced) MAPINFO files, not a general property mechanism.
 

@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** `ACS_NamedTerminate - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=ACS_NamedTerminate&oldid=33698`), verified 2026-07-29 against the Zandronum source's `src`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
@@ -11,7 +11,7 @@
 ## Bucket
 
 Extension function, `ACSF_ACS_NamedTerminate` (index `-41` in `zcommon.bcs`'s `special` table).
-Its `case ACSF_ACS_NamedTerminate:` in `p_acs.cpp` (~line 6341) is shared with the other five
+Its `case ACSF_ACS_NamedTerminate:` in `p_acs.cpp` (~line 6341) is shared with the other six
 `ACS_Named*` extension functions (`NamedExecute`, `NamedSuspend`, `NamedLockedExecute`,
 `NamedLockedExecuteDoor`, `NamedExecuteWithResult`, `NamedExecuteAlways`): it resolves the string
 argument to a named-script number (`-FName(...)`), then dispatches through
@@ -61,10 +61,15 @@ UZDoom's `SetScriptState` (the same helper `P_TerminateScript` calls for the sam
 two script tables where Zandronum's equivalent checks only one: after failing to find the named
 script in `FLevelLocals::ACSThinker`'s `RunningScripts`, it also checks
 `FLevelLocals::ClientSideACSThinker`'s `RunningScripts` before giving up. Zandronum's
-`SetScriptState` only consults the single global `DACSThinker::ActiveThinker`. Practical effect: on
-UZDoom, `Acs_NamedTerminate` can terminate a currently-running clientside instance of the named
-script when no matching non-clientside instance is running; on Zandronum it cannot reach a
-clientside script through this call at all. Both engines still return `true` unconditionally either
+`SetScriptState` (`p_acs.cpp:13143`) only consults the single global `DACSThinker::ActiveThinker`,
+which holds every running script, `CLIENTSIDE` or not. Practical effect: on UZDoom,
+`Acs_NamedTerminate` can terminate a currently-running clientside instance of the named script when
+no matching non-clientside instance is running. On Zandronum the reach depends on where the call
+runs. Offline, and on a client (for example from a `CLIENTSIDE` script), a running `CLIENTSIDE`
+script sits in that same table and is terminated like any other. On a server there is nothing to
+hit: `LS_ACS_Execute` hands a `CLIENTSIDE` script to clients instead of running it on the server
+(`p_lnspec.cpp:1761-1767`), and `LS_ACS_Terminate` sends clients nothing, so a server-side call
+never stops the clients' copies. Both engines still return `true` unconditionally either
 way, so this doesn't change the "return value isn't a success signal" finding above — it only
 widens which running script the call can actually hit on UZDoom.
 

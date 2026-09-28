@@ -2,9 +2,9 @@
 
 **This folder is first-party, not vendored.** It is a hand/agent-maintained documentation tree
 covering the ZDoom-family Doom-engine modding surface — ACS/BCS, DECORATE, ZScript, and the
-smaller lump formats (MAPINFO, GLDEFS, SBARINFO, CVARINFO, console cvars/cmds, sprites, and
-more) — created for and edited by AI agents working across Zandronum and GZDoom-family mod
-projects. Unlike a vendored/foreign upstream checkout (an engine or compiler fork you'd treat
+smaller lump formats (MAPINFO, GLDEFS, SBARINFO, CVARINFO, MENUDEF, console cvars/cmds, sprites,
+Zandronum/Skulltag-native lumps, Zandronum's launcher/master-server/RCON protocols, and more) — created for and edited by AI agents working across
+Zandronum and GZDoom-family mod projects. Unlike a vendored/foreign upstream checkout (an engine or compiler fork you'd treat
 conservatively and leave to its own conventions), you should freely create, edit, and correct
 files here.
 
@@ -14,30 +14,56 @@ field, licensing, the Authoring rule, project-agnosticism) lives in exactly one 
 `shared/AUTHORING.md` — read that before writing anything, and `shared/ARCHETYPES.md` for the
 three doc schemas every section is built from.
 
-## Subagents — prefer these if registered
+## Subagents: prefer one if your harness supports it
 
-This tree ships two ready-made Agent-tool subagent definitions:
+This tree ships a ready-made read-only retrieval subagent, **`zdoom-docs-lookup`**. It answers
+ACS/BCS/DECORATE/ZScript/lump-format questions by walking this tree with the same routing this
+file describes. Delegate a lookup question to it instead of working through the "Where to go"
+table and section `INDEX.md`s by hand. Its harness-neutral source is
+[`agents/procedures/zdoom-docs-lookup.md`](agents/procedures/zdoom-docs-lookup.md). The
+per-harness adapters below are generated from it by `tools/gen_agents.py`, so edit the procedure,
+never an adapter.
 
-- **`zdoom-docs-lookup`** (retrieval, read-only, `model: haiku`, canonical copy in this repo's own
-  `agents/`) — answers ACS/BCS/DECORATE/ZScript/lump-format questions by walking this tree itself,
-  following the same routing this file describes. If it's registered, delegate a lookup question
-  to it directly instead of working through the "Where to go" table and section `INDEX.md`s by
-  hand.
-- **`zdoom-docs-intake`** (processing, `model: haiku`, canonical copy at
-  `maintainer/agents/zdoom-docs-intake.md` — moved out of this public repo since the agent is
-  inert without that directory) — turns one saved wiki page under
-  `maintainer/_intake/<section>/` into a verified doc file. Only relevant if you have the
-  maintainer-only `maintainer/` directory locally — see `maintainer/CLAUDE.md`'s "Wiki intake
-  pipeline" if so.
+Take the first rung that fits your harness:
 
-Before doing either job by hand, check whether the corresponding subagent is registered with the
-Agent tool — commonly once at `~/.claude/agents/` (applies to every project on that machine) or
-copied into the calling project's own `.claude/agents/`. If neither is registered, each
-definition's canonical copy above is the source: register it yourself (copy or symlink into a
-`.claude/agents/` directory, project- or user-level) or paste its contents into a generic
-subagent's prompt as a one-off. Every section's own `AGENTS.md` repeats a one-line pointer back to
-this section, since an
-agent can land directly in a subdirectory without reading this file first.
+1. **Your harness supports subagents.** Check whether `zdoom-docs-lookup` is already registered.
+   If not, copy its adapter into the project-level or user-level directory below. Symlinking the
+   file works only for Claude Code and OpenCode: Codex refuses a symlinked role file at spawn
+   time, and Gemini CLI skips one without an error.
+
+   | Harness | Adapter in this repo | Register into (project / user) | Read-only via |
+   |---|---|---|---|
+   | Claude Code | `agents/zdoom-docs-lookup.md` | `.claude/agents/` / `~/.claude/agents/` | `tools: Read, Grep, Glob` |
+   | Codex CLI | `agents/codex/zdoom-docs-lookup.toml` | `.codex/agents/` / `~/.codex/agents/` | Instructions only. A role file can't set `sandbox_mode`, so the subagent inherits the parent session's sandbox. Start Codex with `--sandbox read-only` if you need a hard guarantee. |
+   | Gemini CLI | `agents/gemini/zdoom-docs-lookup.md` | `.gemini/agents/` / `~/.gemini/agents/` | read/search-only `tools` list |
+   | OpenCode | `agents/opencode/zdoom-docs-lookup.md` | `.opencode/agents/` / `~/.config/opencode/agents/` | `permission` denies everything except read, grep, glob, list |
+   | GitHub Copilot | `agents/copilot/zdoom-docs-lookup.agent.md` | `.github/agents/` / `~/.copilot/agents/` | `tools: ["read", "search"]` |
+
+   Harness-specific caveats:
+   - **Codex** only spawns a subagent when the user or an `AGENTS.md` explicitly asks for it, so
+     the calling project's own `AGENTS.md` has to name `zdoom-docs-lookup` and say to delegate to
+     it. Project-level `.codex/agents/` is read only for trusted projects.
+   - **Gemini CLI** asks you to acknowledge a project-level agent file, and asks again whenever
+     the file changes (for example after a regeneration here).
+   - **Reading this tree from another project:** an adapter doesn't know where this tree lives.
+     Pass its path in the delegated question, or keep this checkout as a `zdoom-agent-docs`
+     sibling of that project. Most harnesses also confine reads to the workspace: add the tree
+     with `--include-directories` (Gemini CLI) or `--add-dir` (Copilot CLI). OpenCode asks
+     before each read outside the project. Copilot's cloud agent can't see a sibling checkout at
+     all.
+2. **No subagent support, but you can set a prompt** for a helper or generic subagent: paste the
+   procedure file from its "Role" section down.
+3. **Neither:** follow that procedure inline yourself, starting with `python3 tools/lookup.py
+   <name>` if you have a shell.
+
+Maintainer-only, and Claude Code only: **`zdoom-docs-intake`** (canonical copy at
+`maintainer/agents/zdoom-docs-intake.md`) turns one saved wiki page under
+`maintainer/_intake/<section>/` into a verified doc file. It's inert without the gitignored
+`maintainer/` directory. If you have that directory, see `maintainer/CLAUDE.md`'s "Wiki intake
+pipeline".
+
+Every section's own `AGENTS.md` repeats a one-line pointer back to this section, since an agent can
+land directly in a subdirectory without reading this file first.
 
 ## Where to go
 
@@ -50,8 +76,12 @@ agent can land directly in a subdirectory without reading this file first.
 | A GLDEFS key | [gldefs/INDEX.md](gldefs/INDEX.md) |
 | An SBARINFO key/command | [sbarinfo/INDEX.md](sbarinfo/INDEX.md) |
 | A CVARINFO declaration | [cvarinfo/INDEX.md](cvarinfo/INDEX.md) |
+| A MENUDEF block or menu-item type | [menudef/INDEX.md](menudef/INDEX.md) |
 | A console cvar or console command (CCMD) | [console/INDEX.md](console/INDEX.md) |
 | Sprite naming/rotation conventions | [sprites/INDEX.md](sprites/INDEX.md) |
+| The BOTINFO lump or the compiled botscript format — **Zandronum only, neither exists on UZDoom/GZDoom-family** | [bots/INDEX.md](bots/INDEX.md) |
+| `ANCRINFO`, `AUTHINFO`, `CMPGNINF`, `GAMEMODE`, `MEDALDEF`, `SCORINFO`, `SECTINFO`, `SKININFO`, or `VOTEINFO` — other Zandronum/Skulltag-native lumps, **Zandronum only** (not BOTINFO/botscript — see the row above); also `TEAMINFO`, which UZDoom parses too | [zandronum-lumps/INDEX.md](zandronum-lumps/INDEX.md) |
+| Launcher query, master-server or RCON wire protocols — **Zandronum only** (outbound-traffic measurement is in `console/`) | [netcode/INDEX.md](netcode/INDEX.md) |
 | Authoring rules, tiers, engine scope, or licensing | [shared/AUTHORING.md](shared/AUTHORING.md) |
 | The doc schemas (Callable / Table-of-entries / Concept) | [shared/ARCHETYPES.md](shared/ARCHETYPES.md) |
 | A knowledge area not listed above | [INDEX.md](INDEX.md)'s "Not yet covered" section — check there before assuming it's simply missing |
@@ -65,8 +95,9 @@ read a *section's* `INDEX.md` speculatively; go straight to the one you need.
 **UZDoom is the primary target** (current: UZDoom 5.0.0-pre). Zandronum stays co-equal and fully
 verified, not grandfathered — the consuming projects still ship on it. ZScript and some
 DECORATE/MAPINFO/GLDEFS/SBARINFO/CVARINFO behavior only exists on UZDoom/GZDoom-family engines;
-some Zandronum-side behavior has no UZDoom counterpart either — every doc's engine claim says
-which, stated as an `Applies to:`/`Verified against:` pair (the legacy single-field `Engine:` form
+some Zandronum-side behavior has no UZDoom counterpart either, most sweepingly the `bots/`,
+`zandronum-lumps/` and `netcode/` sections, which are Zandronum-only in full (bar `TEAMINFO`) — every doc's
+engine claim says which, stated as an `Applies to:`/`Verified against:` pair (the legacy single-field `Engine:` form
 is retired tree-wide, and a new one is a hard `tools/lint_docs.py` error). `shared/AUTHORING.md`
 is authoritative on the exact grammar — see its "Engine scope" for the full detail, including
 known gaps between the local checkouts and their own upstreams, and `maintainer/TODO.md`

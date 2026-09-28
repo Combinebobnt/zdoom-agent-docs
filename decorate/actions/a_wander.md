@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_Wander` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_Wander&oldid=49317) + verified against Zandronum source's `src/p_enemy.cpp:2297`, `wadsrc/static/actors/constants.txt`, and `src/thingdef/thingdef_data.cpp`; UZDoom source's `src/playsim/p_enemy.cpp:2251`, `src/scripting/thingdef_data.cpp:328`, and `wadsrc/static/zscript/constants.zs:160+`
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** ZDoom Wiki `A_Wander` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_Wander&oldid=49317) + verified against Zandronum source's `src/p_enemy.cpp:2297`, `src/p_enemy.cpp:1073-1074` (friendly steering in `P_RandomChaseDir`), `wadsrc/static/actors/constants.txt`, and `src/thingdef/thingdef_data.cpp`; UZDoom source's `src/playsim/p_enemy.cpp:2251`, `src/scripting/thingdef_data.cpp:328`, and `wadsrc/static/zscript/constants.zs:160+`
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** action function defined on `AActor` (Zandronum: `src/p_enemy.cpp:2297`; UZDoom: `src/playsim/p_enemy.cpp:2251`)
 
@@ -41,11 +41,11 @@ Calling this action when the actor has the `+STANDSTILL` flag set has no effect 
 
 ### Friendly monsters
 
-The default behavior for friendly monsters is to follow the player rather than wander (this is handled by whatever code sets the actor's `movedir`, typically `A_Look` or similar target-acquisition calls, not by `A_Wander` itself).
+Friendly monsters drift toward a player instead of wandering purely at random. This happens inside `A_Wander` itself. Whenever it picks a new direction (its move counter runs out or the step is blocked), its random-direction helper `P_RandomChaseDir` first tries to step a `+FRIENDLY` actor toward its friend player, or a random in-game player if it has none. It tries this always when that player is out of sight and on a coin flip otherwise, and only when the player is more than 128 units away on an axis. Otherwise it falls back to a random direction.
 
 **GZDoom-family (UZDoom/GZDoom):** To make friendly monsters actually wander instead, the actor must have the `+DONTFOLLOWPLAYERS` flag set (MF8_DONTFOLLOWPLAYERS in the engine source).
 
-**Zandronum:** The `DONTFOLLOWPLAYERS` flag does not exist in the engine. The wiki's advice to use this flag to override friendly-monster behavior has no Zandronum equivalent. There is no per-action flag or DECORATE property to disable player-following for friendly monsters in Zandronum; they will follow the player as set by target-acquisition code.
+**Zandronum:** The `DONTFOLLOWPLAYERS` flag does not exist in the engine. The wiki's advice to use this flag to override friendly-monster behavior has no Zandronum equivalent. There is no per-action flag or DECORATE property to disable player-following for friendly monsters in Zandronum, so a friendly actor calling `A_Wander` always gets the steering described above. Zandronum does skip a spectating player as the steering target.
 
 ### Conversation blocking
 

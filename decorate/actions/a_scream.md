@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_Scream` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_Scream&oldid=52947) + verified against the Zandronum source's `src/p_enemy.cpp:3329-3344`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** ZDoom Wiki `A_Scream` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_Scream&oldid=52947) + verified against the Zandronum source's `src/p_enemy.cpp:3329-3344`, `src/s_sound.cpp:1285-1294`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_Scream)` in `src/p_enemy.cpp` — defined on `AActor`, callable from any actor's state table.
 
@@ -19,7 +19,7 @@ When called:
 
 3. **Channel and cutoff**: The sound is played on `CHAN_VOICE` (the voice channel). Any other sound on the voice channel from the same actor will be cut off by this one.
 
-4. **Network behavior**: No Zandronum-specific network handling — the function body contains no client-mode early return or replication gates (unlike `A_NoBlocking`, which does have one). `A_XScream` shares this same lack of a gate. The sound propagates server-side; client-side behavior depends on the netcode's sound-replication layer.
+4. **Network behavior**: No Zandronum-specific network handling. The function body contains no client-mode early return (unlike `A_NoBlocking`, which does have one). `A_XScream` shares this same lack of a gate. On Zandronum it calls `S_Sound` without the `bSoundOnClient` argument, which defaults to `false` (`src/s_sound.h:229`), so a server-side call sends clients no sound command (`src/s_sound.cpp:1285-1294`). Clients hear the death sound because they run the action themselves when their own copy of the actor enters the state (`AActor::SetState` calls state actions on clients too, `src/p_mobj.cpp:586`).
 
 ## Wiki/engine divergence: FULLVOLDEATH claim (Zandronum only)
 

@@ -2,7 +2,7 @@
 
 **Tier:** A for all fifteen — wiki-derived and source-verified 2026-07-29.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** wiki page `Database - Zandronum Wiki.html` (`?https://wiki.zandronum.com/w/index.php?title=Database&oldid=1276`, saved 2026-07-29) + source-verified against the Zandronum source (`p_acs.cpp:5473-5490,7225-7371`, `za_database.cpp` in full, `za_database.h`).
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** all fifteen are extension functions (negative index in `zcommon.bcs`), semantics in the Zandronum source's `src/p_acs.cpp` (`case ACSF_*DBEntr*`/`ACSF_*DBResult*`/`ACSF_*DBTransaction`, around line 7225-7371) which thinly wrap the Zandronum source's `src/za_database.cpp` (`DATABASE_*`), the actual SQLite layer. Indices -108 to -125 (`zcommon.bcs:1741-1758`, with -113 and -114 reserved/unused between `IncrementDBEntry` and `SortDBEntries`, and -122 reserved between `GetDBEntryRank` and `BeginDBTransaction`).
@@ -160,11 +160,56 @@ not a fork-specific embellishment.
 
 ## "Stops the entire gamesim" claim
 
-Confirmed by source shape, not just wiki assertion: every `ACSF_*DB*` case calls straight into
-synchronous `sqlite3_*` calls (`za_database.cpp`) with no threading or async queuing anywhere in
-this file. Since ACS executes inline in the single-threaded game tic, any of these functions
+Confirmed by source shape, not just wiki assertion - but the scope is narrower than "all fifteen,"
+and it is easy to overstate. **Ten of the fifteen** reach `DATABASE_*` and therefore a synchronous
+`sqlite3_*` call (`za_database.cpp`), with no threading or async queuing anywhere in that file. The
+five result-handle members - `CountDBResults` (`p_acs.cpp:7287`), `FreeDBResults` (`:7296`),
+`GetDBResultKeyString`/`GetDBResultValueString`, and `GetDBResultValue` - never enter SQLite at
+all: they only read the in-process `g_dbQueries` vector that a previous
+`GetDBEntries`/`SortDBEntries` filled, so they carry none of this cost and are safe to call in a
+loop over a result set.
+
+For the ten that do reach SQLite, ACS executes inline in the single-threaded game tic, so the call
 blocks the entire simulation for as long as the underlying SQLite call takes — the wiki's warning
 about batching writes into a transaction to avoid stalls is accurate advice, not folklore.
+
+## Zandronum-specific: no net-state gate, and what actually keeps this safe
+
+**None of the fifteen carries a net-state check of any kind.** This is worth stating explicitly
+because neighbouring cases in the same dispatcher do: `ACSF_ForceToSpectate`
+(`p_acs.cpp:7206`), a few cases earlier in the same switch, gates on `NETWORK_InClientMode() ==
+false` plus `PLAYER_IsValidPlayer` plus `PLAYER_IsTrueSpectator`, and the
+[login/account family](login-account.md) gates on `NETWORK_GetState() == NETSTATE_SERVER`. The
+database cases run whatever the net state is.
+
+So a `CLIENTSIDE` script calling `SetDBEntry` on a connected client does not fail and does not
+reach the server's database - it silently writes that client's *own local* one. Every client
+process has a database of its own available to it: `DATABASE_Construct()`
+(`za_database.cpp:197`) is called unconditionally at startup, outside the host/client branch, but
+opens nothing (its whole body registers the destructor). The handle is opened by `DATABASE_Init()`
+(`:213`), whose only caller in the tree is the `databasefile` cvar callback (`:68`), fired during
+config restore. One asymmetry follows from that: on a fresh install with no `databasefile` line in
+the config yet, no callback has fired and no handle exists at all until the cvar is set.
+
+**What keeps the family safe in practice is structural, not a check anywhere near the DB layer.**
+`P_StartScript` (`p_acs.cpp:13234`) has no client-mode gate either; its only net check is the
+`ACS_NET`/`sv_cheats` guard on console `puke`. The protection lives entirely in which activation
+paths a client is allowed to run at all - OPEN scripts, `StartTypedScripts`, line specials
+filtered by `GAMEMODE_IsHandledSpecial` (`gamemode.cpp:1137`, which permits only
+`ThrustThing`/`ThrustThingZ` as client-predicted), console `puke`, and `A_ClientsideACSExecute`
+(`thingdef/thingdef_codeptr.cpp:6068`).
+
+The exposure is therefore wider than "don't mark a database script `CLIENTSIDE`":
+`ACS_IsScriptClientSide` (`p_acs.cpp:13684`) also makes a plain `NET` script count as clientside
+when `ZACOMPATF_NETSCRIPTS_ARE_CLIENTSIDE` is set, so a compatibility flag outside the mod's own
+control can move a `NET` script's writes onto the client's database. See
+[client-side scripting](../concepts/clientside-scripting.md) for the general client/server split
+this sits inside.
+
+This also compounds with the `:memory:` default above rather than being independent of it: on a
+client that never set `databasefile`, a clientside write lands in a per-process in-memory store
+that is discarded at exit, so it is invisible both to the server and to that client's next
+session.
 
 ## Engine-family divergence
 

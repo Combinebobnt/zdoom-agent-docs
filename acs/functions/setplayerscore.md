@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** wiki page `SetPlayerScore - Zandronum Wiki.html` (`_intake/`, retrieved
 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=SetPlayerScore&oldid=1337`) + source-verified against the Zandronum source
 (`p_acs.cpp:7707-7822`, `p_interaction.cpp:2175-2216,2813-2887,3006-3014`) and

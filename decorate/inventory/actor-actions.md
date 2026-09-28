@@ -38,6 +38,7 @@
 | A_BishopPainBlur | AActor | no | yes | yes | C |  |
 | A_BishopPuff | AActor | no | yes | — | C |  |
 | A_BishopSpawnBlur | AActor | no | yes | yes | C |  |
+| A_Blast | AActor | yes | yes | yes | C |  |
 | A_BlueSpark | AActor | no | yes | yes | C |  |
 | A_BossDeath | AActor | no | yes | yes | A | [notes](../actions/a_bossdeath.md) |
 | A_BounceCheck | AActor | no | yes | yes | C |  |
@@ -70,7 +71,7 @@
 | A_CheckForReload | AActor | yes | yes | yes | C |  |
 | A_CheckLOF | AActor | yes | yes | yes | A | [notes](../actions/a_checklof.md) |
 | A_CheckPlayerDone | AActor | no | yes | yes | C |  |
-| A_CheckRailReload | AActor | no | yes | — | C |  |
+| A_CheckRailReload | AActor | no | yes | — | B | [notes](../actions/a_checkrailreload.md) |
 | A_CheckRange | AActor | yes | yes | yes | A | [notes](../actions/a_checkrange.md) |
 | A_CheckReload | AInventory | no | yes | yes | A | [notes](../actions/a_checkreload.md) |
 | A_CheckSight | AActor | yes | yes | yes | A | [notes](../actions/a_checksight.md) |
@@ -94,7 +95,7 @@
 | A_ClearSoundTarget | AActor | no | yes | yes | C |  |
 | A_ClearTarget | AActor | no | yes | yes | A | [notes](../actions/a_cleartarget.md) |
 | A_ClericAttack | AActor | no | yes | yes | C |  |
-| A_ClientsideACSExecute | AActor | yes | yes | — | C |  |
+| A_ClientsideACSExecute | AActor | yes | yes | — | B | [notes](../actions/a_clientsideacsexecute.md) |
 | A_CloseShotgun2 | AActor | no | yes | yes | C |  |
 | A_CMaceAttack | AActor | no | yes | yes | C |  |
 | A_ComboAttack | AActor | no | yes | yes | C |  |
@@ -150,6 +151,7 @@
 | A_Explode512 | AActor | no | yes | yes | C |  |
 | A_ExtChase | AActor | yes | yes | yes | C |  |
 | A_ExtraLightOff | AActor | no | yes | yes | C |  |
+| A_FaceConsolePlayer | AActor | yes | yes | yes | B | [notes](../actions/a_faceconsoleplayer.md) |
 | A_FaceMaster | AActor | yes | yes | yes | A | [notes](../families/face-pointer.md) |
 | A_FaceTarget | AActor | yes | yes | yes | A | [notes](../families/face-pointer.md) |
 | A_FaceTracer | AActor | yes | yes | yes | A | [notes](../families/face-pointer.md) |
@@ -204,7 +206,7 @@
 | A_FirePhoenixPL2 | AActor | no | yes | yes | C |  |
 | A_FirePistol | AActor | no | yes | yes | C |  |
 | A_FirePlasma | AActor | no | yes | yes | C |  |
-| A_FireRailgun | AActor | yes | yes | yes | C |  |
+| A_FireRailgun | AActor | yes | yes | yes | B | [notes](../actions/a_firerailgun.md) |
 | A_FireRailgunLeft | AActor | no | yes | yes | C |  |
 | A_FireRailgunRight | AActor | no | yes | yes | C |  |
 | A_FireShotgun | AActor | no | yes | yes | C |  |
@@ -235,7 +237,7 @@
 | A_GetHurt | AActor | no | yes | yes | C |  |
 | A_GhostOff | AActor | no | yes | yes | C |  |
 | A_GiveInventory | AActor | yes | yes | yes | A | [notes](../actions/a_giveinventory.md) |
-| A_GivePlayerMedal | AActor | yes | yes | — | C |  |
+| A_GivePlayerMedal | AActor | yes | yes | — | B | [notes](../actions/a_giveplayermedal.md) |
 | A_GiveQuestItem | AActor | yes | yes | yes | C |  |
 | A_GiveToChildren | AActor | yes | yes | yes | C |  |
 | A_GiveToSiblings | AActor | yes | yes | yes | C |  |

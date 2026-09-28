@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_KillSiblings` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_KillSiblings&oldid=46802) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3583-3608` and `wadsrc/static/actors/actor.txt:244`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_KillSiblings` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_KillSiblings&oldid=46802) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3583-3608` and `wadsrc/static/actors/actor.txt:244`; `SXF_SETMASTER` gating at `src/thingdef/thingdef_codeptr.cpp:2439-2454`, `A_CustomMissile`/`A_DamageSiblings` signatures at `wadsrc/static/actors/actor.txt:206,282`, extra-argument parse error at `src/thingdef/thingdef_states.cpp:430` and `src/sc_man.cpp:458`, name-parameter parsing at `src/thingdef/thingdef_parse.cpp:91-97,926`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:3583` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_KillSiblings)`).
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
@@ -32,11 +32,11 @@ UZDoom's `A_KillSiblings` (`src/playsim/p_actionfunctions.cpp:4270-4296`) carrie
 
 ## Siblings and the master relationship
 
-A sibling relationship is typically established via `A_SpawnItemEx(..., SXF_SETMASTER)` — this action sets the `master` pointer of the spawned actor to point back to the spawner. The `A_KillSiblings` action then uses that relationship to identify victims: all actors whose `master` pointer matches the calling actor's `master` pointer, excluding the caller itself (enforced by the `mo != self` check in the iteration loop).
+A sibling relationship is typically established via `A_SpawnItemEx(..., SXF_SETMASTER)`, which points the spawned actor's `master` at the originator (the spawner, or for a missile spawner, the first non-missile up its `target` chain). On UZDoom, `SXF_SETMASTER` does this unconditionally. On Zandronum it only takes effect when the spawned actor is `+ISMONSTER`, passed its spawn position check, and the originator is itself `+ISMONSTER`; any other spawn leaves `master` unset (or copied from the spawner's own master under `SXF_TRANSFERPOINTERS`). The `A_KillSiblings` action then uses that relationship to identify victims: all actors whose `master` pointer matches the calling actor's `master` pointer, excluding the caller itself (enforced by the `mo != self` check in the iteration loop).
 
 **Important limitations:**
 - **Master must be non-NULL:** If the calling actor has no master (master pointer is NULL), the function returns without effect.
-- **Spawned with `A_SpawnProjectile` are not affected:** The `A_SpawnProjectile` action does not set the `master` pointer and was never designed to spawn creatures targeted by this action. Only use `A_SpawnItemEx` with the `SXF_SETMASTER` flag if you intend to later destroy spawned actors via `A_KillSiblings`.
+- **Projectile spawners are not affected:** UZDoom's `A_SpawnProjectile` does not set the `master` pointer. Zandronum has no `A_SpawnProjectile`; its equivalent `A_CustomMissile` does not set `master` either. Only use `A_SpawnItemEx` with the `SXF_SETMASTER` flag if you intend to later destroy spawned actors via `A_KillSiblings` (on Zandronum, only for monsters spawned by monsters, as above).
 
 ## Parameters
 
@@ -54,7 +54,7 @@ When called, the action invokes `P_DamageMobj(victim, self, self, victim->health
 
 ## Invulnerability and special resistances
 
-An `+INVULNERABLE` sibling **will not be harmed** by `A_KillSiblings`. The function does not use `DMG_FORCED` and does not set the `DMG_FOILINVUL` flag, so `P_DamageMobj` will reject the damage as soon as it checks the `MF2_INVULNERABLE` flag. **Zandronum has no `KILS_FOILINVUL` flag** (present in GZDoom/UZDoom's extended version) — there is no way to bypass invulnerability in Zandronum's implementation.
+An `+INVULNERABLE` sibling **will not be harmed** by `A_KillSiblings`. The function does not use `DMG_FORCED` and does not set the `DMG_FOILINVUL` flag, so `P_DamageMobj` will reject the damage as soon as it checks the `MF2_INVULNERABLE` flag. **Zandronum has no `KILS_FOILINVUL` flag** (present in GZDoom/UZDoom's extended version) — there is no way to bypass invulnerability in Zandronum's implementation. This is not absolute for a non-player target: `P_DamageMobj` only rejects the damage when the inflictor lacks `+FOILINVUL`, and the inflictor here is the calling actor, so a caller with `+FOILINVUL` bypasses the target's invulnerability (`p_interaction.cpp:1212-1220`).
 
 Similarly, other invulnerability-like conditions (DORMANT flag, spectral immunity, etc.) are handled by `P_DamageMobj` and apply here.
 
@@ -75,11 +75,11 @@ If a sibling's health is already 0 or below at the time of the call, `P_DamageMo
 | Source pointer | No | Yes (configurable via `src` param) |
 | Inflictor pointer | No | Yes (configurable via `inflict` param) |
 
-**If you port code from the wiki to Zandronum,** compilation will fail with "unknown identifier" errors for any `KILS_*` flags, and passing more than one argument to `A_KillSiblings` will fail with a "too many arguments" error. The wiki's example code using extended parameters **will not compile** in Zandronum.
+**If you port code from the wiki to Zandronum,** passing a second argument to `A_KillSiblings` (e.g. `A_KillSiblings("Fire", KILS_FOILINVUL)`) aborts DECORATE parsing with a fatal script error `Expected ')', got ','.`, since the parser expects the closing parenthesis right after the single `damagetype` argument. The wiki's example code using extended parameters **will not load** in Zandronum. A bare `KILS_*` word passed as the only argument does not error at all: the name parameter accepts any bare token, so it silently becomes a damage type of that name.
 
 ## Related functions
 
 - **`A_KillMaster`** — kills the calling actor's own master instead of its siblings. Zandronum version takes only `damagetype` and carries no network check.
 - **`A_KillChildren`** — kills all actors with `master == self`. Zandronum version also takes only `damagetype` and carries no network check.
-- **`A_DamageSiblings`** — damages (but not necessarily kills) siblings. Zandronum version takes `damagetype` and `damage` amount.
-- **`A_SpawnItemEx`** — the primary source of sibling relationships; sets the `master` pointer.
+- **`A_DamageSiblings`** — damages (but not necessarily kills) siblings. Zandronum version takes `amount` then `damagetype` (`A_DamageSiblings(int amount, name damagetype = "none")`).
+- **`A_SpawnItemEx`** — the primary source of sibling relationships; sets the `master` pointer via `SXF_SETMASTER` (on Zandronum, only for monsters spawned by monsters).

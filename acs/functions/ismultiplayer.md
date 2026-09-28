@@ -2,10 +2,10 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-15)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** wiki page `IsMultiplayer - Zandronum Wiki.html` (`_intake/`, retrieved
 `https://wiki.zandronum.com/w/index.php?title=IsMultiplayer&oldid=1306`) + source-verified (`p_acs.h:685`, `p_acs.cpp:11202-11205`, `network.cpp:1552-1555`,
-`network.h:266-281`, `zt-bcc/src/builtin.c:60`, `zt-bcc/lib/zasm.bcs:131`). The wiki's behavioral
+`network.h:267-282`, `zt-bcc/src/builtin.c:60`, `zt-bcc/lib/zasm.bcs:131`). The wiki's behavioral
 description is accurate; this doc's additions are the demo-playback nuance and the
 wiki-name-vs-callable-name divergence, neither of which the wiki mentions.
 
@@ -45,7 +45,7 @@ bool NETWORK_InClientMode( )
 }
 ```
 
-and the network state enum (the Zandronum source's `src/network.h:266-281`):
+and the network state enum (the Zandronum source's `src/network.h:267-282`):
 
 ```cpp
 enum

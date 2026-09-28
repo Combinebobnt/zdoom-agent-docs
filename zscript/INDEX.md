@@ -97,6 +97,16 @@ fixed an ordering restriction).
   (`Random` vs. `CRandom`), player-number handling, CVar lookups, and prediction safety.
   Engine-family note: the packet-server networking model is UZDoom-specific, not cross-checked
   against GZDoom's peer-to-peer model.
+- [Network command and buffer size limits](concepts/network-command-size-limits.md) — tier B.
+  `SendNetworkCommand`/`SendNetworkBuffer`'s skip-length field has an operator-precedence bug that
+  undercounts sizes at 510/511/1022/1023 bytes and onward; the loopback delivery path skips the
+  size check that would otherwise catch it, so a bad-size command mis-parses even in singleplayer.
+  Observed live: a `1` byte in the payload's last 256 bytes aborts the game with a fatal error;
+  other content can pass by luck. Also covers the shared 14000-byte `MAX_MSGLEN` packet budget.
+- [Consistency checking](concepts/consistency-checking.md) — tier B. What `CalculateConsistency`
+  actually sums (four RNG seeds, player position/yaw/pitch, health — no roll, no arbitrary ZScript
+  fields), why a mismatch has no resync path, and why the inconsistent flag clearing on next spawn
+  makes it less useful than it looks.
 - [ZScript HUDs: design patterns and concepts](concepts/zscript-huds.md) — tier B. HUD design
   patterns (virtual resolution, coordinate system), play-scope-to-UI-scope event bridging via
   `SendInterfaceEvent`/`InterfaceProcess`, and the BaseStatusBar-vs-AltHUD class-role split.

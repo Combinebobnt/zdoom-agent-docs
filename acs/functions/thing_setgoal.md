@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-06)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** ZDoom Wiki `Thing_SetGoal` (retrieved 2026-08-06, https://zdoom.org/w/index.php?title=Thing_SetGoal&oldid=49506), re-verified against Zandronum source `src/p_lnspec.cpp:1657-1694`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** action special 229, `p_lnspec.cpp` `FUNC(LS_Thing_SetGoal)`

@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `ThingCountName - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
 `https://zdoom.org/w/index.php?title=ThingCountName&oldid=26428`) + source-verified against the Zandronum source (`p_acs.cpp:10526-10529` for the
 builtin dispatch, `DLevelScript::ThingCount` at `p_acs.cpp:3894-3988` for the actual counting
@@ -46,6 +46,9 @@ case PCD_THINGCOUNTNAME:
   wiki. This applies to *any* class counted this way, not just monsters — `ThingCountName` can
   count non-monster actor classes too (the wiki's monster framing is because that's the common
   use case, not a restriction the engine enforces).
+- **Exact class only, not subclasses**: both iterator branches test `actor->IsA (kind)`, an
+  exact-class match. Counting `"Demon"` does not include `Spectre` or any other class inheriting
+  from it; only the DECORATE replacement retry below widens the match.
 - **Inventory items held by an actor are excluded**: `!actor->IsKindOf(RUNTIME_CLASS(AInventory))
   || static_cast<AInventory *>(actor)->Owner == NULL` — an `AInventory`-derived class sitting on
   the ground counts, but one currently held by a player/monster does not. Not mentioned on the
@@ -71,7 +74,7 @@ case PCD_THINGCOUNTNAME:
 every instance of the class map-wide, ignoring TID):
 
 ```text
-// Map has: Imp(tid 5) x2, Imp(tid 5), Imp(tid 0), Baron(tid 5) x2, Baron(tid 4), Baron(tid 0),
+// Map has: Imp(tid 5) x2, Imp(tid 0), Baron(tid 5) x2, Baron(tid 4), Baron(tid 0),
 // Demon(tid 5), Demon(tid 4), Demon(tid 0)
 ThingCountName("DoomImp", 0)     // 3  (tid 0 == "ignore tid", counts all Imps)
 ThingCountName("BaronOfHell", 0) // 4

@@ -7,8 +7,8 @@ lumps. Not sourced from a wiki page — this is below source-code level.
 **Applies to:** UZDoom=yes, Zandronum=yes — the layout itself is fixed by the 1995-era compiler and
 has not changed since; both engines still load it, and their old-format readers are the same code
 apart from the string-lookup difference recorded below.
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3
-(2026-08-16)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb
+(2026-09-25)
 **Provenance:** Established while scoping old-format support for an ACS decompiler. Validation:
 every one of 939 script bodies across all 57 objects disassembled to an exact instruction
 boundary with zero drift and zero unrecognized opcodes, and the recovered statements were

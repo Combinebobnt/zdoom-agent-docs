@@ -2,10 +2,10 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** wiki page `IsPlayerContestingControlPoint - Zandronum Wiki.html` (`_intake/`,
 retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=IsPlayerContestingControlPoint&oldid=2254`) + source-verified against `p_acs.cpp:5550,8059-8069`,
-`sectinfo.h:61-70`, `domination.cpp:90-102,113-183,211-224`,
+`sectinfo.h:61-70`, `domination.cpp:90-102,113-183,211-225`,
 `p_interaction.cpp:3005-3022`, `zt-bcc/lib/zcommon.bcs:1813`. The wiki's prose description
 ("Returns whether the given player is currently contesting the given control point") is
 accurate; only its parameter signature (`bool point`) is wrong, and it omits both the
@@ -28,9 +28,9 @@ is the `case ACSF_IsPlayerContestingControlPoint:` block at `p_acs.cpp:8059-8069
   contesting" from "not a valid interactable player" from the return value alone.
 - `point` — zero-based index into `level.info->SectorInfo.Points`, same array
   `GetControlPointInfo`/`SetControlPointInfo` use. **Out-of-range `point` also silently returns
-  `false`** (`p_acs.cpp:8064-8065`), not an error.
+  `false`** (`p_acs.cpp:8066-8067`), not an error.
 - Return value: `level.info->SectorInfo.Points[point].contesting.count(pln) != 0`
-  (`p_acs.cpp:8068`) — `contesting` is a `std::set<int>` of player indices
+  (`p_acs.cpp:8069`) — `contesting` is a `std::set<int>` of player indices
   (`DPOINT_s::contesting`, the Zandronum source's `src/sectinfo.h:66`).
 
 ## Wiki's parameter signature is wrong: `point` is not a `bool`
@@ -51,7 +51,7 @@ Unlike `GetControlPointInfo`'s `owner`/`disabled` fields (plain `int`/`bool` mem
 whatever `DPOINT_s`'s default construction happens to leave them outside Domination — see
 `functions/getcontrolpointinfo.md`'s footgun section), `contesting` is a `std::set<int>`, which
 default-constructs empty regardless of gametype. `DOMINATION_Tick()` — the only code that ever
-inserts into it — starts with `if (!domination) return;` (`domination.cpp:114-115`), so on a
+inserts into it — starts with `if (!domination) return;` (`domination.cpp:115-116`), so on a
 non-Domination gametype (or before the first tick) the set simply stays empty and this function
 correctly returns `false` for every player/point pair. There's no uninitialized-garbage trap
 here the way there is for `owner`/`disabled`, but the function is still only *meaningful* (i.e.
@@ -63,7 +63,7 @@ Server computes `contesting` fresh every tick from actual player positions
 (`DPOINT_s::PlayerInsidePoint`, counting only players with `bOnTeam` set and, if
 `gameinfo.bAllowDominationContestScripts` is on, passing the `GAMEEVENT_DOMINATION_CONTEST` event
 check — `domination.cpp:126-146`) and replicates changes to clients via
-`SERVERCOMMANDS_SetDominationPointState` (`domination.cpp:213-224`), so reading this function
+`SERVERCOMMANDS_SetDominationPointState` (`domination.cpp:213-225`), so reading this function
 clientside reflects real state, not just server-local state.
 
 **Example — check if the local player is contesting point 0 (Domination gametype only):**

@@ -2,13 +2,13 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `GetPlayerScore - Zandronum Wiki.html` (`_intake/`, retrieved
 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetPlayerScore&oldid=1350`) + source-verified against the Zandronum source
-(`p_acs.cpp:7792-7822`, `p_interaction.cpp:3658-3723`) and `zt-bcc/lib/zcommon.bcs:1229-1239,1772`.
+(`p_acs.cpp:7792-7822`, `p_interaction.cpp:3658-3723`, `gamemode.cpp:476-484`) and `zt-bcc/lib/zcommon.bcs:1229-1239,1772`.
 The wiki's parameter list, all 9 enum values, and basic return semantics hold as documented. This
-doc's source-verified additions: the gamemode-flag dependence and priority order of
-`SCORE_SPREAD`/`SCORE_RANK`, the 0-based/tie-insensitive rank convention, and the
+doc's source-verified additions: the gamemode-flag dependence of
+`SCORE_SPREAD`/`SCORE_RANK` (each mode sets exactly one `PLAYERSEARN*` flag), the 0-based/tie-insensitive rank convention, and the
 invalid-player/zero-score return-value ambiguity — none of which the wiki mentions.
 `GetPlayerScore` (with `SCORE_FRAGS` through `SCORE_SECRETS`) was added in commit `b9f6e508c`
 (2020-11-29); `SCORE_SPREAD`/`SCORE_RANK` were added later in commit `a48b8b1aa` (2021-11-20, "Added
@@ -59,21 +59,22 @@ case ACSF_GetPlayerScore:
   `0` from the outer function, same as an invalid player.
 - **`SCORE_SPREAD` and `SCORE_RANK` are computed, not stored fields**, and both depend on the
   active gamemode's scoring flags (`GAMEMODE_GetCurrentFlags()`), not always frags:
-  - `PLAYER_CalcSpread` (`p_interaction.cpp:3658-3700`) picks whichever of
-    `GMF_PLAYERSEARNWINS`/`GMF_PLAYERSEARNPOINTS`/`GMF_PLAYERSEARNFRAGS` is set (checked in that
-    priority order — wins beats points beats frags if a gamemode somehow sets more than one),
-    finds the highest score among all *other* players in-game who aren't true spectators, and
-    returns `player's score - that highest score`. A negative result means trailing the leader by
+  - Every game mode carries exactly one of the four `GMF_PLAYERSEARN*` earn flags (kills, frags,
+    points, wins). The engine refuses to start with a mode that sets none or more than one
+    (`gamemode.cpp:476-484`), so both functions below read a single counter.
+  - `PLAYER_CalcSpread` (`p_interaction.cpp:3658-3700`) uses whichever of
+    `GMF_PLAYERSEARNWINS`/`GMF_PLAYERSEARNPOINTS`/`GMF_PLAYERSEARNFRAGS` the mode sets, finds
+    the highest score among all *other* players in-game who aren't true spectators, and returns `player's score - that highest score`. A negative result means trailing the leader by
     that amount; a positive result (possible only for the current leader) is the lead over the
-    runner-up. If no other counted player exists (or none of the three flags is set), it returns
+    runner-up. If no other counted player exists (or the mode earns kills instead), it returns
     `0` rather than erroring.
   - `PLAYER_CalcRank` (`p_interaction.cpp:3704-3723`) counts how many other non-spectator
     in-game players strictly exceed the target player's score on whichever single metric the
-    gamemode flags select (same wins/points/frags priority as above). The result is **0-based**
+    mode's earn flag selects (wins, points or frags). The result is **0-based**
     (rank `0` = first place, not `1`), and ties do not increment rank — two players tied for the
     lead both report rank `0`.
-  - Both functions silently return `0` for a gamemode with none of the three `GMF_PLAYERSEARN*`
-    flags set (e.g. a mode that doesn't track any of wins/points/frags) — indistinguishable from
+  - Both functions always return `0` in a mode that earns kills (`GMF_PLAYERSEARNKILLS`: the
+    stock Cooperative, Survival and Invasion modes in `gamemode.txt`). That is indistinguishable from
     "tied for the lead" / "no spread from the leader". The wiki doesn't mention this
     gamemode-dependence at all, describing `SCORE_SPREAD`/`SCORE_RANK` only as generic "spread
     from the leading player" / "current rank".

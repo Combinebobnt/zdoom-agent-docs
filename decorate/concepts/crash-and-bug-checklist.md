@@ -4,10 +4,12 @@
 adds no new unverified claims of its own beyond what the linked network-synchronization concept
 file already states as architectural reasoning, not fact).
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** Cross-referenced from this repo's own verified `actions/`/`classes/`/`concepts/`
 docs (compiled 2026-07-31, extended 2026-08-01) — not a wiki-intake page, no new source reading
-beyond what's cited in each linked file.
+beyond what's cited in each linked file. The `A_TakeInventory` item-held precondition is from
+Zandronum's `src/thingdef/thingdef_codeptr.cpp:2284-2296`; the `A_Chase` client-mode gate is
+`src/p_enemy.cpp:2576-2577,2681-2683`.
 
 A running, checklist-style index of **verified, recurring** crash/bug-causing patterns in Zandronum's
 DECORATE layer — not a tutorial, not exhaustive. Each entry is one sentence of "what to
@@ -39,8 +41,9 @@ behavior differs — several crash patterns in this checklist are Zandronum-spec
    left operand is false, forcing evaluation of the right operand — `receiver->player->cheats` —
    *before* the trailing `inv->IsKindOf(AAmmo)` check even runs, and with no NULL guard on
    `receiver->player`. Calling either action with that flag on any non-player actor (a monster, a
-   projectile, an actor reached via an `AAPTR_*` pointer redirect) crashes the engine, independent
-   of what item is being taken. On UZDoom, the guard condition uses `player &&` before the
+   projectile, an actor reached via an `AAPTR_*` pointer redirect) that currently holds the item
+   (any item other than `HexenArmor`, which the helper skips entirely) crashes the engine, whether or not the item
+   is ammo. On UZDoom, the guard condition uses `player &&` before the
    `PowerInfiniteAmmo` check, preventing the dereference. See [A_TakeInventory](../actions/a_takeinventory.md).
 
 2. **A bare-identifier read of a user variable (`var int user_<name>;`) declared on a `Weapon` or
@@ -69,7 +72,8 @@ above as exhaustive, only as what's been found *so far*.
 1. **`A_Chase`'s target-pointer access in the fast-chase strafe block looks like an unguarded NULL
    dereference but isn't.** `actor->target` is read again inside the `CHF_FASTCHASE` strafing block
    (`src/p_enemy.cpp`) after the function's own earlier target-reacquisition block already returns
-   on every NULL-target code path, and `CheckMeleeRange()` independently null-guards its own target
+   on every NULL-target code path outside client mode (the strafe block itself is skipped in client
+   mode), and `CheckMeleeRange()` independently null-guards its own target
    argument too. See [A_Chase](../actions/a_chase.md).
 
 ## Wiki-documented flags that don't exist in Zandronum (silently inert, not a compile error)

@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** ZDoom Wiki "Actor states" (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=Actor_states&oldid=55033) + ZDoom Wiki
 "DECORATE format specifications" (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=DECORATE_format_specifications&oldid=52163), both cross-checked against
 the Zandronum source's state-table parser and runtime (`src/thingdef/thingdef_states.cpp`,
@@ -14,9 +14,7 @@ been checked against Zandronum specifically, and every place the wiki's descript
 here is called out explicitly rather than silently inherited. Per `../../shared/AUTHORING.md`'s
 engine-scope caveats, the local Zandronum checkout used to verify this is a `master` HEAD
 reporting `3.3-alpha` in `version.h`, not a pristine 3.2.1 checkout — re-check against an actual
-3.2.1 client if a claim here ever turns out not to hold (this page cites `p_mobj.cpp`/
-`p_states.cpp`/`p_pspr.cpp`/`thingdef_states.cpp`, none of which the applied ZandronumMCP patch
-touches, so that patch's line-shift risk doesn't apply here).
+3.2.1 client if a claim here ever turns out not to hold.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 Every DECORATE actor's animation/behavior is one state machine: a flat array of frames
@@ -190,7 +188,10 @@ Four keywords can appear where a state line normally would, each acting on the *
   built-in `HideIndefinitely` state) so it can reappear when the map resets, rather than being
   permanently gone. This full hide-vs-destroy branch is Zandronum-specific multiplayer behavior,
   not something the wiki (written for single-player-oriented GZDoom) describes. Same "before first
-  state" guard as `Goto`.
+  state" guard as `Goto`. The dangling-label form (`XDeath:` immediately followed by `Stop`)
+  retargets the label to `NULL` (`FStateDefinitions::SetStop`, `p_states.cpp:790-809`), i.e.
+  **undefines it** rather than making it an instant-removal sequence. A subclass writing
+  `XDeath: Stop` removes an inherited `XDeath`, so a gibbing hit falls back to `Death`.
 - **`Wait` / `Fail`** — exact synonyms in DECORATE. Makes the preceding state's `NextState` point
   **at itself**, so the state re-enters itself indefinitely instead of ever advancing — distinct
   from `-1` duration, which instead skips the tic-countdown check altogether. Only legal after a

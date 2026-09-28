@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `MAPINFO/Cluster_definition` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=MAPINFO%2FCluster_definition&oldid=49574) + verified against Zandronum source (`src/g_mapinfo.cpp:702-791`, `src/g_level.cpp`) and UZDoom source (`src/gamedata/g_mapinfo.cpp:829-972`, `src/g_level.cpp`).
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `MAPINFO/Cluster_definition` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=MAPINFO%2FCluster_definition&oldid=49574) + verified against Zandronum source (`src/g_mapinfo.cpp:702-791`, unknown-key handling `src/g_mapinfo.cpp:482-495,583-593,779-784,1999`; `src/g_level.cpp:977-1046,1672-1743`; `src/g_hub.cpp:133-141`) and UZDoom source (`src/gamedata/g_mapinfo.cpp:829-972`, `src/g_level.cpp`).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 A cluster is a logical grouping of maps that can optionally display transition messages and/or form a hub with shared state. The cluster block in MAPINFO defines cluster-wide settings: intermission messages, music, graphics, hub behavior, and cutscene blocks.
@@ -55,7 +55,7 @@ These cutscene blocks are a UZDoom/GZDoom-family feature requiring ZScript suppo
 ### Present in both engines but absent from the wiki page
 
 **Name**  
-An alternate identifier for the cluster, accepted as a `lookup` reference in `entertext`/`exittext`; parsed into `ClusterName` and sets `CLUSTER_LOOKUPCLUSTERNAME` flag if a lookup reference is used. The wiki page does not document this property.
+The cluster's display name, parsed into `ClusterName` (accepts a literal string, `lookup, "<keyword>"` or `$<keyword>`). It is not referenced by `entertext`/`exittext`. Its only effect in Zandronum is on leaving a hub cluster: `G_LeavingHub` substitutes it for the level name shown on the hub-total intermission. UZDoom does the same and also exposes it through `Level.GetClusterName()`. In both engines the parser marks a lookup name with `CLUSTER_LOOKUPCLUSTERNAME`, but the consumers test the separate `CLUSTER_LOOKUPNAME` flag, which nothing sets, so a lookup name is displayed as the raw keyword rather than the translated string. The wiki page does not document this property.
 
 **CdTrack**, **CdId**  
 CD audio track selection (legacy feature from 1990s Doom WAD conventions). `cdtrack` accepts a numeric track number; `cdid` accepts a hexadecimal ID. Both are parsed but their runtime behavior depends on emulation of actual CD audio hardware, which is not relevant to modern engines. The wiki page does not mention these properties.
@@ -67,11 +67,12 @@ The ZDoom-family engines implement a larger set of properties than Zandronum. Sp
 - **GZDoom-family only:** `AllowIntermission`, `Intro`, `Outro`, `GameOver`.
 - **Shared but wiki-incomplete:** `Name`, `CdTrack`, `CdId`, and implementation differences in `EnterText`/`ExitText` lookups (see properties section above).
 
-Zandronum projects may include GZDoom-family properties in a MAPINFO source file, but they are silently ignored at runtime — no parse error results.
+Zandronum does not silently accept GZDoom-family properties. A bare flag such as `AllowIntermission` is skipped with a non-fatal red "Unknown property" console message. A cutscene block (`Intro`/`Outro`/`GameOver { ... }`) breaks the parse: Zandronum's skip logic only consumes `= value, ...`, so the block's own closing `}` ends the cluster definition early and the leftover tokens reach the top level, where they abort startup with a fatal "Unknown top level keyword" script error. Keep cutscene blocks out of any MAPINFO a Zandronum build loads.
 
 ## Implementation notes
 
 - **Hub state retention and memory:** The Zandronum and UZDoom engines both save hub-level state in a per-level data structure (visible in source as snapshot serialization, actor records, and switch state storage). The wiki's ~20 KB per-level estimate reflects typical snapshot sizes for average-complexity maps. Levels are restored when re-entered within the same hub.
+- **Zandronum multiplayer:** Zandronum shows the between-cluster `EnterText`/`ExitText` screen only in single player (`NETWORK_GetState() == NETSTATE_SINGLE`). The end-of-game text on an end sequence is not gated this way.
 - **Message suppression in hubs:** Both engines suppress intermission screens by default when moving between levels in the same hub cluster. UZDoom adds the `CLUSTER_ALLOWINTERMISSION` flag to override this behavior; Zandronum lacks this flag and always suppresses intermissions within the same hub (subject to an additional `!deathmatch` condition in multiplayer mode).
 - **ExitTextIsLump and Hexen handling:** Both engines support `ExitTextIsLump` (and `EnterTextIsLump`, the latter not listed in the wiki) to interpret the message value as a lump name and print its contents directly. UZDoom adds a special-case handler that remaps HEXEN.WAD/HEXDD.WAD lump references to the string table automatically, a behavior absent in Zandronum.
 

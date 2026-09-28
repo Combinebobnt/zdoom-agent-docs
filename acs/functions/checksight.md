@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** `CheckSight - ZDoom Wiki` (https://zdoom.org/w/index.php?title=CheckSight&oldid=52148), verified against Zandronum source 2026-07-29
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Extension function (`zcommon.bcs` index -35, dispatches to `case ACSF_CheckSight` in `p_acs.cpp:6290`)
@@ -57,5 +57,5 @@ The wiki page for ZDoom is accurate and complete for Zandronum. **No divergence 
 
 - **Engine implementation:** the Zandronum source's `src/p_acs.cpp:6290-6315` (the case block with full flag handling and multi-actor iteration)
 - **Declaration:** the zt-bcc source's `lib/zcommon.bcs:1663`
-- **Flag enumeration (SF_*):** the Zandronum source's `src/p_local.h:100-104` (the `ESightFlags` enum)
-- **Sight-check core logic:** the Zandronum source's `src/p_sight.cpp:900-950` (P_CheckSight implementation with fake-floor handling)
+- **Flag enumeration (SF_*):** the Zandronum source's `src/p_local.h:457-462` (the `ESightFlags` enum)
+- **Sight-check core logic:** the Zandronum source's `src/p_sight.cpp:653-728` (P_CheckSight implementation with fake-floor handling)

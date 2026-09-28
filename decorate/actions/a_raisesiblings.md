@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_RaiseSiblings` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RaiseSiblings&oldid=53236) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4875-4894`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_RaiseSiblings` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RaiseSiblings&oldid=53236) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4875-4894`, `src/p_mobj.cpp:7849-7868` (`GetRaiseState`), `src/thingdef/thingdef_codeptr.cpp:2445-2456` (`SXF_SETMASTER` monster gate), `wadsrc/static/actors/actor.txt:206` (`A_CustomMissile`) and `src/thingdef/thingdef_states.cpp:430-438` (no-parameter action parse error).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:4875` (`DEFINE_ACTION_FUNCTION(AActor, A_RaiseSiblings)`).
 
@@ -36,18 +36,20 @@ When called, this action:
 
 A sibling relationship is established when actors share the same `master` pointer. This typically happens via `A_SpawnItemEx(..., SXF_SETMASTER)` — this action sets the `master` pointer of the spawned actor to point back to the spawner. The `A_RaiseSiblings` action then uses that relationship to identify and resurrect victims: all actors whose `master` pointer matches the calling actor's `master` pointer (excluding the caller itself).
 
-For example, if actor A spawns actors B, C, and D via `A_SpawnItemEx` with `SXF_SETMASTER`, all three of B, C, and D will have `master == A`. If B calls `A_RaiseSiblings`, it will resurrect C and D (sharing the same master, A) but not B itself.
+For example, if actor A spawns actors B, C, and D via `A_SpawnItemEx` with `SXF_SETMASTER`, all three of B, C, and D will have `master == A`. On UZDoom this holds for any spawner. On Zandronum, `SXF_SETMASTER` only sets `master` when both the spawned actor and the originator (the spawner, or the shooter if the spawner is a missile) are monsters (`ISMONSTER`); a non-monster spawner leaves the flag with no effect, so no sibling relationship forms. If B calls `A_RaiseSiblings`, it will resurrect C and D (sharing the same master, A) but not B itself.
 
 **Important limitations:**
 
 - **Master must be non-NULL:** If the calling actor has no master (master pointer is NULL), the function returns without effect.
-- **Spawned with `A_SpawnProjectile` are not affected:** The `A_SpawnProjectile` action does not set the `master` pointer and was never designed to spawn creatures targeted by this action. Only use `A_SpawnItemEx` with the `SXF_SETMASTER` flag if you intend to later resurrect spawned actors via `A_RaiseSiblings`.
+- **Spawned with `A_SpawnProjectile` are not affected:** On UZDoom, the `A_SpawnProjectile` action does not set the `master` pointer and was never designed to spawn creatures targeted by this action. Zandronum has no `A_SpawnProjectile`; its counterpart `A_CustomMissile` likewise never sets `master`. Only use `A_SpawnItemEx` with the `SXF_SETMASTER` flag if you intend to later resurrect spawned actors via `A_RaiseSiblings`.
 
 ## Resurrection failure conditions
 
 ### No Raise state
 
 If a sibling actor has no `Raise` state defined, `P_Thing_Raise` returns without effect and the sibling remains dead. This is not an error; it is a silent condition. Many actors do not define a `Raise` state and therefore cannot be resurrected.
+
+The same silent skip applies before the `Raise` state is even looked up: a sibling that is not a corpse (still alive), a corpse whose death animation has not finished (non-infinite tics on a state without `CanRaise`), or a player is never raised.
 
 ### No room to raise
 
@@ -84,7 +86,7 @@ This means the "Zandronum difference from ZDoom Wiki" section below is Zandronum
 
 **Neither parameter nor flag constants exist in Zandronum 3.2.1.** The Zandronum version is a no-argument action that always performs the position check and does not modify affiliations — it resurrects siblings as-is.
 
-If you port DECORATE code from upstream ZDoom/GZDoom to Zandronum, do not attempt to pass flags to `A_RaiseSiblings`. Doing so will result in a "too many arguments" compile error, not a silent no-op.
+If you port DECORATE code from upstream ZDoom/GZDoom to Zandronum, do not attempt to pass flags to `A_RaiseSiblings`. Doing so aborts DECORATE parsing with a "You cannot pass parameters" script error, not a silent no-op.
 
 Additionally, the wiki's claim that "the only function that sets the necessary information is `A_SpawnItemEx`" is outdated — `A_RearrangePointers` and `A_TransferPointer` can also assign the `master` pointer, establishing a sibling relationship post-spawn.
 
@@ -97,4 +99,4 @@ Additionally, the wiki's claim that "the only function that sets the necessary i
 - **`A_TransferPointer`** — transfers a pointer from one actor to another; can establish a sibling relationship between pre-existing actors.
 - **`A_KillSiblings`** — destroys all sibling actors (damage = sibling health). Zandronum version takes only `damagetype` and carries a special network gate (allows `+CLIENTSIDEONLY` actors).
 - **`A_DamageSiblings`** — damages all sibling actors by a fixed amount. Zandronum version takes `amount` and `damagetype`.
-- **`A_RemoveSiblings`** — removes (without death animation) all sibling actors instead of resurrecting them.
+- **`A_RemoveSiblings`** — removes (without death animation) sibling actors instead of resurrecting them. On Zandronum only dead siblings are removed unless its `removeall` argument is true.

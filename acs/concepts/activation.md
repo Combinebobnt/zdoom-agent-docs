@@ -2,8 +2,8 @@
 
 **Tier:** A (ZDoom-wiki-sourced, verified line-by-line against fork C++; the fork's total absence of ZScript was independently confirmed by searching the Zandronum source's `src` for any ZScript lexer/parser/lump handling, not just inferred from the wiki gap).
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
-**Provenance:** wiki page `Activation - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=Activation&oldid=54953`) + verified against the Zandronum source's `src/p_lnspec.cpp` (`LS_Thing_Activate`/ `LS_Thing_Deactivate`/`DoActivateThing`/`DoDeactivateThing`), `p_mobj.cpp` (`AActor::Activate`/ `Deactivate`), `p_map.cpp` (`P_ActivateThingSpecial`), `actor.h` (`THINGSPEC_*`, `MF2_DORMANT`, `MF5_USESPECIAL`, `MF6_BUMPSPECIAL`), and `thingdef_properties.cpp` (`Activation` property) (2026-07-29).
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
+**Provenance:** wiki page `Activation - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=Activation&oldid=54953`) + verified against the Zandronum source's `src/p_lnspec.cpp` (`LS_Thing_Activate`/ `LS_Thing_Deactivate`/`DoActivateThing`/`DoDeactivateThing`), `p_mobj.cpp` (`AActor::Activate`/ `Deactivate`), `p_map.cpp` (`P_ActivateThingSpecial`; `P_UseTraverse` at 5362-5384; the sideways `BUMPSPECIAL` path at 1340-1342/1358-1384), `p_mobj.cpp:4439-4456` (standing-on-top `BUMPSPECIAL`), `p_interaction.cpp:550-554` (death call), `cl_main.cpp:5895-5905`, `sv_commands.cpp:2197-2206` and `protocolspec/spec.things.txt:332-340` (`ThingActivate`/`ThingDeactivate` broadcast), `actor.h` (`THINGSPEC_*`, `MF2_DORMANT`, `MF5_USESPECIAL`, `MF6_BUMPSPECIAL`), and `thingdef_properties.cpp` (`Activation` property) (2026-07-29).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 What ACS's `Thing_Activate(tid)`/`Thing_Deactivate(tid)` action specials actually do to an actor
@@ -45,8 +45,11 @@ pointer (`target.Activate()`). None of that exists here. In Zandronum:
   a mod override it on UZDoom. There is no `Used` virtual anywhere in the Zandronum source, though
   — that part of the original claim holds.
 - The wiki's "calling them directly ... in ZScript" bullet and the entire "ZScript" section
-  don't apply. The *only* way to trigger `Activate`/`Deactivate` in Zandronum is the ACS action
-  specials below, or the DECORATE `USESPECIAL`/`BUMPSPECIAL` actor flags.
+  don't apply. The *only* way to trigger `Activate`/`Deactivate` in Zandronum is the
+  `Thing_Activate`/`Thing_Deactivate` action specials below (from ACS, or as a line/thing
+  special), or the DECORATE `USESPECIAL`/`BUMPSPECIAL` actor flags through
+  `P_ActivateThingSpecial`. A sideways `BUMPSPECIAL` collision never calls either method on
+  Zandronum; see the bump section below.
 
 ## ACS: `Thing_Activate`/`Thing_Deactivate`
 
@@ -62,7 +65,8 @@ nothing" from "some matched and did something," since `DoActivateThing`/`DoDeact
 actor's `activationtype` flags make anything observable happen.
 
 Verified against `p_lnspec.cpp:1210-1230` — calling `Thing_Activate`/`Thing_Deactivate` on a
-matched actor does exactly two things, both unconditional:
+matched actor does two things locally, both unconditional (plus a network broadcast on a Zandronum
+server, below):
 
 1. **Clears/sets the `THINGSPEC_Switch` bookkeeping.** If the actor's `activationtype` currently
    has `THINGSPEC_Activate` (or `THINGSPEC_Deactivate`) set, that flag is cleared and, if
@@ -73,14 +77,25 @@ matched actor does exactly two things, both unconditional:
    actor's `activationtype` flags. This matches the wiki's claim that these ACS functions "always"
    call the virtual, "regardless of how the activation property is set up."
 
-The **default** `AActor::Activate`/`Deactivate` (`p_mobj.cpp:5229-5262`, what every actor gets
+On a Zandronum server, `LS_Thing_Activate`/`LS_Thing_Deactivate` also send
+`SERVERCOMMANDS_ThingActivate`/`ThingDeactivate` (actor plus activator, `spec.things.txt:332-340`)
+for each matched actor before step 1. The client handler (`cl_main.cpp:5895-5905`) calls the raw
+`Activate`/`Deactivate` method, not `DoActivateThing`, so the client's copy of the
+`activationtype` bits is not rewritten. Nothing is sent for an actor that has no net ID
+(`sv_commands.cpp:2197-2206`).
+
+The **default** `AActor::Activate`/`Deactivate` (`p_mobj.cpp:5229-5267`, what every actor gets
 unless it's one of the overriding classes above) only does something if
 `(flags3 & MF3_ISMONSTER) && (health > 0 || flags & MF_ICECORPSE)` — i.e. a living monster or an
-ice corpse. In that case it flips `MF2_DORMANT` (`actor.h:192`) and switches to the `Active`/
-`Inactive` state if the actor defines one (falls back to `tics = 1`, i.e. "advance to whatever's
-next," if it doesn't). **On any other actor — a decoration, a non-monster, a dead monster without
-`MF_ICECORPSE` — `Thing_Activate`/`Thing_Deactivate` is a confirmed no-op** unless that actor is
-one of the overriding classes above. Real-world callers have been observed calling both
+ice corpse. Even then it is not a toggle. `Activate` acts only if the actor is currently dormant
+(`MF2_DORMANT`, `actor.h:192`): it clears the flag and enters the `Active` state, or sets
+`tics = 1` ("advance to whatever's next") if there is none. `Deactivate` acts only if the actor is
+not dormant: it sets the flag and enters the `Inactive` state, or sets `tics = -1` (freezes on the
+current frame) if there is none. Activating an already-active monster, or deactivating a dormant
+one, does nothing. **On any other actor — a decoration, a non-monster, a dead monster without
+`MF_ICECORPSE` — the actor-side effect of `Thing_Activate`/`Thing_Deactivate` is a confirmed
+no-op** unless that actor is one of the overriding classes above; only the step-1
+`activationtype` bookkeeping still happens. Real-world callers have been observed calling both
 on a TID assigned to non-monster decoration actors — worth double-checking that whatever actor
 carries that TID is actually a monster/ice-corpse or one of the overriding classes, or the
 calls do nothing.
@@ -89,9 +104,27 @@ calls do nothing.
 
 Separately from the ACS functions above, an actor can trigger its own `Activate`/`Deactivate` (and
 optionally its `special` line-special) when a player uses (`MF5_USESPECIAL`, `actor.h:284`) or
-bumps (`MF6_BUMPSPECIAL`, `actor.h:312`) it — both flags confirmed present in Zandronum. This
-requires the actor to also have `SOLID` (collision-based triggering needs collision), matching the
-wiki. The DECORATE `Activation` property (confirmed:
+bumps (`MF6_BUMPSPECIAL`, `actor.h:312`) it — both flags confirmed present in Zandronum.
+`USESPECIAL` does not need `SOLID`: the use trace (`P_UseTraverse`, `p_map.cpp:5362-5384`) checks
+every blockmap actor it crosses, with no solidity test, on both engines. `BUMPSPECIAL` on
+Zandronum does need the actor to be `SOLID`, on both of its bump paths.
+
+Zandronum has two `BUMPSPECIAL` paths, and only one of them uses the `activationtype` machinery:
+
+- **Standing on top** of the actor (`p_mobj.cpp:4439-4456`, a mover resting on a solid actor
+  found by `P_TestMobjZ`) goes through `P_ActivateThingSpecial`: players by default,
+  monsters/projectiles only with `THINGSPEC_MonsterTrigger`/`MissileTrigger`, at most once a
+  second per actor (`lastbump`).
+- **Colliding sideways** (`p_map.cpp:1358-1384`, with `solid` computed at `p_map.cpp:1340-1342`; Zandronum keeps Skulltag's implementation here;
+  the ZDoom version at `p_map.cpp:1014-1025` is commented out) bypasses it entirely. Offline or on
+  the server, whenever a mover that is `SOLID` (or `BLOCKEDBYSOLIDACTORS`) collides with a `SOLID`,
+  non-`NOCLIP` `BUMPSPECIAL` actor, it runs the actor's `special` directly with the mover as
+  activator, on every collision check, with no `lastbump` rate limit. `activationtype` is ignored:
+  no player-only default, no `MonsterTrigger`/`MissileTrigger` gate, no activator choice, no
+  `ClearSpecial`, no target switching, and no `Activate`/`Deactivate` call. Skulltag score
+  pillars are also handled in this path.
+
+The DECORATE `Activation` property (confirmed:
 `DEFINE_PROPERTY(activation, N, Actor)`, `thingdef_properties.cpp:1362`) sets the `activationtype`
 bitfield read by `P_ActivateThingSpecial` (`p_map.cpp:7087-7141`) and `THINGSPEC_*` flag values
 (`actor.h:603-619`, all confirmed present and bit-identical to the wiki's list —
@@ -100,19 +133,23 @@ bitfield read by `P_ActivateThingSpecial` (`p_map.cpp:7087-7141`) and `THINGSPEC
 `TriggerActs`=1<<7, `Activate`=1<<8, `Deactivate`=1<<9, `Switch`=1<<10).
 
 `P_ActivateThingSpecial(thing, trigger, death)` is the one function that reconciles all of this —
-called on death, or on a successful USESPECIAL/BUMPSPECIAL collision check elsewhere. Verified
+called on death (when the actor has a `special`, is not `MF_SPECIAL` unless it is a monster, and
+lacks `THINGSPEC_NoDeathSpecial`, `p_interaction.cpp:550-554`), on a use of a `USESPECIAL` actor,
+or on the standing-on-top `BUMPSPECIAL` path (on Zandronum, not the sideways one above). Verified
 behavior, matching the wiki:
 
-- `THINGSPEC_ThingTargets`/`TriggerTargets` swap `target` pointers between `thing` and `trigger`
-  unconditionally, before anything else.
+- `THINGSPEC_ThingTargets` sets `thing`'s `target` to `trigger`, and `THINGSPEC_TriggerTargets`
+  sets `trigger`'s `target` to `thing`. Each is gated only on its own flag and runs before
+  anything else. It is not a swap.
 - The `Activate`/`Deactivate`/`Switch` state machine only runs `if (!death && ...)` — death never
   calls the actor's `Activate`/`Deactivate` virtual, only its `special` (see below). A switchable
   actor (`THINGSPEC_Switch` set, neither `Activate` nor `Deactivate` set yet) defaults to
   activating first, exactly as the wiki states.
 - The actor's `special` line-special runs (`P_ExecuteSpecial`) if `thing->special != 0`, with the
   activator chosen by `THINGSPEC_ThingActs`/`TriggerActs`/the `LEVEL_ACTOWNSPECIAL` MAPINFO flag —
-  confirmed `TriggerActs` overrides the level flag, matching the wiki. `death` always clears
-  `special` after running it once; `THINGSPEC_ClearSpecial` does the same on a non-death success
+  confirmed `TriggerActs` overrides the level flag, matching the wiki. `death` clears
+  `special` after running it once (always on Zandronum; UZDoom skips the clear under
+  `LEVEL2_HEXENHACK`, `src/playsim/p_map.cpp:7283`); `THINGSPEC_ClearSpecial` does the same on a non-death success
   only.
 
 ## See also
@@ -127,7 +164,15 @@ indices 130/131, the `THINGSPEC_*` bitfield and the `Activation` DECORATE proper
 `P_ActivateThingSpecial`'s dispatch, and the default `AActor::Activate`/`Deactivate` monster/ice-
 corpse gate — is confirmed present and structurally unchanged in the UZDoom source
 (`src/playsim/p_lnspec.cpp`, `src/playsim/actor.h`, `src/playsim/p_mobj.cpp`). A script calling
-`Thing_Activate`/`Thing_Deactivate` behaves the same way on both engines.
+`Thing_Activate`/`Thing_Deactivate` behaves the same way on both engines, apart from the
+Zandronum-only server-to-client broadcast described above.
+
+`BUMPSPECIAL` differs. UZDoom's sideways collision path (`src/playsim/p_map.cpp`'s
+`PIT_CheckThing`) goes through `P_ActivateThingSpecial` with the player-only default,
+`MonsterTrigger`/`MissileTrigger` and `lastbump`, like its standing-on-top path. Zandronum's
+sideways path is Skulltag's direct special call described above, which ignores `activationtype`
+and never calls `Activate`/`Deactivate`. That path is unchanged since 3.2.1 apart from a score
+pillar setting.
 
 The default-vs-override picture changes shape on UZDoom, though. Zandronum's fixed
 (nineteen-and-counting-class) override list doesn't carry over as a fixed list at all: UZDoom's

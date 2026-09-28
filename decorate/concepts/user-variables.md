@@ -3,8 +3,8 @@
 **Tier:** A (original content below); B (the "No initializer syntax" and "Parent-class visibility
 and lookup cost" findings, added from direct source reading with no wiki starting point)
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki "User variable" (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=User_variable&oldid=54780) + exhaustively verified against Zandronum source: declaration/parsing and error-recovery behavior (`src/thingdef/thingdef_parse.cpp:349-403` `ParseUserVariable`, `src/sc_man.cpp:888-925` `FScanner::ScriptError`/`ScriptMessage`, `src/thingdef/thingdef.cpp:357-359` deferred abort), per-class instance layout (`src/dobjtype.cpp:256-269` `PClass::CreateNew`, `:348-356` `PClass::Extend`), the DECORATE-side write path (`src/thingdef/thingdef_codeptr.cpp:5149-5202` `A_SetUserVar`/`A_SetUserArray`), the DECORATE-side bare-identifier read path (`src/thingdef/thingdef_expression.cpp:1841-1966` `FxIdentifier::Resolve`/`FxSelf`, `src/thingdef/thingdef_exp.h:70-73` `FCompileContext::FindInClass`, `src/thingdef/thingdef_expression.cpp:2093-2147` `FxClassMember`), the Weapon calling convention (`src/p_pspr.cpp:257` `P_SetPsprite`), the CustomInventory calling convention (`src/thingdef/thingdef_codeptr.cpp:128-181` `ACustomInventory::CallStateChain`, `src/g_shared/a_pickups.cpp:1818,1829,1838-1848` its Drop/Use/TryPickup call sites), and the ACS-side read/write gate (`src/p_acs.cpp:5593-5652`, cross-referenced in `../../acs/functions/getuservariable.md`). The feature predates the Zandronum 3.2.1 version-bump commit `28f736fb3` (introduced by the upstream-ported commit `57cff1f42`/`19b23f2cf`, confirmed an ancestor of the version-bump commit via `git merge-base --is-ancestor`) and is implemented entirely in Zandronum's own DECORATE compiler — nothing in this file depends on ZScript or any GZDoom/UZDoom-only mechanism.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
+**Provenance:** ZDoom Wiki "User variable" (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=User_variable&oldid=54780) + exhaustively verified against Zandronum source: declaration/parsing and error-recovery behavior (`src/thingdef/thingdef_parse.cpp:349-403` `ParseUserVariable`, `src/sc_man.cpp:888-925` `FScanner::ScriptError`/`ScriptMessage`, `src/thingdef/thingdef.cpp:357-359` deferred abort), per-class instance layout (`src/dobjtype.cpp:256-269` `PClass::CreateNew`, `:348-356` `PClass::Extend`), the DECORATE-side write path (`src/thingdef/thingdef_codeptr.cpp:5149-5202` `A_SetUserVar`/`A_SetUserArray`), the DECORATE-side bare-identifier read path (`src/thingdef/thingdef_expression.cpp:1841-1966` `FxIdentifier::Resolve`/`FxSelf`, `src/thingdef/thingdef_exp.h:72-75` `FCompileContext::FindInClass`, `src/thingdef/thingdef_expression.cpp:2093-2147` `FxClassMember`), the Weapon calling convention (`src/p_pspr.cpp:257` `P_SetPsprite`), the CustomInventory calling convention (`src/thingdef/thingdef_codeptr.cpp:128-181` `ACustomInventory::CallStateChain`, `src/g_shared/a_pickups.cpp:1818,1829,1838-1848` its Drop/Use/TryPickup call sites), and the ACS-side read/write gate (`src/p_acs.cpp:5593-5652`, symbol lookup `src/dobjtype.cpp:541-571` `PSymbolTable::FindSymbol`, cross-referenced in `../../acs/functions/getuservariable.md`). The feature predates the Zandronum 3.2.1 version-bump commit `28f736fb3` (introduced by the upstream-ported commit `57cff1f42`/`19b23f2cf`, confirmed an ancestor of the version-bump commit via `git merge-base --is-ancestor`) and is implemented entirely in Zandronum's own DECORATE compiler — nothing in this file depends on ZScript or any GZDoom/UZDoom-only mechanism.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 User variables are custom fields you can declare on an actor in DECORATE to store per-instance state. On Zandronum, they must be `int`-typed; on UZDoom, they can be either `int` or `float`. They are guaranteed not to conflict with predefined engine fields, making them safe for mod-specific data storage.
@@ -25,9 +25,9 @@ actor MyMonster : ZombieMan
 
 **Requirements:**
 - **Type:** On Zandronum, must be `int` only; Zandronum's DECORATE parser rejects `float`, `string`, or other types. This is *not* an immediate hard abort: `ParseUserVariable` calls `sc.ScriptMessage("User variables must be of type int")` and increments `FScriptPosition::ErrorCounter`, then keeps parsing the rest of the file so any further errors are also reported in the same pass. DECORATE loading as a whole still fails: once every DECORATE lump has been parsed, `LoadDecorations()` checks `ErrorCounter > 0` and calls `I_Error("%d errors while parsing DECORATE scripts", ...)` (`src/thingdef/thingdef.cpp:357-359`) — a deferred-fatal, not a silent recovery. On UZDoom, both `int` and `float` are accepted as user variable types (see "Engine-family divergence" below).
-- **Name:** Must start with the literal prefix `user_` (case-insensitive matching, enforced with `strnicmp("user_", name, 5)`). A non-matching name goes through the identical `ScriptMessage` + deferred-abort path described above, not a separate mechanism. The prefix exists to guarantee no collision with internal engine fields.
-- **Native classes:** Unlike the three checks above, declaring *any* user variable on a native (not DECORATE-defined) class is an immediate hard abort, not deferred: `ParseUserVariable` calls `sc.ScriptError("Native classes may not have user variables")` when `!cls->bRuntimeClass`, and `FScanner::ScriptError` calls `I_Error` directly (`src/sc_man.cpp:888-904`) with no further parsing.
-- **Arrays:** Optional bracket notation with a compile-time constant size, e.g. `var int user_array[42];`. A zero or negative size goes through the same soft `ScriptMessage` + deferred-abort path as the type/name checks above (`sc.ScriptMessage("Array size must be positive")`), and additionally the parser locally recovers by clamping the *declared* array to size 1 (`maxelems = 1;`) so scanning can continue and surface any later errors in the same file (`src/thingdef/thingdef_parse.cpp:376-386`). The clamp does not rescue the load — `ErrorCounter` is still nonzero, so the deferred `I_Error` check at the end of the DECORATE pass still aborts the whole load; there is no way to end up with a working size-1 array from this path.
+- **Name:** Must start with the literal prefix `user_` (case-insensitive matching, enforced with `strnicmp("user_", name, 5)`) and be at least 6 characters long, so a bare `user_` is rejected too. A non-matching name goes through the identical `ScriptMessage` + deferred-abort path described above, not a separate mechanism. The prefix exists to guarantee no collision with internal engine fields.
+- **Native classes:** Unlike the type and name checks above, declaring *any* user variable on a native (not DECORATE-defined) class is an immediate hard abort, not deferred: `ParseUserVariable` calls `sc.ScriptError("Native classes may not have user variables")` when `!cls->bRuntimeClass`, and `FScanner::ScriptError` calls `I_Error` directly (`src/sc_man.cpp:888-904`) with no further parsing.
+- **Arrays:** Optional bracket notation with a compile-time constant size, e.g. `var int user_array[42];`. A zero or negative size goes through the same soft `ScriptMessage` + deferred-abort path as the type/name checks above (`sc.ScriptMessage("Array size must be positive")`), and additionally the parser locally recovers by clamping the *declared* array to size 1 (`maxelems = 1;`) so scanning can continue and surface any later errors in the same file (`src/thingdef/thingdef_parse.cpp:378-390`). The clamp does not rescue the load — `ErrorCounter` is still nonzero, so the deferred `I_Error` check at the end of the DECORATE pass still aborts the whole load; there is no way to end up with a working size-1 array from this path.
 - **Semicolon:** Declarations end with `;`, not a bare identifier line.
 
 ### No initializer syntax (tier B — source-verified, no wiki starting point)
@@ -47,18 +47,29 @@ there is no declarative default.
 
 ## Usage in expressions
 
-User variables are readable in DECORATE action-function expressions — e.g., as parameters to action functions (`A_SetHealth(user_boost + 50)`, `A_Jump(256 - user_count / 2, "Special")`):
+User variables are readable in DECORATE action-function expressions — e.g., as parameters to action functions (`A_CustomMissile("Rocket", 32, 0, user_spread * 2)`, `A_Jump(256 - user_count / 2, "Special")`):
 
-```text
-// Missile: check user_rockets via expression in A_Jump condition
-POSS F 8 A_JumpIf(user_rockets > 0, "UseRocket")
-    A_PosAttack
-    Goto See
+```decorate
+actor RocketZombie : ZombieMan
+{
+    var int user_rockets;
 
-UseRocket:
-    POSS E 10 A_CustomMissile("Rocket")
-    A_SetUserVar("user_rockets", user_rockets - 1)
-    Goto See
+    States
+    {
+    Spawn:
+        POSS A 0 NoDelay A_SetUserVar("user_rockets", 3)
+        Goto Super::Spawn
+    Missile:
+        POSS E 10 A_FaceTarget
+        POSS E 0 A_JumpIf(user_rockets > 0, "UseRocket")
+        POSS F 8 A_PosAttack
+        Goto See
+    UseRocket:
+        POSS F 10 A_CustomMissile("Rocket")
+        POSS E 0 A_SetUserVar("user_rockets", user_rockets - 1)
+        Goto See
+    }
+}
 ```
 
 **Note:** DECORATE expressions in Zandronum do not support anonymous `{ statements; }` action blocks — those are a GZDoom-era ZScript feature. Inline code blocks do not exist; all logic must be structured via state jumps and action functions. See `state-machine.md` for the full list of Zandronum-unsupported extensions.
@@ -83,12 +94,15 @@ mentioned by the wiki page this file is otherwise sourced from.
 
 This lookup is also **not a cheap, fixed-offset field access the way a plain compiled-in DECORATE
 property is.** Every `GetUserVariable`/`SetUserVariable` (and their `Array` siblings) call does a
-fresh `FName` construction from the passed string plus a symbol-table hash lookup — there is no 
-caching of the resolved symbol across calls, unlike a native property's fixed byte offset. A script 
-polling a user variable every tic pays that lookup cost every time, whereas the DECORATE-side 
-bare-identifier/`A_SetUserVar` path resolves (or re-resolves) the same symbol but is still doing 
-the equivalent hash lookup at runtime on the write side — see the read-side compile-time-offset 
-shortcut (and its footgun) documented below instead.
+fresh `FName` construction from the passed string plus a symbol-table lookup. Nothing caches the
+resolved symbol across calls, unlike a native property's fixed byte offset. The lookup differs by
+engine. Zandronum binary-searches the class's sorted symbol array, then each ancestor's in turn
+(`src/dobjtype.cpp:541-571` `PSymbolTable::FindSymbol`). UZDoom does a hash-map lookup per class
+level. A script polling a user variable every tic pays that lookup cost every time.
+`A_SetUserVar`/`A_SetUserArray` redo the same runtime lookup on every call (their name argument is
+already an `FName`, so there is no string conversion). A bare-identifier read in a DECORATE
+expression is different: it resolves its offset once at load time. See the read-side
+compile-time-offset shortcut (and its footgun) documented below.
 
 ## Conditions for Weapon and CustomInventory
 
@@ -96,7 +110,7 @@ The wiki describes special pickup/drop/store handling for weapons and `CustomInv
 
 **Default case (a plain actor's own states):** `FState::CallAction` is invoked as `newstate->CallAction(this, this)` (`src/p_mobj.cpp:586`) — `self` and `stateowner` are the same object, so there is no distinction to worry about; a bare identifier and `A_SetUserVar` both read/write that actor's own instance.
 
-**Weapon states:** `P_SetPsprite` calls `state->CallAction(player->mo, player->ReadyWeapon)` (`src/p_pspr.cpp:257`) — **`self` is the player pawn, `stateowner` is the weapon object.** Every `DEFINE_ACTION_FUNCTION_PARAMS`-style action function (including `A_SetUserVar`/`A_SetUserArray`) receives `self` as its own local `self` parameter and operates on it, so `A_SetUserVar` called from a weapon's own state writes to **the player pawn**, not the weapon — this is the verified mechanism behind the wiki's "weapons... are never stored [on]" and "weapons may set the user variables on the player" claims. If the pawn's class doesn't have that `user_` field declared, the write silently no-ops with the "is not a user variable" console message described above.
+**Weapon states:** `P_SetPsprite` calls `state->CallAction(player->mo, player->ReadyWeapon)` (`src/p_pspr.cpp:257`) — **`self` is the player pawn, `stateowner` is the weapon object.** Every `DEFINE_ACTION_FUNCTION_PARAMS`-style action function (including `A_SetUserVar`/`A_SetUserArray`) receives `self` as its own local `self` parameter and operates on it, so `A_SetUserVar` called from a weapon's own state writes to **the player pawn**, not the weapon — this is the verified mechanism behind the wiki's "weapons... are never stored [on]" and "weapons may set the user variables on the player" claims. If the pawn's class doesn't have that `user_` field declared, the write changes nothing and prints `<name> is not a user variable in class <class>` to the console (`A_SetUserArray` prints `is not a user array` instead).
 
 **CustomInventory states:** `ACustomInventory::CallStateChain` invokes `State->CallAction(actor, this, &StateCall)` (`src/thingdef/thingdef_codeptr.cpp:135-181`), where `actor` is the receiving actor passed in by the caller and `this` is the `CustomInventory` item. The three call sites all pass the *receiver*, not the item, as `actor`: `TryPickup` passes `toucher` for the `Pickup` state (`src/g_shared/a_pickups.cpp:1838-1848`), `Use` passes `Owner` for the `Use` state (`:1829`), and `SpecialDropAction` passes `dropper` for the `Drop` state (`:1818`). So — same pattern as Weapon — **`self` is the receiving actor, `stateowner` is the item**, for all three of Pickup/Use/Drop. This matches the wiki's "user variables stored through DECORATE via... CustomInventory are set upon the owner itself" and explains the console-message claim ("if the receiver does not have the variable defined, it will log a console message") directly: it's the same `bUserVar`-lookup-on-`self`-fails-silently-with-a-message path as the Weapon case. The one part of the wiki's phrasing this doesn't literally match is "will only affect the item itself until picked up" — a `CustomInventory` item's *own* pre-pickup states (e.g. an idle `Spawn` loop, ticked normally like any other actor before it's touched) still run through the default `self == stateowner == this` path (`src/p_mobj.cpp:586`), so user variables read/written there do affect the item's own instance; it's specifically the `Pickup`/`Use`/`Drop` label chains (run via `CallStateChain`, not normal ticking) where `self` switches to the receiver.
 
@@ -106,7 +120,7 @@ The write path (`A_SetUserVar`) does **not** share this bug, because it re-resol
 
 **On UZDoom, this read-side bug is mitigated by compile-time detection:** when parsing action-function parameters, if an unsafe context is detected (the compile-time flag `ctx.Unsafe` is set when a self-pointer is used ambiguously), the function is marked as unsafe; at load time, CheckForUnsafeStates in weapon/inventory-item classes detects these unsafe function calls and generates a load-time error message, aborting the DECORATE load. This prevents the crash at runtime instead of letting it occur. On Zandronum, no such load-time detection exists, so the bug can crash at runtime. 
 
-**Practical takeaway (matches the wiki's actual recommendation): declare the user variable on the player pawn or receiving actor's own class, never on the Weapon or CustomInventory item class** — this sidesteps both the write-side no-op and the read-side type confusion, since `self` is always the pawn/receiver by the time either path runs.
+**Practical takeaway (matches the wiki's actual recommendation): declare the user variable on the player pawn or receiving actor's own class, never on the Weapon or CustomInventory item class** — this sidesteps both the write-side no-op and the read-side type confusion, since `self` is always the pawn/receiver by the time either path runs. On Zandronum this rescues writes and ACS reads only. A bare identifier naming a pawn-declared variable inside the weapon's or item's own state code is looked up in the weapon/item class at load time, misses, and gives `Unknown identifier`, a counted error that aborts the DECORATE load (`src/thingdef/thingdef_expression.cpp:1914`, `src/sc_man.cpp:1045-1046`). Read such a variable from ACS with `GetUserVariable` instead.
 
 ## Engine-family divergence
 

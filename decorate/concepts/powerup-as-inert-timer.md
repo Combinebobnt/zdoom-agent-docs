@@ -4,7 +4,7 @@
 **Applies to:** UZDoom=yes, Zandronum=yes — the trick (a `PowerSpeed` subclass with `Speed 1.0` used
 purely as a self-expiring, side-effect-free duration gate) works on both engines; UZDoom requires
 closing one extra side-effect channel absent from Zandronum, see the divergence section below.
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-17)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** Source-derived (no wiki page consulted) — verified against `src/g_shared/
 a_artifacts.cpp` (`APowerSpeed::DoEffect`, `APowerSpeed::GetSpeedFactor`, `APowerup::CreateCopy`),
 `src/thingdef/thingdef_properties.cpp` (`Speed`, `Inventory.Icon`), and `src/thingdef/

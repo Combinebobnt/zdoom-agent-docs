@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** `SetPlayerLivesLeft - Zandronum Wiki.html` (wiki `https://wiki.zandronum.com/w/index.php?title=SetPlayerLivesLeft&oldid=1333`), verified against the Zandronum source's `src/p_acs.cpp`, `p_interaction.cpp`, and `gamemode.cpp` 2026-07-29.
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Extension function (index -105; `GetPlayerLivesLeft` at -104)

@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_Recoil` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_Recoil&oldid=48676) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:2797-2818`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** ZDoom Wiki `A_Recoil` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_Recoil&oldid=48676) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:2797-2818`, `src/sv_commands.cpp:1646-1684`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `AActor` action function.
 
@@ -17,11 +17,11 @@ Applies velocity to the calling actor in the direction opposite to its facing an
 
 **Horizontal-only:** The function only modifies x and y velocity components, computed using the actor's current `angle` via cosine/sine. The z (vertical) component remains unchanged — `A_Recoil` does not apply upward or downward velocity, even indirectly.
 
-**No pitch adjustment:** The action function does not account for the actor's pitch (up/down facing angle). For a weapon, this means recoil is applied horizontally even if the weapon points upward. If vertical recoil relative to pitch is desired, adjust `xyvel` in DECORATE itself: e.g., `A_Recoil(base_recoil * cos(pitch))` — `pitch` is accessible in DECORATE expressions (see [`concepts/expressions.md`](../concepts/expressions.md)).
+**No pitch adjustment:** The action function does not account for the actor's pitch (up/down facing angle). For a weapon, this means recoil is applied horizontally even if the weapon points upward. To shrink the horizontal push as the actor looks up or down, scale `xyvel` in DECORATE itself, e.g. `A_Recoil(8 * cos(pitch))`. This still adds no vertical velocity. `pitch` and `cos` are accessible in DECORATE expressions (see [`concepts/expressions.md`](../concepts/expressions.md)).
 
 **Network multiplayer (Zandronum):**
-- **For players:** Recoil is applied on the client-side actor without sending updates to the server. The server does not broadcast the velocity change.
-- **For non-player actors:** Recoil is skipped on clients (even if `+CLIENTSIDEONLY` is not set); the server applies it and broadcasts a full position/velocity resync via `SERVERCOMMANDS_MoveThingExact` to all clients.
+- **For players:** Recoil runs everywhere the action runs: on the server and on each client's own copy. The server sends no position or velocity update for it.
+- **For non-player actors:** Recoil is skipped on clients unless the actor has `+CLIENTSIDEONLY`. The server applies it and then calls `SERVERCOMMANDS_MoveThingExact` with the x/y/z position and x/y velocity bits. That update goes to all fully-connected clients, but bits whose value was already sent this tic are dropped, and an actor with no NetID gets nothing sent (`src/sv_commands.cpp:1646-1684`).
 
 (The fork author flagged the player-side behavior as deliberate-but-unsure in a source comment.)
 

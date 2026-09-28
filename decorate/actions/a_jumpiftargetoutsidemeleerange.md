@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_JumpIfTargetOutsideMeleeRange` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_JumpIfTargetOutsideMeleeRange&oldid=42382) + verified against Zandronum source's `src/thingdef/thingdef_codeptr.cpp:815-829` and `src/p_enemy.cpp:245-280` (`CheckMeleeRange` function).
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_JumpIfTargetOutsideMeleeRange` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_JumpIfTargetOutsideMeleeRange&oldid=42382) + verified against Zandronum source's `src/thingdef/thingdef_codeptr.cpp:815-829` and `src/p_enemy.cpp:245-280` (`CheckMeleeRange` function), plus `wadsrc/static/actors/actor.txt:12` (default `MeleeRange`), `src/p_maputl.cpp:59-64` (`P_AproxDistance`), `src/thingdef/thingdef_states.cpp:377-397` (offset rules), `src/network.cpp:1598-1611` and `src/thingdef/thingdef_codeptr.cpp:695-753` (`DoJump`).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** AActor — callable from any actor's state table.
 
@@ -11,7 +11,7 @@ Jumps to a target state (or forward by an offset) if the calling actor's target 
 
 ## Parameters
 
-- **`label` or `offset`** — Target state label or state offset to jump to if the condition is met. Two overloads: pass a string (quoted in DECORATE) to jump to a named state, or an integer offset to jump forward by that many frame states from the current one.
+- **`label` or `offset`** — Target state label or state offset to jump to if the condition is met. Two overloads: pass a string (quoted in DECORATE) to jump to a named state, or an integer offset to jump forward by that many frame states from the current one. On Zandronum the offset must be a non-negative integer literal. A negative offset is a parse error ("Negative jump offsets are not allowed"), 0 means no jump, and a positive offset on a line defining more than one frame is a parse error.
 
 ## Behavior and range calculation
 
@@ -19,16 +19,16 @@ The jump condition inverts the result of `CheckMeleeRange()`, which evaluates se
 
 1. **Null target** — If the calling actor has no target (`target` field is null), the function jumps. The jump occurs regardless of the actor's current position or any other state.
 2. **Distance check** — The distance between the caller and target is calculated using octagonal approximation (not true Euclidean). The jump occurs if distance >= `meleerange + target->radius`. Note that the **caller's own radius is not included** in this calculation — only the target's radius is added. This asymmetry can produce surprising results for very wide actors (e.g., a wide monster may be unable to reach a target that is theoretically overlapping it).
-3. **Vertical range** — Unless the target has the `MF5_NOVERTICALMELEERANGE` flag set, the function checks whether the target is within the calling actor's vertical reach (target's `z` and `z + height` must be within the caller's `z` to `z + height` range). If the target fails this check, the function jumps.
-4. **Friendly fire** — If the target is considered a friend of the caller (determined by `IsFriend(self, target)`), the function jumps.
+3. **Vertical range** — Unless the **calling actor** has the `NOVERTICALMELEERANGE` flag (`MF5_NOVERTICALMELEERANGE`) set, the function requires the two actors' vertical spans to overlap. This check fails (so the jump fires) when the target's bottom is above the caller's top (`target z > z + height`) or the target's top is below the caller's bottom (`target z + height < z`). The target's own flags play no part here.
+4. **Friendly fire** — If the target is considered a friend of the caller (the caller's `IsFriend(target)`), the function jumps.
 5. **Line of sight** — The function performs a `P_CheckSight` test. If no line of sight exists between the caller and target, the function jumps.
-6. **Special case: master as goal** — If the target is the same actor as the caller's `goal` field, melee range is immediately considered "in range" and no jump occurs. This short-circuit happens before the vertical and friendly checks.
+6. **Special case: target is the move goal** — If the target is the same actor as the caller's `goal` field (the actor it is walking toward, not its `master`), it counts as in range and no jump occurs. This short-circuit comes after the distance check (so a distant goal still jumps) but before the vertical, friendly and sight checks.
 
-The default melee range (`MELEERANGE`) is `64 * FRACUNIT` (64 fixed-point units, or approximately 1 map unit in standard Doom dimensions), but this is configurable per actor via its `meleerange` property. Many monster classes override this default.
+The range used is the caller's `MeleeRange` actor property, which the base `Actor` class defaults to 44 map units on both engines (Zandronum's `wadsrc/static/actors/actor.txt:12`; UZDoom writes it as `64 - MELEEDELTA`). No stock Zandronum actor definition overrides it. Zandronum's engine constant `MELEERANGE` (64 map units, `src/p_local.h:85`) is a different value used by other melee code (e.g. `A_CustomPunch`'s default range), not by this check.
 
 ## Engine-family divergence: distance calculation
 
-UZDoom's melee-range check (`Actor.CheckMeleeRange()`, declared in the ZScript stdlib's `actors/actor.zs` and backed natively by `P_CheckMeleeRange` in `src/playsim/p_enemy.cpp`) computes the caller-to-target distance with a true 2D Euclidean measurement (`Actor.Distance2D`, i.e. the length of the `(dx, dy)` vector), not Zandronum's octagonal approximation (`P_AproxDistance`, `max(|dx|,|dy|) + min(|dx|,|dy|)/2`). The Euclidean distance is always less than or equal to the octagonal approximation for the same `(dx, dy)` pair (equal only along the axes, increasingly smaller as the angle approaches 45 degrees), so for the same numeric `meleerange`, a target near the boundary along a diagonal approach can be judged in range on UZDoom while Zandronum's approximation would judge it out of range and take the jump.
+UZDoom's melee-range check (`Actor.CheckMeleeRange()`, declared in the ZScript stdlib's `actors/actor.zs` and backed natively by `P_CheckMeleeRange` in `src/playsim/p_enemy.cpp`) computes the caller-to-target distance with a true 2D Euclidean measurement (`Actor.Distance2D`, i.e. the length of the `(dx, dy)` vector), not Zandronum's octagonal approximation (`P_AproxDistance`, `max(|dx|,|dy|) + min(|dx|,|dy|)/2`). The Euclidean distance is always less than or equal to the octagonal approximation for the same `(dx, dy)` pair. They are equal only along the axes, and the approximation over-estimates by up to about 11.8% (worst near 26.6 degrees off an axis, about 6% at 45 degrees). So for the same numeric `meleerange`, a target near the boundary along an off-axis approach can be judged in range on UZDoom while Zandronum's approximation would judge it out of range and take the jump.
 
 ## Engine-family divergence: sector-based attack blocking
 
@@ -40,9 +40,11 @@ The ZDoom wiki's description — "when the target of the calling actor is beyond
 
 ## Network synchronization
 
-In multiplayer, the melee-range check is server-authoritative. If the calling actor does not have the `NETFL_CLIENTSIDEONLY` flag, the function returns immediately in client mode without evaluating the condition — the server's decision is broadcast to the client via a position/frame synchronization update (`CLIENTUPDATE_FRAME | CLIENTUPDATE_POSITION`). This synchronization is necessary because clients do not have access to the calling actor's target pointer in network-latent actors.
+In multiplayer, the melee-range check is server-authoritative. In client mode the function returns without evaluating the condition unless the client handles the actor itself, meaning it has `+CLIENTSIDEONLY` or has no network ID (`NETWORK_InClientModeAndActorNotClientHandled`, `src/network.cpp:1598-1611`). The engine's own comment gives the reason: monsters have no targets on the client end.
 
-For `+CLIENTSIDEONLY` actors (spawned only on the client and having no network authority), the range check runs on both server and client independently, with each maintaining its own copy of the actor's state.
+When the server takes the jump, what clients receive depends on where it was called from (`DoJump`). From the actor's own state, the server sends a set-frame command plus a position update (the `CLIENTUPDATE_FRAME | CLIENTUPDATE_POSITION` flags). From a player's weapon or flash psprite, it sends a weapon state jump instead. From a CustomInventory state chain, nothing is sent.
+
+For client-handled actors, the client runs the check locally against its own copy of the actor and nothing is synchronized.
 
 ## Engine-family divergence: no client/server authority split
 

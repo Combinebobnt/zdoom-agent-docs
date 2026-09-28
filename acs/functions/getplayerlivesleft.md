@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
-**Provenance:** `GetPlayerLivesLeft - Zandronum Wiki.html` (wiki `https://wiki.zandronum.com/w/index.php?title=GetPlayerLivesLeft&oldid=1351`), verified against the Zandronum source's `src/p_acs.cpp` and `p_interaction.cpp` 2026-07-29.
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
+**Provenance:** `GetPlayerLivesLeft - Zandronum Wiki.html` (wiki `https://wiki.zandronum.com/w/index.php?title=GetPlayerLivesLeft&oldid=1351`), verified against the Zandronum source's `src/p_acs.cpp` and `p_interaction.cpp` 2026-07-29; the `GMF_USEMAXLIVES`/`sv_maxlives` gating correction (2026-09-24) additionally checked `src/gamemode.cpp:1024-1027` and `src/p_acs.cpp:7194-7204`.
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Extension function (index -104; `SetPlayerLivesLeft` at -105)
 
@@ -29,13 +29,16 @@ value range).
 
 ## Only meaningful under a lives-limited gamemode
 
-`ulLivesLeft` defaults to `0` for every player (`p_user.cpp:380`) and is otherwise only written by
-`PLAYER_SetLivesLeft()` calls gated on `GAMEMODE_AreLivesLimited()` (`gamemode.cpp:1024-1027`,
-true only when `sv_maxlives > 0` and the current gamemode has `GMF_USEMAXLIVES` — e.g. Invasion,
-Survival, Last Man/Team Last Man Standing). Calling `GetPlayerLivesLeft` in a gamemode that
-doesn't use `sv_maxlives` will just always return `0` for every in-game player — indistinguishable
-from "player is on their last life" — since the field is never touched there. The wiki page
-doesn't mention this precondition at all.
+`ulLivesLeft` defaults to `0` for every player (`p_user.cpp:380`). Every non-ACS write site gates
+on the same `GMF_USEMAXLIVES` gamemode flag `GAMEMODE_AreLivesLimited()` checks
+(`gamemode.cpp:1024-1027`; that helper also requires `sv_maxlives > 0`, but only for Invasion
+specifically, not for every `GMF_USEMAXLIVES` mode), e.g. Invasion, Survival, Last Man/Team Last
+Man Standing. The one exception is `SetPlayerLivesLeft` itself (`p_acs.cpp:7194-7204`), which
+writes `ulLivesLeft` unconditionally behind only `PLAYER_IsValidPlayer()`, with no gamemode gate at
+all. Calling `GetPlayerLivesLeft` in a gamemode that doesn't use `sv_maxlives` will just always
+return `0` for every in-game player until a script calls `SetPlayerLivesLeft` directly,
+indistinguishable from "player is on their last life" since the field is otherwise never touched
+there. The wiki page doesn't mention this precondition at all.
 
 ## See also
 

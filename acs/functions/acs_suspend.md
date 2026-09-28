@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** `ACS_Suspend - ZDoom Wiki.html` (https://zdoom.org/w/index.php?title=ACS_Suspend&oldid=35857), verified 2026-07-29 against the Zandronum source's `src`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
@@ -32,7 +32,7 @@ as [ACS_NamedTerminate](acs_namedterminate.md) and for the same reason:
 
 - If `map` names a level not found by `FindLevelByNum`, the function silently does nothing at all
   and still returns `true` (`p_lnspec.cpp:1858-1861`).
-- If `map` resolves (or is `0`/current map) but no script with that name is currently *running*,
+- If `map` resolves (or is `0`/current map) but no script with that number is currently *running*,
   `SetScriptState` (`p_acs.cpp:13143-13152`) looks the script number up in the active
   `DACSThinker`'s `RunningScripts` hash table, finds nothing, and silently no-ops — again with
   `true` already returned.
@@ -52,18 +52,25 @@ start" flag or deferred state.
 - **Different map:** does not suspend anything now. It queues a deferred action
   (`addDefered(..., acsdefered_t::defsuspend, ...)`) that fires only if/when that target map is
   actually entered later (`P_DoDeferedScripts`, `p_acs.cpp:13154-13199`) — same
-  deferred-execution mechanism `ACS_Execute`/`ACS_Terminate` use for cross-map targets. **Caveat:**
-  a deferred suspend on a non-running script (the common case when a map first loads) is still a
-  no-op, so deferred suspends are near-useless in practice.
+  deferred-execution mechanism `ACS_Execute`/`ACS_Terminate` use for cross-map targets. The
+  deferred list runs during level load (`g_level.cpp:1603`), after `P_SetupLevel` has already
+  started that map's `OPEN` scripts (`P_SpawnSpecials`, `p_spec.cpp:1796`) but before any of them
+  has run a tic. So a deferred suspend does catch an `OPEN` script of the target map and holds it
+  at its first instruction. **Caveat:** a script that isn't running at that moment (e.g. one only
+  started later by a line special) is not affected; the deferred suspend is consumed and
+  discarded either way.
 
 ## Resumption rules
 
 A suspended script resumes only through a non-`ACS_ALWAYS` script-start path:
 
 - `ACS_Execute` / `Acs_NamedExecute` — respects suspended instances; resumes the suspended script
-  at its saved PC.
-- `ACS_ExecuteAlways` / `Acs_NamedExecuteAlways` — always starts a fresh instance; a
-  previously-suspended one is orphaned forever.
+  at its saved PC (`P_GetScriptGoing`, `p_acs.cpp:13061-13069`). The new call's arguments are
+  ignored.
+- `ACS_ExecuteAlways` / `Acs_NamedExecuteAlways` — always starts a fresh instance and does not
+  resume the suspended one. It is not orphaned, though: `ACS_ALWAYS` instances are never
+  registered in `RunningScripts` (`p_acs.cpp:13130-13131`), so the suspended instance keeps its
+  slot and a later `ACS_Execute` still resumes it.
 - `ACS_ExecuteWithResult` / `Acs_NamedExecuteWithResult` — always starts a fresh instance (these
   are flavored like `ACS_ExecuteAlways` internally).
 - `ACS_LockedExecute` / `Acs_NamedLockedExecute` — respects suspended instances (these are
@@ -76,9 +83,12 @@ statement — this pattern holds identically for `ACS_Suspend`-suspended scripts
 ## Clientside behavior
 
 Unlike `ACS_Execute` (which has a `CLIENTSIDE`-script carve-out in `p_lnspec.cpp:1761-1766`),
-`LS_ACS_Suspend` has no server→client broadcast. A server-side call to suspend a `CLIENTSIDE`-flagged
-script does not reach clients — the script continues running on clients even though suspended on
-the server.
+`LS_ACS_Suspend` has no server→client broadcast. The server's normal start paths hand
+`CLIENTSIDE` scripts to clients instead of running them (that carve-out, and
+`FBehavior::StartTypedScripts`, `p_acs.cpp:3403-3411`), so a server-side call to suspend a
+`CLIENTSIDE` script usually finds no server instance to suspend, and nothing is sent to clients.
+Their copies keep running. An `ACS_Suspend` called from a `CLIENTSIDE` script on a client does
+suspend that client's own local instance.
 
 ## Engine-family divergence: Clientside behavior
 

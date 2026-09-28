@@ -2,7 +2,7 @@
 
 **Tier:** A (both claims traced directly to the relevant `PCD_*` opcode implementations in `p_acs.cpp` on each engine, not wiki-sourced or inferred; the Zandronum read is against that source's `master` HEAD, a `3.3-alpha` development snapshot ahead of the 3.2.1 target — this is core VM instruction behavior, stable across that gap).
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-16)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** derived directly from the Zandronum source's `src/p_acs.cpp` (`PCD_RSHIFT` line 10635, `PCD_MODULUS` line 9601, `FACSStackMemory` typedef line 359) while reviewing a hand-ported Mersenne Twister implementation in a real project's script that assumed unsigned 32-bit shift/modulus semantics throughout. Cross-checked that BCS has no unsigned type or logical-shift operator via `zt-bcc.wiki/Types.md` and `Grammar.md`.
 
 There is no `unsigned` type in BCS/ACS — `int` (and `raw`) are always signed 32-bit
@@ -13,9 +13,8 @@ because it makes two operators behave differently than a port from a spec writte
 
 ## `>>` is an arithmetic (sign-extending) shift, not a logical one
 
-`PCD_RSHIFT` in `p_acs.cpp` is implemented as plain C++ `STACK(2) = STACK(2) >> STACK(1)` where
-the stack is `int32_t` (`FACSStackMemory = BoundsCheckingArray<int32_t, STACK_SIZE>`,
-`p_acs.cpp:359`). Right-shifting a negative `int32_t` in C++ is sign-extending on every mainstream
+`PCD_RSHIFT` in `p_acs.cpp` applies plain C++ `>>` to the top two stack slots, and every stack
+slot is an `int32_t` (the `FACSStackMemory` array type, `p_acs.cpp:359`). Right-shifting a negative `int32_t` in C++ is sign-extending on every mainstream
 compiler target (GCC/Clang/MSVC on x86/ARM) — so `x >> n` in ACS fills the top `n` bits with the
 sign bit, not with zero, whenever `x` is negative (bit 31 set).
 
@@ -37,8 +36,7 @@ int logical_shift_11 = (x >> 11) & 0x001fffff; // zero out the 11 sign-extended 
 
 ## `%` follows C-style truncated division (sign follows the dividend), and traps on zero
 
-`PCD_MODULUS` (`p_acs.cpp:9601`) does `STACK(2) = STACK(2) % STACK(1)` on `int32_t`, i.e. plain
-C++ `%`: the result's sign matches the *dividend's* sign, and it can be negative or zero — it does
+`PCD_MODULUS` (`p_acs.cpp:9601`) applies plain C++ `%` to the top two `int32_t` stack slots: the result's sign matches the *dividend's* sign, and it can be negative or zero — it does
 **not** floor to a non-negative remainder the way e.g. Python's `%` does. `x % 0` doesn't crash the
 engine: it sets the script's ACS-VM `state` to `SCRIPT_ModulusBy0`, which halts the interpreter
 loop at that instruction. It is **not silent** — once the loop exits, the engine prints a

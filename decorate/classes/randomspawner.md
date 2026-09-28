@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** ZDoom Wiki Classes:RandomSpawner (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=Classes%3ARandomSpawner&oldid=52772) + verified against
 Zandronum source `src/g_shared/a_randomspawner.cpp` and `src/p_enemy.cpp` (`CheckBossDeath`, `A_BossDeath`), and Zandronum's `src/g_shared/a_pickups.cpp` (Inventory respawn lifecycle). Pointer/flag/user-variable transfer behavior re-verified 2026-08-01 against the same file's `PostBeginPlay()`/`BeginPlay()` and `thingdef_parse.cpp`'s `ParseUserVariable`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
@@ -250,9 +250,13 @@ RandomSpawner subclass its own, unrelated DoomEd number does not establish this 
 
 ## Zandronum-specific networking notes
 
-The spawner itself is **server-side only** in networked games:
-- `BeginPlay()` checks client mode and returns early, marking itself `NETFL_SERVERSIDEONLY` and
-  freeing its network ID.
+The spawner itself is **server-side only** in networked games, via two separate branches in
+`BeginPlay()` for the client and server roles, not one path doing both:
+- On a client (not itself `NETFL_CLIENTSIDEONLY`), `BeginPlay()` returns early, skipping the
+  drop-item roll and the eventual `PostBeginPlay()` spawn entirely; the server tells the client
+  about the spawn separately (see the next bullet).
+- When running as the server, `BeginPlay()` marks the actor `NETFL_SERVERSIDEONLY` and frees its
+  network ID.
 - `PostBeginPlay()` calls `SERVERCOMMANDS_SpawnThing()` to replicate the spawned actor to clients,
   plus angle/velocity sync if needed.
 

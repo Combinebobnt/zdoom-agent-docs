@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
 **Provenance:** ZDoom Wiki `A_DeQueueCorpse` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_DeQueueCorpse&oldid=32299) + verified against the Zandronum source's `src/g_shared/a_action.cpp:455`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_DeQueueCorpse)` in `src/g_shared/a_action.cpp` — callable from any actor's state table.
@@ -30,12 +30,26 @@ When called, this action searches the active corpse queue for an entry pointing 
 Place this action in a monster's `Raise` state or any other state where resurrection is about to occur, before the actor transitions back to its normal `Spawn` or `See` state:
 
 ```text
-Raise:
-    MONS A 0 A_DeQueueCorpse;
-    MONS ABCD 5 A_Raise;
-    MONS A 0 A_Look;
-    Goto Spawn;
+ACTOR QueuedZombieMan : ZombieMan
+{
+    States
+    {
+    Death:
+        POSS H 5
+        POSS I 5 A_Scream
+        POSS J 5 A_NoBlocking
+        POSS K 5 A_QueueCorpse
+        POSS L -1
+        Stop
+    Raise:
+        POSS K 5 A_DeQueueCorpse
+        POSS JIH 5
+        Goto See
+    }
+}
 ```
+
+On Zandronum, a trailing `;` on a state line is a parse error: it is read as the next sprite name and fails the 4-character check. Parameterless actions such as this one are called bare there, since `()` gives "You cannot pass parameters".
 
 ## Engine-family divergence: queue data structure and dequeue mechanism
 

@@ -2,12 +2,14 @@
 
 **Tier:** B
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-17)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** Source-derived (no wiki page consulted) — verified against the Zandronum source's
 `src/thingdef/thingdef_properties.cpp:1221-1224` (property parsing, stores into
 `AActor::MaxDropOffHeight`), `src/p_enemy.cpp` (`P_Move`'s `dropoff` parameter), `src/p_map.cpp`
 (`P_TryMove`'s dropoff-height check block), and `src/p_mobj.cpp` (`P_XYMovement`'s calls into
-`P_TryMove`).
+`P_TryMove`). The `MF2_BLASTED`/`missileCheck` exemption is `src/p_map.cpp:2062-2063`;
+`MF2_BLASTED` is set by `P_RadiusAttack` (`src/p_map.cpp:5858`) and `A_BlastRadius`
+(`src/g_hexen/a_blastradius.cpp:72`) and cleared at rest in `src/p_mobj.cpp:4393-4395`.
 **Bucket:** `DEFINE_PROPERTY(maxdropoffheight, F, Actor)` in `src/thingdef/thingdef_properties.cpp`;
 stores directly into `AActor::MaxDropOffHeight` (`src/actor.h`).
 
@@ -35,8 +37,10 @@ path that constrains a typical monster: its local `dropoff` variable starts at `
 raised to `2` for the unrelated `MF6_JUMPDOWN` "dogs jump off ledges to chase" special case. But the
 `MF5_NODROPOFF` half of the `||` is an unconditional override — an actor carrying that flag is
 checked against `MaxDropOffHeight` **regardless of the `dropoff` argument**, including when the
-caller is momentum-driven movement (see below). A second branch of the same `if` block, gated on
-`MF5_AVOIDINGDROPOFF`, is used by `P_NewChaseDir`'s "move away from a dropoff" logic (temporarily
+caller is momentum-driven movement (see below). Inside the block, the ordinary comparison has
+its own exemption on both engines: it is skipped for an actor currently flagged `MF2_BLASTED`, and
+for `P_CheckMissileSpawn`'s spawn-time check (`P_TryMove`'s `missileCheck` argument). A second
+branch of the same `if` block, gated on `MF5_AVOIDINGDROPOFF`, is used by `P_NewChaseDir`'s "move away from a dropoff" logic (temporarily
 set while a monster already standing at a dropoff's edge is fleeing it) and applies a slightly
 different pair of comparisons; it is not itself an exception to the gating above.
 
@@ -60,6 +64,11 @@ A monster pushed off a tall ledge by any of the above will fall off it regardles
 `MaxDropOffHeight`'s configured value — **unless it carries `MF5_NODROPOFF`** ("cannot drop off
 under any circumstances"), in which case the `||` in the gating condition makes the check apply
 anyway, blocking the momentum-driven move outright rather than merely letting the actor fall.
+The exception is a non-player actor pushed by a no-damage radius push or a blast. `P_RadiusAttack`
+sets `MF2_BLASTED` on it when called with `RADF_NODAMAGE` (which `A_RadiusThrust` always passes)
+and without `RADF_NOIMPACTDAMAGE`, and `A_BlastRadius` sets it too unless told not to damage. That
+flag exempts the actor from the comparison until its horizontal velocity drops to zero, so it
+falls off the ledge even with `MF5_NODROPOFF`.
 `MaxDropOffHeight` is not a blanket "keep monsters away from ledges" guarantee for ordinary actors;
 it only reliably stops them from choosing to step off one on their own, unless the actor opts in to
 the stricter behavior via `MF5_NODROPOFF`.

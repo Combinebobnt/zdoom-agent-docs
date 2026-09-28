@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
-**Provenance:** ZDoom Wiki `A_CheckCeiling` (retrieved 2026-07-29, https://zdoom.org/w/index.php?title=A_CheckCeiling&oldid=42394) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3722-3733`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_CheckCeiling` (retrieved 2026-07-29, https://zdoom.org/w/index.php?title=A_CheckCeiling&oldid=42394) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3722-3733`, `:695-753` (`DoJump`), `src/thingdef/thingdef_states.cpp:377-397` (jump offsets) and `src/thingdef/thingdef_expression.cpp:2740-2757` (label lookup).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Action function on `AActor` (`DEFINE_ACTION_FUNCTION_PARAMS` in `src/thingdef/thingdef_codeptr.cpp`).
 
@@ -19,19 +19,21 @@ state A_CheckCeiling (int offset)
 ## Parameters
 
 **`target`** (state label or frame offset)  
-The jump destination. If a state label (e.g., `"Death"`, `"CancelMovement"`), the name is resolved in the calling actor's derived class's state table (virtual resolution). If an integer, the offset counts **frames in the current state line**, not instruction lines.
+The jump destination. An unqualified state label (e.g., `"Death"`, `"CancelMovement"`) is resolved at run time against the class of the actor that owns the calling state (for a weapon state, the weapon), so a subclass's override of that label wins. A `Super::` or `Class::` qualified label is resolved at load time instead. On Zandronum, an unqualified label that doesn't exist prints `Jump target '<label>' not found in <class>` every time the action runs (the label is evaluated before the height test), and no jump happens.
+
+An integer must be a non-negative literal. Offset N targets the state N after the calling one, counting every frame letter of the following lines. `0` means no jump. A negative offset is a parse error ("Negative jump offsets are not allowed"), and so is a positive offset on a line that defines more than one frame.
 
 ## Behavior
 
 - Checks whether the calling actor's **top** (calculated as `z + height`) is at or above the ceiling (`ceilingz`).
 - If the actor is **not touching the ceiling**, returns without jumping. Execution continues to the next action or frame in the current state.
 - If the actor **is touching or above the ceiling**, performs the jump to the target state.
-- The jump does not set any result value for inventory-pickup state chains (`ACTION_SET_RESULT(false)` is always called, per the source).
-- Unlike `A_CheckFloor` (which checks only `z <= floorz`), this function must account for the actor's height because actors can be submerged into the ceiling from above.
+- On Zandronum, the call always sets the result of a CustomInventory state chain to false (`ACTION_SET_RESULT(false)`), whether or not it jumps.
+- Unlike `A_CheckFloor` (which checks only `z <= floorz`), this function must add the actor's height, because `z` is the actor's bottom and it is the top that meets the ceiling.
 
 ## Network considerations
 
-Unlike jump functions like `A_Jump` or `A_JumpIf*`, this action function's behavior depends only on static actor properties (`z`, `height`, `ceilingz`) that are replicated across the network, so ceiling state is consistent between server and clients. The source includes a comment `// [BB] Clients have ceiling information`, confirming that clients have the data needed to perform the check independently without waiting for server synchronization.
+On Zandronum, the jump passes no client-update flags, so the server never sends clients a frame update for it. Each client runs the check itself against its own copy of the actor's `z`, `height` and `ceilingz` (the source comment is `[BB] Clients have ceiling information.`). If a client's position for the actor differs from the server's, the two can take different branches. `A_Jump`, `A_JumpIfHealthLower` and `A_JumpIfCloser`, by contrast, do send a frame update when the server jumps from the actor's own state.
 
 ## Examples
 

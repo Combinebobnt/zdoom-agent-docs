@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-18)
-**Provenance:** Zandronum Wiki `AddBot` (retrieved 2026-08-18, https://wiki.zandronum.com/w/index.php?title=AddBot&oldid=2240) + source-verified against the Zandronum source's `src/p_acs.cpp:8540-8581`, `src/g_level.h:57`, `src/g_mapinfo.cpp:327`, `lib/zcommon.bcs:168`.
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
+**Provenance:** Zandronum Wiki `AddBot` (retrieved 2026-08-18, https://wiki.zandronum.com/w/index.php?title=AddBot&oldid=2240) + source-verified against the Zandronum source's `src/p_acs.cpp:8540-8581`, `src/g_level.h:223`, `src/g_mapinfo.cpp:1379`, `lib/zcommon.bcs:168`.
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function (index -168; dispatched as `ACSF_AddBot`).
 

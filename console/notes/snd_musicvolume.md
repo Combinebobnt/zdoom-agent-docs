@@ -2,12 +2,12 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-16); Zandronum 3.2.1 @28f736fb3 (2026-08-02)
-**Provenance:** Zandronum source `src/sound/i_music.cpp:118–142`, verified 2026-08-02.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-16); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** Zandronum source `src/sound/i_music.cpp:118–142`, verified 2026-08-02; mute-record and restart path `src/s_sound.cpp:2731–2739`, `src/s_sound.cpp:2779–2791`.
 
 Volume multiplier for music playback.
 
-The cvar accepts values in the range 0.0–1.0; any value outside this range is automatically clamped. Changing this cvar triggers a callback that updates the music volume immediately if music is currently playing, and restarts music if the volume was previously 0 (muted).
+The cvar accepts values in the range 0.0–1.0; any value outside this range is automatically clamped. Changing this cvar triggers a callback that pushes the new volume to the sound renderer immediately and notifies the current song if one is playing. If no song is playing, the callback restarts the last recorded song. That is how unmuting works: a music change made while the volume is 0 only records the song without starting it, so raising the volume off 0 starts it then. Lowering the volume to 0 while a song plays does not stop that song, so raising it again only changes the volume.
 
 **Units:** linear multiplier from 0 (silent) to 1 (100% volume), corresponding to `relative_volume * self`.
 

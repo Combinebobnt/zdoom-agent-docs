@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
-**Provenance:** ZDoom Wiki `A_ChangeFlag` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_ChangeFlag&oldid=48413) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4609-4744`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_ChangeFlag` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_ChangeFlag&oldid=48413) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4609-4744` and `src/network.cpp:1599-1611` (`NETWORK_IsActorClientHandled`, `NETWORK_InClientModeAndActorNotClientHandled`), plus git history commit `949fe2141` for the CLIENTSIDEONLY exception's post-3.2.1 introduction.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:4609` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_ChangeFlag)`).
 
@@ -51,7 +51,8 @@ Some flags are marked as deprecated in the engine's flag table. If `flagname` re
 
 **This is server-authoritative in multiplayer.** On network clients:
 
-- **For client-side-only actors** (where `NETWORK_InClientModeAndActorNotClientHandled(self)` is true), the function returns immediately without modifying the flag.
+- **For actors the server itself manages** (not client-side-only, and with a valid network ID: the case where `NETWORK_InClientModeAndActorNotClientHandled(self)` returns true), the function returns immediately without modifying the flag. The client waits for the server's broadcast instead.
+- **Client-side-only actors** (flagged `NETFL_CLIENTSIDEONLY`) and actors with no network ID (`NetID == 0`) are not gated by this check. Even on a network client, the flag change proceeds locally, since the server never owns their state. This exception was added in commit `949fe2141` ("Fixed: A_ChangeFlag didn't work on CLIENTSIDEONLY actors in online games"), which postdates the 3.2.1 version-bump commit `28f736fb3`. On a real Zandronum 3.2.1 client, the guard was the unconditional `NETWORK_InClientMode()`: every network client skipped the flag change, including for client-side-only actors, so those actors' flags never changed except on the server or in single-player.
 - On servers and single-player, the flag change proceeds normally.
 - After the flag changes on the server, if the change actually occurred (the old value differed from the new), the server broadcasts it to all clients via `SERVERCOMMANDS_SetThingFlags`, specifying which flag-word was modified (`FLAGSET_FLAGS`, `FLAGSET_FLAGS2`, etc.).
 

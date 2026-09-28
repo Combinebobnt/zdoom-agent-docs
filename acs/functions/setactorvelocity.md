@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** wiki page `SetActorVelocity - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
 `https://zdoom.org/w/index.php?title=SetActorVelocity&oldid=33146`) + source-verified against `p_acs.cpp:6104-6118`, `p_things.cpp:602-622`,
 `sv_main.cpp:5563-5586`, `p_user.cpp:2805-2861`. The wiki's `tid`/`velx`/`vely`/`velz`/`add`

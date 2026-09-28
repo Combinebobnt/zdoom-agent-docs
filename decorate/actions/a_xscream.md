@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_XScream` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_XScream&oldid=49049) + verified against the Zandronum source's `src/p_enemy.cpp:3346-3362`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** ZDoom Wiki `A_XScream` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_XScream&oldid=49049) + verified against the Zandronum source's `src/p_enemy.cpp:3346-3362`, `src/g_game.cpp:2705-2720` (`G_TransferPlayerFromCorpse`) and `src/g_game.cpp:2732-2758` (`G_DoReborn` queues the corpse unless single-player without respawn).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_XScream)` in `src/p_enemy.cpp` — defined on `AActor`, callable from any actor's state table.
 
@@ -15,7 +15,7 @@ Unlike `A_Scream`, which plays the actor's `DeathSound` property, `A_XScream` al
 
 When called:
 
-1. **Player pointer handling**: In multiplayer, if the actor is a dead corpse and its player has respawned, `A_XScream` temporarily restores the player pointer from the body queue (via `G_TransferPlayerFromCorpse`) so the gibbed sound plays with the correct player's skin sound, then restores it back to null. In single-player or if the player is not found in the queue, this is a no-op.
+1. **Player pointer handling**: If the actor has no player pointer but is in the body queue (a player corpse left behind when its player respawned or became a dead spectator), and that player is still in the game, `A_XScream` temporarily sets the player pointer back to that player (via `G_TransferPlayerFromCorpse`) so the gibbed sound uses that player's skin sound, then resets it to null. Corpses are queued in multiplayer and on single-player maps that allow respawning. In any other case this step does nothing.
 
 2. **Sound selection**: If `self->player` is non-null, plays `*gibbed` (the player's sound-class alias, resolving per the player's skin). Otherwise plays `misc/gibbed` (a default non-player gibbed sound).
 

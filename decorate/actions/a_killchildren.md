@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_KillChildren` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_KillChildren&oldid=46804) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3561-3576`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_KillChildren` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_KillChildren&oldid=46804) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3561-3576`; `SXF_SETMASTER` monster-only rule from `thingdef_codeptr.cpp:2415-2454` (`InitSpawnedItem`); damage-modifier, pain and server-only `Die` behavior from `src/p_interaction.cpp:1295-1341,1746-1748,1770-1789` and `src/p_mobj.cpp:7737-7773` (`TakeSpecialDamage`); action set from `wadsrc/static/actors/actor.txt:206,239-243`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_KillChildren)` in `src/thingdef/thingdef_codeptr.cpp`.
 
@@ -19,7 +19,7 @@ void A_KillChildren([str damagetype])
 
 ### `damagetype` (str, optional)
 
-The damage type to apply when killing the children. This determines which death state the victims enter (if they have specialized death states for this damage type), or falls back to the pain state if they have the `NODAMAGE` flag.
+The damage type to apply when killing the children. This determines which death state the victims enter (if they have specialized death states for this damage type). A child with the `NODAMAGE` flag survives instead, and the damage type then only selects which pain state it may enter (see "Damage and state handling").
 
 Default: `NAME_None` (generic damage type).
 
@@ -32,21 +32,34 @@ When called, this action:
 3. **Damages each child to death** by calling `P_DamageMobj(mo, self, self, mo->health, damagetype, DMG_NO_ARMOR | DMG_NO_FACTOR)`.
    - Damage amount equals the victim's current health, typically killing it instantly.
    - `DMG_NO_ARMOR` prevents damage reduction from armor properties.
-   - `DMG_NO_FACTOR` prevents damage scaling/modifiers.
+   - `DMG_NO_FACTOR` skips only the child's `DamageFactor` and per-damage-type damage factors. Inventory damage modifiers still apply (a `PowerDamage` on the caller, a `PowerProtection` on the child), as do the caller's and child's special-damage hooks, so a protected child can survive the call.
 4. **Continues iterating** through all remaining actors; multiple victims can be killed in one call.
 
 ## Master relationship and scope
 
-A child's master relationship is typically established via `A_SpawnItemEx(..., SXF_SETMASTER)` — this action sets the `master` pointer of the spawned actor to point back to the spawner. The `A_KillChildren` action then uses that relationship to identify and destroy victims.
+A child's master relationship is typically established via `A_SpawnItemEx(..., SXF_SETMASTER)`. The `A_KillChildren` action then uses that relationship to identify and destroy victims. The engines differ on when that flag takes effect:
 
-**Important limitation:** Actors spawned with `A_SpawnProjectile` are **not affected** by `A_KillChildren`. The `A_SpawnProjectile` action does not set the `master` pointer and was never designed to spawn creatures targeted by this action. Only use `A_SpawnItemEx` with the `SXF_SETMASTER` flag if you intend to later destroy spawned actors via `A_KillChildren`.
+- **UZDoom:** `SXF_SETMASTER` always sets the spawned actor's `master` to the spawner (or, for a missile spawner, the actor at the end of its `target` chain).
+- **Zandronum:** `SXF_SETMASTER` only sets `master` when the spawned actor is a monster (`ISMONSTER`) and the spawner (resolved the same way) is also a monster. A player, a decoration, or any other non-monster spawner gets no master link, and neither does a non-monster child such as a missile or effect, so `A_KillChildren` from that spawner finds nothing. `SXF_TRANSFERPOINTERS` copies the caller's own `master`, not the caller.
+
+**Important limitation:** Projectiles fired with the dedicated missile-spawning action (`A_SpawnProjectile` on UZDoom; Zandronum has no `A_SpawnProjectile`, its equivalent is `A_CustomMissile`) are **not affected** by `A_KillChildren`, since that action does not set the `master` pointer. Use `A_SpawnItemEx` with the `SXF_SETMASTER` flag if you intend to later destroy spawned actors via `A_KillChildren`, subject to Zandronum's monster-only restriction above.
+
+**Cleanup gap: a master that is removed rather than killed never calls this.** Calling
+`A_KillChildren` from the master's `Death` state only covers a real death. ACS
+[`Thing_Remove`](../../acs/functions/thing_remove.md), `A_Remove` (UZDoom only), `A_RemoveMaster`/`A_RemoveChildren`/`A_RemoveSiblings`, and anything else that destroys
+the master without a death state leave its children alive with a null `master`. A looping child
+that must not outlive its master can guard itself, e.g. `A_CheckFlag("SHOOTABLE", "<loop>",
+AAPTR_MASTER)` followed by `A_Die` (`A_CheckFlag` doesn't jump on a null pointer). On Zandronum,
+keep the fall-through as the server-only `A_Die`, not a jump: clients never learn `master`, so a
+client-evaluated "master missing" jump would fire on every client from spawn.
 
 ## Damage and state handling
 
 - The victims enter death states **determined by the `damagetype` parameter** — if provided, the engine looks for a death state specific to that damage type (e.g., `Death.Voodoo`).
-- If no such state exists, the engine falls back to the generic `Death` state.
-- Victims with the `NODAMAGE` flag enter their pain state instead of dying, but `A_KillChildren` still applies the damage and respects the damage type for pain-state selection.
-- Victims with the `INVULNERABLE` flag are **unaffected** by this action — they cannot be killed this way.
+- If no such state exists, the engine falls back to the generic `Death` state, but only when the child has one. A child that has only specialized death states, none matching `damagetype`, takes no damage at all and survives.
+- A `DeathType` set on the calling actor overrides `damagetype` for death-state selection, and a `PainType` on the caller overrides it for pain-state selection.
+- Victims with the `NODAMAGE` flag take no damage and survive. They may enter their pain state (selected by the damage type), but only if the usual pain roll against their `PainChance` for that damage type succeeds, or the caller has `+FORCEPAIN`.
+- Victims with the `INVULNERABLE` flag are **unaffected** by this action — they cannot be killed this way. This is not absolute for a non-player target: `P_DamageMobj` only rejects the damage when the inflictor lacks `+FOILINVUL`, and the inflictor here is the calling actor, so a caller with `+FOILINVUL` bypasses the target's invulnerability (`p_interaction.cpp:1212-1220`).
 
 ## Difference from ZDoom Wiki version
 
@@ -66,7 +79,7 @@ The base damage call is otherwise unchanged from Zandronum's: each child is dama
 
 ## Zandronum-specific: network behavior
 
-**Zandronum multiplayer:** This action is handled by the server. The iteration and damage calls are resolved server-side; affected clients receive state updates (death/pain transitions) from the server.
+**Zandronum multiplayer:** Unlike `A_KillSiblings`, this action has no server-only guard of its own, so a client running the calling state executes the loop too. In practice the result is still server-authoritative: the `master` pointer is never replicated to clients, so on a client the loop normally matches nothing, and `P_DamageMobj` only calls `Die` on the server. Affected clients receive the resulting death and pain transitions from the server.
 
 **UZDoom has no equivalent split.** UZDoom/GZDoom-family engines have no server-authoritative/client-prediction distinction for action-function execution at all — `A_KillChildren`'s implementation (and the `DoKill` helper it shares with its siblings) contains no `NETWORK_InClientMode`-style check or `SERVERCOMMANDS_*`-style replication call anywhere in the call chain. It simply runs the full iterate-and-damage loop wherever it's invoked.
 

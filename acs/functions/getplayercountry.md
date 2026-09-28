@@ -2,14 +2,14 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
-**Provenance:** wiki page `GetPlayerCountry - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetPlayerCountry&oldid=2247`) + source-verified (`p_acs.cpp:8853-8879`, `p_interaction.cpp:3006-3014`, `network.cpp:1137-1183`, `network.h:261`, `bots.cpp:1770`, `g_level.cpp:604`, `cl_main.cpp:3832,4392`, `sv_main.cpp:1774`). The wiki's core behavior (three format constants, `"N/A"` for unknown/hidden, `"LAN"` for bots/local network) holds; the exact mechanics below (player-validity gate, what actually sets `ulCountryIndex`, and the client-vs-server split) are this doc's source-verified additions.
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
+**Provenance:** wiki page `GetPlayerCountry - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetPlayerCountry&oldid=2247`) + source-verified (`p_acs.cpp:8853-8881`, `p_interaction.cpp:3006-3014`, `network.cpp:1140-1170`, `network.h:261`, `bots.cpp:1770`, `g_level.cpp:604`, `cl_main.cpp:3832,4392`, `sv_main.cpp:1774`). The wiki's core behavior (three format constants, `"N/A"` for unknown/hidden, `"LAN"` for bots/local network) holds; the exact mechanics below (player-validity gate, what actually sets `ulCountryIndex`, and the client-vs-server split) are this doc's source-verified additions.
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
 
 Returns the country a player's client is connecting from, in one of three string formats.
 Extension function (`ACSF_GetPlayerCountry`, index `-177` in `zcommon.bcs`), implementation in
-the Zandronum source's `src/p_acs.cpp:8853-8879`.
+the Zandronum source's `src/p_acs.cpp:8853-8881`.
 
 - `player` — a player index. Validated with `PLAYER_IsValidPlayer` (`p_interaction.cpp:3006-3014`:
   rejects `player >= MAXPLAYERS` or a slot with `playeringame[player] == false`). **Any invalid
@@ -28,18 +28,23 @@ the Zandronum source's `src/p_acs.cpp:8853-8879`.
     not a distinct error path, just the same catch-all.
 - **`"LAN"` is returned via a real sentinel value, not a special-cased string compare on the
   caller's data:** `ulCountryIndex` is set to `COUNTRYINDEX_LAN` (`network.h:261`, `= UCHAR_MAX`)
-  for bots (`bots.cpp:1770`), the local/console player in singleplayer or a listen-server host
-  (`g_level.cpp:604`, `cl_main.cpp:3832`), and any server-side connection whose IP is in a private
-  range — `172.16.0.0`-`172.31.255.255`, `10.0.0.0/8`, `192.168.0.0/16`, or `127.0.0.0/8`
-  (`network.cpp:1137-1153`, `NETWORK_GetCountryIndexFromAddress`). The shared string-lookup helper
-  (`network_GetCountryStringFromIndex`, `network.cpp:1161-1169`) special-cases exactly this sentinel
-  to return the literal string `"LAN"` before ever consulting GeoIP, for all three `type` values.
+  for bots, in two places (`bots.cpp:1770`, when the bot is linked to its player slot, and
+  `cl_main.cpp:3832`, when it spawns client-side), for the local/console player in an offline game
+  (`g_level.cpp:604`: singleplayer, or a single-player game emulating multiplayer such as a bot
+  match), and for any server-side connection whose IP is in a private range
+  (`172.16.0.0`-`172.31.255.255`, `10.0.0.0/8`, `192.168.0.0/16`, or `127.0.0.0/8`;
+  `network.cpp:1140-1158`, `NETWORK_GetCountryIndexFromAddress`). A listen-server host's own
+  connection gets `COUNTRYINDEX_LAN` this same way, via its loopback or private address matching
+  that check; there is no separate listen-server-specific code path. The shared string-lookup
+  helper (`network_GetCountryStringFromIndex`, `network.cpp:1162-1170`) special-cases exactly this
+  sentinel to return the literal string `"LAN"` before ever consulting GeoIP, for all three `type`
+  values.
 - **`"N/A"` covers three distinct cases**, all converging on the same string: (1) the player has
   `ulCountryIndex == 0` (never resolved — e.g. GeoIP database isn't loaded server-side,
-  `NETWORK_IsGeoIPAvailable()` false, `network.cpp:1149-1150`, or the client hasn't sent/been
+  `NETWORK_IsGeoIPAvailable()` false, `network.cpp:1154-1155`, or the client hasn't sent/been
   assigned a country yet), (2) the requesting side is the server and that player's
   `bWantHideCountry` is set (`cl_hidecountry`, checked at `p_acs.cpp:8866`), or (3) GeoIP resolves
-  the index but returns a null/empty string (`network.cpp:1166-1168`). The function itself only
+  the index but returns a null/empty string (`network.cpp:1167-1169`). The function itself only
   guards case (1)/(2) explicitly; case (3) is handled one layer down in
   `network_GetCountryStringFromIndex`.
 - **Country resolution only happens server-side, from the connecting IP** — `sv_main.cpp:1774`
@@ -48,7 +53,7 @@ the Zandronum source's `src/p_acs.cpp:8853-8879`.
   whatever `ulCountryIndex` the server replicated to it; it isn't independently resolved
   per-caller.
 - Return value is added to the transient ACS string table via `GlobalACSStrings.AddString(...)`
-  like any other ACS-returned string (`p_acs.cpp:8872,8875,8878`) — no special lifetime caveat
+  like any other ACS-returned string (`p_acs.cpp:8872,8875,8880`) — no special lifetime caveat
   beyond the usual ACS string-table rules.
 
 **Example:**

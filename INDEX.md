@@ -1,6 +1,6 @@
 # zdoom-agent-docs — top-level map
 
-The full section map. Read `CLAUDE.md` first if you haven't — it routes by knowledge area and
+The full section map. Read `AGENTS.md` first if you haven't — it routes by knowledge area and
 gets you to the right section index in one hop, without loading this file. Read this file only
 when the router table doesn't resolve your question, or you want the overall coverage picture.
 
@@ -27,6 +27,16 @@ when the router table doesn't resolve your question, or you want the overall cov
 - **[gldefs/](gldefs/INDEX.md)** — GLDEFS keys (dynamic lights, glows, etc).
 - **[sbarinfo/](sbarinfo/INDEX.md)** — SBARINFO keys and commands.
 - **[cvarinfo/](cvarinfo/INDEX.md)** — CVARINFO declaration syntax and semantics.
+- **[menudef/](menudef/INDEX.md)** — MENUDEF block/menu-item grammar, shared by both engines
+  (item-keyword dispatch is closed on Zandronum, open on UZDoom), plus Zandronum's own
+  option-menu-item additions.
+- **[zandronum-lumps/](zandronum-lumps/INDEX.md)** — nine other Zandronum/Skulltag-native lump
+  formats (`ANCRINFO`, `AUTHINFO`, `CMPGNINF`, `GAMEMODE`, `MEDALDEF`, `SCORINFO`, `SECTINFO`,
+  `SKININFO`, `VOTEINFO`), each unrelated to the others beyond sharing that lineage.
+  **Zandronum-only** — none exists on UZDoom/GZDoom-family engines. Also `TEAMINFO`, the one
+  exception: UZDoom parses it too, though most of its keys only act on Zandronum. `BOTINFO` and the compiled
+  botscript format are a
+  related but separate lump pair covered by `bots/`, not here.
 
 ## Runtime & assets
 
@@ -35,6 +45,16 @@ when the router table doesn't resolve your question, or you want the overall cov
   the first-party prose reference `notes/` entries should draw from. A growing subset of cvars/
   ccmds have curated `notes/` prose — see the section's own `INDEX.md` for what's covered.
 - **[sprites/](sprites/INDEX.md)** — sprite naming/rotation conventions.
+- **[bots/](bots/INDEX.md)** — the `BOTINFO` declaration lump and the compiled botscript bytecode
+  its `script =` key names. **Zandronum-only** — UZDoom/GZDoom-family engines parse neither. Two
+  tier-B concept pages cover both lumps; the 114-entry bot command table is not yet inventoried.
+
+## Networking
+
+- **[netcode/](netcode/INDEX.md)** — the out-of-band UDP protocols a Zandronum server speaks to
+  external tools: launcher queries, master-server registration and ban-list push, and RCON.
+  **Zandronum-only** — UZDoom/GZDoom-family engines have no dedicated server. The game protocol
+  and hosting how-tos are out of scope; outbound-traffic measurement lives in `console/`.
 
 ## Shared concepts
 
@@ -57,6 +77,12 @@ when the router table doesn't resolve your question, or you want the overall cov
     (not even the dead `PCD_WRITETOINI`/`GETFROMINI` opcodes work) — closest analogue is
     CVARINFO-declared archived cvars, meaningfully weaker on every axis (no dynamic keys, no
     ranked queries, ZScript-only).
+  - [Damage retaliation: what writes a monster's `target` during
+    gameplay](shared/concepts/monster-target-retaliation.md) — tier B. Getting hit flips who a
+    monster is chasing, gated by a twelve-check `OkayToSwitchTarget` decision (Zandronum's gate
+    set; UZDoom's native default adds three more and is `native virtual`, fully overridable from
+    ZScript) — and `AActor::Die` unconditionally overwrites `target` with the killer regardless of
+    that gate.
 
 ## Not yet covered
 
@@ -68,7 +94,6 @@ for what earns an entry.
 
 | Format | Backing source (once someone documents it) |
 |---|---|
-| MENUDEF | `UDB/Build/Scripting/ZDoom_MENUDEF.cfg` |
 | KEYCONF | `UDB/Build/Scripting/ZDoom_KEYCONF.cfg` |
 | GAMEINFO | `UDB/Build/Scripting/ZDoom_GAMEINFO.cfg` |
 | TEXTURES | `UDB/Build/Scripting/ZDoom_TEXTURES.cfg` |

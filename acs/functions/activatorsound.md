@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** `ActivatorSound - ZDoom Wiki` (https://zdoom.org/w/index.php?title=ActivatorSound&oldid=37264), verified 2026-07-29 against fork source.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
@@ -32,7 +32,7 @@ the zt-bcc source's `src/builtin.c:57,205`), implementation in `p_acs.cpp:11395-
   `true` for the fork-added `bSoundOnClient` parameter (`s_sound.h:228-229`, `// [EP] Added
   bSoundOnClient`). When the engine is running as a network server, this makes it additionally
   replicate the sound to clients — `SERVERCOMMANDS_SoundActor` for the activator-present case,
-  `SERVERCOMMANDS_Sound` for the activator-absent case (`s_sound.cpp:1273-1276`, `1289-1292`).
+  `SERVERCOMMANDS_Sound` for the activator-absent case (`s_sound.cpp:1273-1276`, `1290-1293`).
   Vanilla ZDoom's `S_Sound` has no such parameter or replication step, so this is purely a
   Zandronum-fork concern, not something the wiki page could describe.
 - The wiki's own top-of-page note — "superseded by `PlaySound`, which duplicates and extends its

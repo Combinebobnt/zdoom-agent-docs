@@ -4,7 +4,7 @@
 **Applies to:** UZDoom=yes, Zandronum=yes — file-level claim for eight of nine; `SpawnParticle`
 is the outlier, implemented on UZDoom and absent on Zandronum (source-read, not
 `tools/engine_matrix.py`-derived — see its own section below)
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-17)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** wiki pages `Spawn - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=Spawn&oldid=52107`), `SpawnForced - ZDoom Wiki.html`
 (`https://zdoom.org/w/index.php?title=SpawnForced&oldid=40373`), `SpawnSpot - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=SpawnSpot&oldid=38909`), `SpawnSpotForced - ZDoom Wiki.html`
 (`https://zdoom.org/w/index.php?title=SpawnSpotForced&oldid=43870`), `SpawnSpotFacing - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=SpawnSpotFacing&oldid=37428`), `SpawnSpotFacingForced -
@@ -287,6 +287,26 @@ optional). Dispatch is in `p_acs.cpp` (`PCD_SPAWNPROJECTILE`, `p_acs.h:847`), wh
   default. No named enum/flags exist for this parameter in `zcommon.bcs`.
 - `newtid` — assigned identically to **every** actor spawned in one call (when `tid` matched
   multiple sources) — not made unique per spawn.
+- **⚠ On Zandronum, `newtid` is assigned server-side only and is never broadcast to clients** —
+  unlike the `DoSpawn`-based six, which do send `SERVERCOMMANDS_SetThingTID` (see "Shared
+  behavior" above). `P_Thing_Projectile` sets `mobj->tid` and hashes it locally
+  (`p_things.cpp:306-307`), then its `NETSTATE_SERVER` block (`p_things.cpp:433-459`) sends only
+  `SERVERCOMMANDS_SpawnMissile`, whose payload has no TID field at all
+  (`protocolspec/spec.weapons.txt:1-11`). The actor itself *is* replicated and does get a NetID —
+  only the TID is lost. Since TID lookups themselves work normally in a `CLIENTSIDE` script
+  (`ThingCount`, `SetActivator`, `GetActorX/Y/Z` all query one global `TIDHash` with no client-mode
+  bailout: `p_acs.cpp:4445-4456,5952-5961,10516-10519,11998-12013`), the failure is silent and
+  one-sided: the same `ThingCount(T_NONE, newtid)` that returns 1 offline returns 0 on every
+  connected client, so a mod whose client-side drawing/HUD logic finds a server-spawned actor by
+  TID works in single-player and dies in client/server with no error anywhere. The fix is to
+  re-assign the same TID immediately afterwards — `Thing_ChangeTID(newtid, newtid)` routes through
+  `LS_Thing_ChangeTID`'s `arg0 != 0` branch, which broadcasts `SERVERCOMMANDS_SetThingTID` per
+  match (`p_lnspec.cpp:1099-1118`); that iterator is safe against same-value re-assignment, since
+  it captures `next` before mutating and re-insertion goes to the hash chain's head. Note
+  `SERVERCOMMANDS_SetThingTID` itself silently no-ops for an actor with no NetID
+  (`EnsureActorHasNetID`, `sv_commands.cpp:2044-2053`; `sv_showwarnings 1` surfaces it). The same
+  gap applies to the `Thing_ProjectileAimed`/`Thing_ProjectileIntercept` line specials, which share
+  `P_Thing_Projectile`.
 - **Always void, always silent on failure** — no console message for unknown class, unresolved
   `tid`/null activator, `DF_NO_MONSTERS`-blocked monster class, or a blocked spawn location
   (`P_CheckMissileSpawn` explodes it in place, or `P_TestMobjLocation` destroys it). There is no
@@ -314,6 +334,10 @@ divergence" above for the full asymmetry).
 
 **Provenance:** wiki page `SpawnProjectile - ZDoom Wiki.html` (`_intake/`, `https://zdoom.org/w/index.php?title=SpawnProjectile&oldid=49273`) +
 source-verified against `zt-bcc/src/builtin.c:134`, `p_acs.h:847`, `p_things.cpp:239-467,281-464`.
+The `newtid`-not-replicated finding is this tree's own, added 2026-08-21 from a live mod bug that
+only reproduced on a dedicated server; source-verified against `p_things.cpp:306-307,433-459`,
+`p_lnspec.cpp:1099-1118`, `sv_commands.cpp:2044-2053`, and the client-side TID-lookup call sites
+listed in that bullet. Not on either wiki, which has no concept of the client/server split here.
 
 ---
 
@@ -385,8 +409,8 @@ comment block reading `// [BB] Out of order ZDoom backport.` and then to Zandron
 `SetSectorTerrain`, `SpawnParticle`, `SetMusicVolume`, `CheckProximity`, `CheckActorState` in
 ZDoom's numbering) have no enum member and no `case` in `DLevelScript::CallFunction`'s switch at
 all** (checked the full switch body, `p_acs.cpp:5899-9059`). A call with `funcIndex == 96` falls
-through to the switch's own `default: break;` (`p_acs.cpp:9058-9059`) and the function returns `0`
-unconditionally (`p_acs.cpp:9060`) — no particle, no console warning, no distinguishable failure
+through to the switch's own `default: break;` (`p_acs.cpp:9059-9060`) and the function returns `0`
+unconditionally (`p_acs.cpp:9063`) — no particle, no console warning, no distinguishable failure
 signal versus a "successful" call, since the function is `void` on the BCS side anyway. **This is
 the exact same reserved-range gap `acs/families/inventory.md` documents for `GetMaxInventory` at
 -93** — same enum jump, same dead range, same silent no-op shape.
@@ -422,7 +446,7 @@ does exactly what the wiki says, and the "nearest working alternative" workaroun
 Zandronum-only advice — a UZDoom-targeted script can call `SpawnParticle` directly.
 
 **Divergence found (real, not upstream-vs-fork noise):** the ZDoom wiki describes a fully working
-function; this Zandronum checkout (`master` HEAD, target 3.2.1) has never implemented ACSF 93-99
+function; this Zandronum checkout (`master` HEAD, 3.3-alpha) has never implemented ACSF 93-99
 at all, `SpawnParticle` included. Confirmed by reading the enum and the full switch body, not just
 grepping for the name (a plain `grep -rn SpawnParticle` over the Zandronum source's `src/` returns zero hits,
 which is itself the tell — every other implemented `ACSF_*` name appears at least in the enum
@@ -432,4 +456,4 @@ having backported this range, not the wiki describing a feature neither fork imp
 
 **Provenance:** wiki page `SpawnParticle - ZDoom Wiki.html` (`_intake/`, `https://zdoom.org/w/index.php?title=SpawnParticle&oldid=54779`) +
 source-verified against `zt-bcc/lib/zcommon.bcs:1726`, `p_acs.cpp:5360-5449` (enum),
-`p_acs.cpp:5899-9060` (full `CallFunction` switch and its terminal `default`/`return 0`).
+`p_acs.cpp:5899-9064` (full `CallFunction` switch and its terminal `default`/`return 0`).

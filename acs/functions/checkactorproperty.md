@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-30)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `CheckActorProperty - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-30, `https://zdoom.org/w/index.php?title=CheckActorProperty&oldid=36602`) + source-verified against `p_acs.cpp:5020-5086`/`6101`, `zcommon.bcs:266-314`. Verified that the 42-property switch is identical to `GetActorProperty`'s supported set; wiki's 8 additional properties checked individually and confirmed unimplemented (7 compile-but-dead in `zcommon.bcs`, 1 absent entirely). String-property NULL-handling risk cross-referenced against crash checklist.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
@@ -56,12 +56,12 @@ The core mechanics documented above are unchanged on UZDoom: plain-integer equal
 
 ## Examples
 
-**Check if an actor's health is above a threshold:**
+**Check if an actor's health is exactly a given value** (integer properties compare with `==`; for a threshold, read the value with `GetActorProperty` and compare it yourself):
 
 ```text
 if (CheckActorProperty(tid, APROP_HEALTH, 50))
 {
-    Log(s: "Actor has health >= 50");
+    Log(s: "Actor has exactly 50 health");
 }
 ```
 

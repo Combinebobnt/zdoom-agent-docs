@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** `UniqueTID - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=UniqueTID&oldid=40890`), verified against fork source 2026-07-29.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
@@ -27,17 +27,21 @@ index `-46` in the zt-bcc source's `lib/zcommon.bcs:1674`), implemented in
   - Linear mode: the maximum number of TIDs to check starting from `tid`. `0` means unlimited
     (search all the way to `INT_MAX`). The engine clamps the internal `limit + tid - 1` addition
     to `INT_MAX` if it would overflow, so a huge `limit` can't wrap around.
-  - Random mode: the maximum total number of TIDs probed across all the 5-at-a-time random
-    attempts (`0` again means unlimited, effectively `INT_MAX`).
+  - Random mode: roughly the total number of TIDs probed across all the 5-at-a-time random
+    attempts (`0` again means unlimited, effectively `INT_MAX`). The budget is spent in whole
+    rounds of 5, so it is effectively rounded up to a multiple of 5: `limit = 1` still probes 5
+    TIDs.
   - **Engine gotcha not in the wiki (confirmed identical on UZDoom and Zandronum):** the ACSF
     dispatch clamps a negative `limit` argument to `0` before calling into `P_FindUniqueTID`
     (`(argCount > 1 && args[1] >= 0) ? args[1] : 0`, `p_acs.cpp:6359`) — i.e. **a negative limit
     silently becomes "unlimited," not "zero attempts" or an error.** The wiki doesn't mention this
     because it's describing the generic/positive case only.
-- **Return value:** the free TID found (always `> 0` in practice, since `0` is treated as "not a
-  real TID" throughout — the loop explicitly requires `tid != 0`), or **`0` if the search
+- **Return value:** the free TID found, or **`0` if the search
   exhausted its `limit` without finding one.** `0` is therefore both "search still unlimited" (as
-  an input) and "search failed" (as an output) — don't confuse the two positions.
+  an input) and "search failed" (as an output) — don't confuse the two positions. A found TID is
+  never `0` (the loop skips it) and is always positive in random mode or with a positive `tid`.
+  With a negative `tid` the linear scan returns the first unused value from there, which is
+  usually that negative `tid` itself.
 
 ## Engine-family divergence: clientside TID namespace
 
@@ -47,8 +51,7 @@ called from `ACSF_UniqueTID` at `src/playsim/p_acs.cpp:5897-5898` — and reprod
 algorithmic detail described above unchanged: the non-zero/zero mode split, the
 `limit+start_tid-1` overflow clamp to `INT_MAX`, the 5-at-a-time random probe loop, the
 `0`-on-failure return, and the ACSF dispatch's negative-`limit`-clamps-to-`0` behavior
-(`(argCount > 1 && args[1] >= 0) ? args[1] : 0`, `p_acs.cpp:5898`, byte-identical to Zandronum's
-`p_acs.cpp:6359`). One thing differs:
+(`p_acs.cpp:5898`, the same argument handling as Zandronum's `p_acs.cpp:6359`). One thing differs:
 
 - **A `clientside` parameter selects a wholly separate TID namespace to search — a concept
   Zandronum's `P_FindUniqueTID(int start_tid, int limit)` doesn't have at all.** Zandronum's
@@ -56,8 +59,8 @@ algorithmic detail described above unchanged: the non-zero/zero mode split, the
   signature gained a third `bool clientside` argument, threaded through from the calling script
   (`bClientSide` on the ACS thread, true for a script running under the `CLIENTSIDE` script type)
   into `Level->FindUniqueTID(...)` at the ACSF call site and on into `IsTIDUsed(tid, clientside)`
-  (`p_mobj.cpp:3610-3621`), which looks up `ClientSideTIDHash[tid & 127]` instead of the normal
-  `TIDHash[tid & 127]` when `clientside` is true. Practical effect: on UZDoom, a `CLIENTSIDE`
+  (`p_mobj.cpp:3610-3621`), which searches the `ClientSideTIDHash` buckets instead of the normal
+  `TIDHash` buckets when `clientside` is true. Practical effect: on UZDoom, a `CLIENTSIDE`
   script's `UniqueTid()` call only avoids collisions with other *clientside* actors' TIDs — it can
   return a TID that's already in use by a server-side actor (and vice versa for a normal script),
   because the two are disjoint namespaces. On Zandronum there is only one namespace, so a
@@ -65,7 +68,7 @@ algorithmic detail described above unchanged: the non-zero/zero mode split, the
   against the same pool.
 - **The `pr_uniquetid` PRNG stream itself is not split by clientside-ness**, unlike `Random()`'s
   `pr_acs`/`pr_csacs` split (see `random.md`'s own divergence section). Both engines keep a single
-  `static FRandom pr_uniquetid("UniqueTID")` (`p_mobj.cpp:112` on UZDoom, `p_mobj.cpp:137` on
+  file-static `FRandom` named `pr_uniquetid` (`p_mobj.cpp:112` on UZDoom, `p_mobj.cpp:137` on
   Zandronum) that every call reads from regardless of which TID namespace it ultimately checks
   collisions against — only the namespace being searched is clientside-aware, not the
   random-starting-point generator.

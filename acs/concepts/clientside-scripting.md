@@ -3,7 +3,7 @@
 **Tier:** B (wiki + partial source spot-check, not exhaustive — see Tiers in
 `../../shared/AUTHORING.md` for why this doesn't qualify as A).
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `Client-side scripting - Zandronum Wiki.html` (`_intake/`, retrieved
 2026-07-28, `https://wiki.zandronum.com/w/index.php?title=Client-side_scripting&oldid=1545`) + spot-verified against engine source for the `CLIENTSIDE`/`NET` script
 flags (`p_acs.h:358-359`) and the existence of `RequestScriptPuke`/`NamedRequestScriptPuke`
@@ -23,9 +23,15 @@ verification (`p_acs.cpp:1818-1886`) — fully source-verified, not a wiki resta
 LIFO-batch execution-order section and the server→client reliability verification (both added
 2026-08-09, found while diagnosing a persistent latency-dependent client-visual item-sync desync
 in a real multiplayer mod) are fully source-verified
-(`p_acs.cpp:3602-3611,3831-3849`, `cl_main.cpp:1144-1166,1333-1402,7163-7193`,
+(`p_acs.cpp:3602-3611,3831-3849,13133-13138`, `cl_main.cpp:1144-1166,1333-1402,7163-7193`,
 `sv_commands.cpp:3567-3605`, `sv_main.cpp:1006-1031,6169-6217`,
-`network/netcommand.cpp:109-118`, `network/servercommands.cpp:11793-11812`).
+`network/netcommand.cpp:109-118`, `protocolspec/spec.misc.txt:1-12`,
+`protocolspec/generator/codegenerator.py:307-308`). The typed-script
+sibling-ordering section (added 2026-09-20, found while reviewing a mod's server/client player-TID
+sync for stale-state bugs) is fully source-verified on Zandronum
+(`p_acs.cpp:2929,3002-3021,3025-3030,3384-3420`, `name.cpp:231`, `p_acs.h:505`, `p_mobj.cpp:5763,5803`, `g_game.cpp:4286`,
+`sv_main.cpp:1680,7203`, `g_level.cpp:1993`); not re-traced for UZDoom, where `CLIENTSIDE` is
+non-functional anyway (see Engine-family divergence below).
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 
 What `CLIENTSIDE` scripts are, why they exist, and the client/server execution model they run
@@ -35,18 +41,23 @@ and is worth reading before writing (or debugging) any `CLIENTSIDE` script.
 
 ## What it is and why it exists
 
-A `CLIENTSIDE` script runs entirely on one machine (the client that triggered it) and never
-executes on, or reports back to, the server — confirmed in engine source: `SCRIPTF_ClientSide`
-is a real per-script flag (the Zandronum source's `src/p_acs.h:359`, `"Is executed on the clients,
-not on the server"`). The point is bandwidth: a HUD element, an on-screen effect, or anything
-purely cosmetic doesn't need the server to compute it and broadcast the result to everyone as
-`HudMessage` packets — running it clientside means it costs zero network traffic and is invisible
-to other players, since it never leaves the machine it ran on.
+A `CLIENTSIDE` script runs on clients and never executes on, or reports back to, the server.
+`SCRIPTF_ClientSide` is a real per-script flag (the Zandronum source's `src/p_acs.h:359`, "is
+executed on the clients, not on the server"). A client can start one locally (its own `OPEN`
+scripts, a local `puke`). When the server starts one (a typed script, `ACS_Execute*`), it doesn't
+run it but sends a start command, by default to every client, each of which runs its own copy
+(`ExecuteClientScript` and `SendNetworkString`'s `client` argument narrow that to one client).
+Offline, it simply runs locally. The point is bandwidth: a HUD element, an on-screen effect, or
+anything purely cosmetic doesn't need the server to compute it and broadcast the result to
+everyone as `HudMessage` packets. A server-started `CLIENTSIDE` script costs one small start
+command; everything it then draws or prints stays on the machine that ran it.
 
 `NET` is the companion flag (`SCRIPTF_Net`, `p_acs.h:358`, `"Safe to puke in multiplayer"`) — it
 marks a script as safe to trigger via the console `puke` command or from a `CLIENTSIDE` script
 asking the server to run something. `CLIENTSIDE` and `NET` are independent flags and commonly
-combined (`script 4 OPEN NET CLIENTSIDE`).
+combined (`script 4 OPEN NET CLIENTSIDE`). One exception: with `compat_netscriptsareclientside`
+set, Zandronum treats every `NET` script as `CLIENTSIDE` too (`ACS_IsScriptClientSide`,
+`src/p_acs.cpp:13684-13696`).
 
 ## Execution model
 
@@ -177,7 +188,8 @@ outlive the triggering event — e.g. re-binding its own activator every tic wit
 it survives a death/respawn cycle rather than needing to be restarted. **This works for ordinary
 death/respawn, but not for a player manually becoming a spectator and rejoining** — see the ENTER
 entry in [Script types](script-types.md) for the full trace. Short version: `PLAYER_SetSpectator`
-and `PLAYER_SpectatorJoinsGame` both call `FBehavior::StaticStopMyScripts` on the player's actor,
+and `PLAYER_SpectatorJoinsGame` both call `FBehavior::StaticStopMyScripts` on the player's actor
+(unless `compat_dont_stop_player_scripts_on_disconnect` is set),
 which hard-kills any script (including a `CLIENTSIDE` one) whose activator currently matches —
 with **no code path for the dying script to run its own cleanup**. If that loop was guarded by a
 "don't start a second one, I'm already running" boolean meant to survive re-triggering, that
@@ -223,7 +235,9 @@ so no immediate `RunScript()`), which runs on the next `DACSThinker::Tick`. Two 
 combine into an ordering hazard:
 
 - `DLevelScript::Link()` **prepends** the new script to the head of the thinker's script list
-  (`p_acs.cpp:3831-3849`).
+  (`p_acs.cpp:3831-3849`). Exception: on a map defined in Hexen-style MAPINFO
+  (`LEVEL2_HEXENHACK`), the constructor then moves it to the tail with `PutLast()`
+  (`p_acs.cpp:13133-13138`), so there batches run in send order and nothing below applies.
 - `DACSThinker::Tick()` iterates that list **head→tail** (`p_acs.cpp:3602-3611`).
 
 So all server-triggered clientside script instances that arrive within one client tic window run
@@ -255,6 +269,53 @@ it narrows the race, it doesn't close it.
   with one added script.
 - **Self-heal on view-open.** Re-send the full authoritative snapshot whenever the client opens
   the UI that displays the synced data — doesn't prevent the desync, but bounds its lifetime.
+
+### A typed script's CLIENTSIDE sibling runs its first statement AFTER the server-side one's writes land
+
+**Source-verified 2026-09-20 (Zandronum).** A common shape is a pair of same-typed scripts —
+`script "Foo" ENTER` server-side to push per-player state down, and `script "FooCl" ENTER
+CLIENTSIDE` to consume it — where the clientside half opens by initialising or clearing the
+client's own copy of that state. That ordering is backwards from how it reads in the source file:
+by the time the clientside half's first statement executes, the server half's pushed-down writes
+have usually already been applied, and clearing them there wipes the snapshot the server just
+sent. Three engine facts stack up:
+
+- **`FBehavior::StartTypedScripts` walks `Scripts[]` in ascending script-number order**
+  (`qsort`/`SortScripts`, the Zandronum source's `src/p_acs.cpp:2929,3025-3030`), so every named
+  script is visited before every numbered one. At load, a named script's number becomes minus its
+  index in the engine's global name table (`src/p_acs.cpp:3002-3021`), so the relative order of
+  two named siblings follows name-table interning order, not simply their declaration order. For
+  the `ENTER`/`RESPAWN`/`RETURN` pairs below, which one is visited first doesn't change the
+  outcome, because the server-side half is only queued (next bullet). That isn't true of every
+  type: `KILL` and `UNLOADING` starts pass `runNow=true`.
+- **Visiting a `CLIENTSIDE` script on a server sends its start command immediately; visiting a
+  server-side one only queues it.** The clientside branch calls
+  `SERVERCOMMANDS_ACSScriptExecute` and `continue`s (`src/p_acs.cpp`, `StartTypedScripts`); the
+  other branch calls `P_GetScriptGoing` and runs the body inline only when `runNow` is set —
+  which defaults to `false` (`src/p_acs.h:505`) and is left at the default by every player-typed
+  call site (`src/p_mobj.cpp:5763,5803`, `src/g_game.cpp:4286`, `src/sv_main.cpp:1680,7203`,
+  `src/g_level.cpp:1993`). So the server-side body first runs at the next `DACSThinker::Tick`,
+  after the sibling's start command has already gone out.
+- **The client applies the batch newest-first** (the LIFO section above). Whatever the server-side
+  body broadcast at clients during that tic is prepended *ahead of* the earlier-sent
+  `CLIENTSIDE` start command, so those writes run first and the `CLIENTSIDE` body runs last.
+  (The broadcast is the client's only source for these in a netgame: the local
+  `StartTypedScripts(SCRIPT_Enter, ...)` call in `P_SpawnPlayer` is unreachable there, since a
+  client builds player pawns from the `SpawnPlayer` server command rather than through
+  `P_SpawnPlayer`, and `cl_main.cpp` has no `StartTypedScripts` call site at all. So there is no
+  second, locally-started instance racing the broadcast one.)
+
+Net effect, whenever both land in one client tick (the normal case when they're sent in the same
+server tic, and the guaranteed case under coalescing): **the clientside script's own "reset my
+local copy" prologue runs after the incoming writes, not before.** A later re-broadcast usually
+heals it, but only if that arrives in a *later* client tick — all inbound executions in one tick
+reverse together regardless of which server tic sent them.
+
+**Don't open a `CLIENTSIDE` script with a clear of state the server pushes to it.** Level load
+already zeroes map-scope storage on both machines (see [Variable scope](scope.md)'s map-storage
+note), so the clear buys nothing on a fresh map and actively destroys state on every mid-level
+re-invocation of the same script. Treat each inbound write as authoritative and let the engine's
+own zeroing handle initialisation.
 
 ## Client → server (requesting data up)
 
@@ -295,20 +356,74 @@ Two things worth internalizing from this pattern, both load-bearing for correctn
   be idempotent (the `CheckInventory("ActionDone")` guard) since it may receive the same puke more
   than once, or none at all without a retry loop.
 
+## Finding a server-spawned actor by TID from a CLIENTSIDE script
+
+**TID lookups work fine client-side; what varies is whether the client was ever told the TID.**
+Source-verified 2026-08-21 (Zandronum). This trips mods up because the failure is invisible
+offline and silent online.
+
+`ThingCount`, `SetActivator(tid)`, `GetActorX/Y/Z(tid)` and `GetActorProperty(tid, ...)` all
+resolve through one global `TIDHash` (via `SingleActorFromTID`, or `FActorIterator` directly for
+`ThingCount`), with no client-mode bailout and no separate client TID namespace
+(`p_acs.cpp:3924-3926`, `4445-4456`, `5952-5961`, `10516-10519`, `11998-12013`). The client maintains that hash from `SERVERCOMMANDS_SetThingTID`, applied at
+`cl_main.cpp:5695-5704` (`RemoveFromHash`/`AddToHash`). So a TID-based lookup succeeds client-side
+exactly when the server sent that command for that actor, and returns a clean zero/null otherwise —
+never an error.
+
+**Which server-side operations broadcast a TID:**
+
+| Broadcasts `SetThingTID` | Does not |
+|---|---|
+| `Spawn`/`SpawnForced`/`SpawnSpot`/`SpawnSpotForced`/`SpawnSpotFacing`/`SpawnSpotFacingForced` (`p_acs.cpp:4202-4203`) | `SpawnProjectile`'s `newtid` argument (`p_things.cpp:306-307` assigns, `:433-459` sends only `SERVERCOMMANDS_SpawnMissile`, which has no TID field) |
+| `Thing_ChangeTID` action special, both branches (`p_lnspec.cpp:1093-1094`, `1114-1116`) | `Thing_ProjectileAimed`/`Thing_ProjectileIntercept` (same `P_Thing_Projectile` backend) |
+| Join snapshot, for any actor with `tid != 0` (`sv_main.cpp:2912-2913`) | `Thing_Projectile`/`Thing_ProjectileGravity` (no TID argument at all) |
+| Morphs (`a_morph.cpp:202,448`), DECORATE spawn (`thingdef_codeptr.cpp:2686`) | |
+
+**The DECORATE-spawn row is 3.3-alpha-only.** `A_SpawnItemEx`'s TID broadcast
+(`thingdef_codeptr.cpp:2686`) was added by commit `92472813e` ("Fixed: A_SpawnItemEx didn't sync
+the TID of spawned actors to clients in online games"), which postdates the 3.2.1 version-bump
+commit (`28f736fb3`) by git ancestry. A DECORATE-spawned actor's TID is **not** broadcast on a
+3.2.1 server; the workarounds below are needed there even for `Spawn`-family DECORATE calls that
+go through `A_SpawnItemEx`.
+
+The practical trap is the `SpawnProjectile`/`DoSpawn` split: both spawn a fully replicated actor
+with a real NetID, but only one tells clients its TID. Client-side code that locates the actor by
+TID therefore works in single-player and silently does nothing in client/server — see
+[`families/spawning.md`](../families/spawning.md)'s `SpawnProjectile` section for the full
+writeup.
+
+**Three workarounds, in order of preference:**
+
+1. **Re-assign the TID after spawning** — `Thing_ChangeTID(newtid, newtid)` server-side forces the
+   broadcast. Safe against same-value re-assignment (`p_lnspec.cpp:1099-1118` captures `next`
+   before mutating; re-insertion goes to the chain head).
+2. **Don't use TIDs at all** — pass what the client needs as script arguments to a `CLIENTSIDE`
+   script (see the relay pattern above); the arguments transmit reliably (three from
+   `ACS_Execute`/`ACS_ExecuteAlways`, four from `ACS_ExecuteWithResult`/`ExecuteClientScript`).
+3. **Pre-place the actor in the map editor** with the TID you want — the join snapshot covers it.
+
+Whichever you pick, note that `SERVERCOMMANDS_SetThingTID` silently returns for an actor with no
+NetID (`EnsureActorHasNetID`, `sv_commands.cpp:2044-2053`) — so an actor flagged `+NONETID` or
+`+SERVERSIDEONLY` can never be reached by TID from a client, no matter how its TID was assigned.
+`sv_showwarnings 1` prints a warning when this happens, except for a `+SERVERSIDEONLY` actor
+(`sv_commands.cpp:99-112`).
+
 ## Networking note (server→client now source-verified; client→server still wiki-only)
 
 **Server→client script activation is reliable and strictly ordered — source-verified 2026-08-09.**
 `NetCommand` defaults to the reliable buffer (`_unreliable(false)`,
-`network/netcommand.cpp:109/118`) and `ServerCommands::ACSScriptExecute::BuildNetCommand`
-(`network/servercommands.cpp:11793-11812`) never calls `setUnreliable`, so script-execute
-commands ride the reliable stream. The client parses reliable packets strictly in sequence — a
+`network/netcommand.cpp:109/118`), and the generated `ACSScriptExecute` command only calls
+`setUnreliable` when its spec entry says `UnreliableCommand` (`protocolspec/generator/codegenerator.py:307-308`),
+which `protocolspec/spec.misc.txt:1-12` doesn't, so script-execute commands ride the reliable stream. The client parses reliable packets strictly in sequence — a
 gap makes it buffer later packets and request the missing one (`cl_main.cpp:1144-1166`,
 `1333-1402`); unrecoverable loss ends the session loudly rather than silently skipping: the
 server kicks ("Too many missed packets", `sv_main.cpp:6169-6217`) or the client bails ("Missing
 more than N packets. Unable to recover."). Consequence: **server→client clientside-script
 executions are never silently dropped or transport-reordered — but see the LIFO execution-order
 section above for how they still get *applied* out of order.** All four script arguments transmit
-(`sv_commands.cpp:3567-3605`, `arg3` included since the command carries four `addVariable` slots).
+(`sv_commands.cpp:3567-3605`, since the command carries four `Variable` fields). `arg3` is 0 unless
+the caller passed four: `ACS_Execute`/`ACS_ExecuteAlways` and typed-script starts pass three
+(`p_lnspec.cpp:1765,1796`, `p_acs.cpp:3409`), `ACS_ExecuteWithResult` and `ExecuteClientScript` pass four.
 
 The wiki describes client→server traffic (`RequestScriptPuke` etc.) as effectively unreliable;
 that direction was *not* traced in this pass — keep the retry idiom above, which degrades

@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** wiki page `SetAmmoCapacity (ACS) - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=SetAmmoCapacity_%28ACS%29&oldid=52592`) + source-verified against `p_acs.cpp:11843-11879`, `g_shared/a_pickups.h:240` (`AAmmo : public AInventory`), `zt-bcc/src/builtin.c:132`. Wiki/fork divergence (direct-parent-only `Ammo` check, activator-only targeting, item-creation-on-first-use with `Amount` zeroed, Zandronum-only server-sync packet) recorded above rather than silently trusted or omitted.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
@@ -48,6 +48,14 @@ Sets the max-carry amount of an ammo type on the **activator only**. Compiler bu
   item whose requested cap happens to equal `-1`, which can't happen in practice since `-1` isn't
   a sane cap), no packet is sent — this is purely a bandwidth-avoidance check, not a gameplay
   difference.
+- **This sync check grew a null-item guard after 3.2.1.** Before `8afdb006d` (commit message:
+  `Added an extra sanity check to avoid a crash in the ACS function "SetAmmoCapacity".`, dated
+  2025-11-09, not an ancestor of the 3.2.1 version-bump commit `28f736fb3`, 2025-08-04), the sync
+  condition had no null check on `item`, only the player-and-server gate. `item` can be NULL here
+  when `GiveInventoryType` was called (the item-didn't-exist branch above) and `CallTryPickup`
+  refused the new item (`p_mobj.cpp:1021-1024`). On a real 3.2.1 client, hitting that path while
+  the activator is a networked player is a null-pointer dereference. At this checkout (3.3-alpha)
+  that crash is fixed.
 
 **Example — grow max ammo capacity on pickup (from the wiki, semantics verified against this
 fork):**

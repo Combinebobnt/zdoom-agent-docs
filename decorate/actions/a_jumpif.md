@@ -2,18 +2,21 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** ZDoom Wiki `A_JumpIf` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_JumpIf&oldid=42392) + verified against the
 Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3523-3538` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor,
 A_JumpIf)`). Network behavior verified against `src/thingdef/thingdef_codeptr.cpp:695-753` (the `DoJump`
-function called by the `ACTION_JUMP` macro) and `src/network.h:118-125` (the `ClientJumpUpdateFlag` enum).
+function called by the `ACTION_JUMP` macro) and `src/network.h:118-125` (the `ClientJumpUpdateFlag` enum). Offset parsing verified against
+`src/thingdef/thingdef_states.cpp:377-397` and `src/thingdef/thingdef_parse.cpp:124-146`; the result
+slot's consumer against `src/thingdef/thingdef_codeptr.cpp:135-150` (`ACustomInventory::CallStateChain`).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:3523` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_JumpIf)`).
 **Source excerpt:** Quotes Zandronum engine source; see [LICENSE](../../LICENSE) §3 for Zandronum's
 license terms.
 
 Evaluates a DECORATE expression and, if it evaluates to true, jumps to a specified state offset or
-state label. The jump offset can be a numeric literal or an expression.
+state label. On Zandronum a numeric jump offset must be an integer literal. On UZDoom it can also be an
+expression.
 
 ## Parameters
 
@@ -22,7 +25,10 @@ state label. The jump offset can be a numeric literal or an expression.
   `sin()`, `cos()`, `checkclass()`, etc. See `concepts/expressions.md` for the full set and validity
   in different contexts.
 - **`offset` / `"state"`** — the target state. Either an integer offset (number of states forward from
-  the current state) or a string state label. A numeric offset can be a literal or an expression.
+  the current state) or a string state label. On Zandronum the offset must be a non-negative integer
+  literal (`thingdef_states.cpp:377-397`): `0` means no jump, and a positive offset is a parse error on
+  a state line that defines several frames. Any other form must be a quoted label
+  (`thingdef_parse.cpp:124-146`). On UZDoom a numeric offset can be a literal or an expression.
 
 ## Engine-family divergence: no client/server authority split
 
@@ -32,7 +38,7 @@ evaluate-then-jump with no `NETWORK_InClientMode()`/`CLIENTUPDATE_FRAME`/`SERVER
 construct anywhere in the UZDoom source tree (confirmed by a tree-wide search: zero occurrences). There is
 no `NETFL_CLIENTSIDEONLY`-style split between "network-authoritative" and "client-side-only" actors for
 this action, and consequently none of the two "Critical synchronization caveat" consequences described
-above apply on UZDoom: the expression's RNG calls (if any) are consumed exactly once, identically on
+below apply on UZDoom: the expression's RNG calls (if any) are consumed exactly once, identically on
 every machine, and there is no result-slot early-return path to leave stale. `A_JumpIf` is also
 implemented directly in ZScript rather than as a native (C++) action function, unlike Zandronum's
 `DEFINE_ACTION_FUNCTION_PARAMS` implementation, and its signature is correspondingly different: it
@@ -47,15 +53,18 @@ expression parameter **before** checking whether the actor is clientsideonly. Th
 consequences:
 
 1. **RNG consumption on non-clientside actors in client mode.** If the expression uses `random()`,
-   `frandom()`, or `random2()`, those calls consume entries from the expression evaluator's RNG
-   (`pr_exrandom`) on both server and client, even though the jump itself is suppressed on the client.
-   This causes the RNG state to diverge between server and client, potentially affecting subsequent
-   expression evaluations in the same state or nearby actions.
+   `frandom()`, or `random2()`, those calls still run on the client and advance its local copy of the
+   RNG, even though the client's jump is suppressed. The RNG is `pr_exrandom` unless the call names
+   one (`random[name](...)` uses that named RNG instead). The network protocol carries no RNG state,
+   so the client's streams are independent of the server's either way. The effect is that later
+   client-side-only rolls on the same RNG see a different sequence than if the call were skipped.
 
-2. **Result slot left untouched on non-clientside actors in client mode.** After the network check,
-   `ACTION_SET_RESULT(false)` is not executed for non-clientside actors in client mode (the function
-   returns early). Any prior result slot value persists, which can affect branching in subsequent
-   `if` statements in DECORATE that key off the action's return value.
+2. **Result slot left untouched on non-clientside actors in client mode.** The function returns
+   before `ACTION_SET_RESULT(false)`. DECORATE has no `if` statements; the only reader of this result
+   is a CustomInventory `Pickup`/`Use`/`Drop` state chain, which presets the slot to `true` before
+   each call (`thingdef_codeptr.cpp:135-150`). So if a client runs such a chain, this call counts as a
+   success there, where on the server it does not. The server decides the chain's real outcome.
+   Outside a CustomInventory chain the macro does nothing.
 
 Here is the full implementation from the Zandronum source:
 
@@ -78,8 +87,10 @@ DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_JumpIf)
 }
 ```
 
-On the server (or in single-player), if the expression evaluates true, the jump is executed and all
-clients are notified of the state change via `SERVERCOMMANDS_SetThingFrame`. On a client for a
+On the server (or in single-player), if the expression evaluates true, the jump is executed. What the
+server sends depends on where the call ran (`DoJump`): an actor's own state change goes out via
+`SERVERCOMMANDS_SetThingFrame`, a weapon or flash psprite jump via `SERVER_HandleWeaponStateJump`, and
+a jump inside a CustomInventory state chain sends nothing. On a client for a
 non-`NETFL_CLIENTSIDEONLY` actor, the expression is still evaluated (including any side effects), but
 the jump is suppressed locally; the server's state-change notification will be received separately. For
 a `NETFL_CLIENTSIDEONLY` actor, both the expression and jump happen entirely on the client.
@@ -88,7 +99,9 @@ a `NETFL_CLIENTSIDEONLY` actor, both the expression and jump happen entirely on 
 
 The related `A_Jump` action function checks the network mode **before** consuming RNG, not after. This
 means `A_Jump` does not suffer RNG desynchronization on non-clientside actors in client mode, because
-the `pr_cajump()` calls are skipped entirely in client mode for non-clientside actors.
+the `pr_cajump()` calls are skipped entirely in client mode for non-clientside actors. Its own
+`count` and `maxchance` parameters are still evaluated before the check, though, so a `random()` call
+written inside them runs on the client just like one in `A_JumpIf`'s expression.
 
 ## Wiki/engine divergence: anonymous functions not applicable (Zandronum)
 

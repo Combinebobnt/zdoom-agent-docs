@@ -2,11 +2,11 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-17)
-**Provenance:** ZDoom Wiki `CVARINFO` (retrieved via `extract_wiki_html.py`, https://zdoom.org/w/index.php?title=CVARINFO&oldid=54137) + verified against the Zandronum engine source's `src/d_main.cpp:1713–1850`.
+**Verified against:** UZDoom 5.1.0-pre @98b16b78fc (2026-09-26); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** ZDoom Wiki `CVARINFO` (retrieved via `extract_wiki_html.py`, https://zdoom.org/w/index.php?title=CVARINFO&oldid=54137) + verified against the Zandronum engine source's `src/d_main.cpp:1711–1848` and `src/d_netinfo.cpp:1010`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
-CVARINFO is the lump format for declaring custom mod-specific console variables (CVARs). Both UZDoom and Zandronum parse it with their own hand-written `ParseCVarInfo` scanner in `d_main.cpp` (UZDoom: `src/d_main.cpp:1829–1984`; Zandronum: `src/d_main.cpp:1713–1850` — the two are separate, independently-maintained implementations, not shared code, though close in structure since Zandronum's traces to an older ZDoom baseline). This file documents the syntax and scopes common to both engines, noting divergences explicitly. The ZDoom wiki page describes additional features (`nosave`, `cheat`, `latch`, `handlerclass`) that this pass confirmed are implemented in UZDoom but do not exist in Zandronum — see "Engine-family divergence" below.
+CVARINFO is the lump format for declaring custom mod-specific console variables (CVARs). Both UZDoom and Zandronum parse it with their own hand-written `ParseCVarInfo` scanner in `d_main.cpp` (UZDoom: `src/d_main.cpp:1829–1984`; Zandronum: `src/d_main.cpp:1711–1848` — the two are separate, independently-maintained implementations, not shared code, though close in structure since Zandronum's traces to an older ZDoom baseline). This file documents the syntax and scopes common to both engines, noting divergences explicitly. The ZDoom wiki page describes additional features (`nosave`, `cheat`, `latch`, `handlerclass`) that this pass confirmed are implemented in UZDoom but do not exist in Zandronum — see "Engine-family divergence" below.
 
 ## Syntax
 
@@ -22,7 +22,7 @@ A CVARINFO declaration requires exactly one scope, selecting where the CVAR's va
 
 - **`user`** — Per-player CVAR, visible/modifiable by each player independently and replicated across the network to all other players. Not saved to save games, but persisted in the player's config file. Intended for player-specific cosmetic options (name, skin, color, gender, etc.) that all clients need to see — if its value affects gameplay, it will cause desync in multiplayer.
 
-- **`local`** — Per-player CVAR, config-only, not replicated across network and not saved to save games. Each player's value is local to their own client. Intended for user-specific UI/cosmetic options that other players don't need to see. **Critical:** Nothing that can modify gameplay should be tied to a `local` CVAR, as it will cause desync (see the `user` scope note above). Introduced in Zandronum 3.2.1 (commit e64b31af47). **`local` is a Zandronum-only keyword** — UZDoom has no `local` scope; its nearest equivalent is the `nosave` scope (see "Engine-family divergence" below), which is not accepted by Zandronum's parser.
+- **`local`** — Per-player CVAR, config-only, not replicated across network and not saved to save games. Each player's value is local to their own client. Intended for user-specific UI/cosmetic options that other players don't need to see. **Critical:** Nothing that can modify gameplay should be tied to a `local` CVAR, as it will cause desync (see the `user` scope note above). Present since Zandronum 3.0 (commit e64b31af47). **`local` is a Zandronum-only keyword** — UZDoom has no `local` scope; its nearest equivalent is the `nosave` scope (see "Engine-family divergence" below), which is not accepted by Zandronum's parser.
 
 ## Options
 
@@ -35,12 +35,12 @@ The CVAR's data type, required and one of:
 - **`int`** — Integer value, defaults to `0`.
 - **`float`** — Floating-point value, defaults to `0.0`.
 - **`bool`** — Boolean value, defaults to `false`.
-- **`string`** — Text string, defaults to `""` (empty string). User CVAR names and values combined cannot exceed 254 characters total; exceeding this will silently prevent the CVAR from loading on a future session (engine behavior in Zandronum 3.2.1+).
+- **`string`** — Text string, defaults to `""` (empty string). Setting a `user` CVAR on a client or in single player builds a userinfo descriptor, and Zandronum aborts with a fatal "User info descriptor too big" error if the name plus the escaped value (`\` and `%` each become two characters) exceeds 252 characters (`src/d_netinfo.cpp:1010`). A dedicated server skips this check.
 - **`color`** — RGB color value, defaults to `"00 00 00"` (black). Specified as three hex bytes separated by spaces.
 
 ## Naming
 
-CVAR names must begin with a letter or underscore and may only contain alphanumeric characters (`a–z`, `A–Z`, `0–9`) and the underscore (`_`) — correcting this file's earlier "must begin with a letter" wording: both engines tokenize CVAR names with the same generic identifier rule as the rest of their script languages (a letter or underscore, followed by zero or more letters, digits, or underscores), so a leading underscore is accepted by both (confirmed: UZDoom `src/common/engine/sc_man_scanner.re:61,226`; Zandronum `src/sc_man_scanner.re:36,162`). Server CVAR names are limited to 63 characters; exceeding this in Zandronum is silently ignored (earlier ZDoom versions would load but exhibit issues in multiplayer).
+CVAR names must begin with a letter or underscore and may only contain alphanumeric characters (`a–z`, `A–Z`, `0–9`) and the underscore (`_`) — correcting this file's earlier "must begin with a letter" wording: both engines tokenize CVAR names with the same generic identifier rule as the rest of their script languages (a letter or underscore, followed by zero or more letters, digits, or underscores), so a leading underscore is accepted by both (confirmed: UZDoom `src/common/engine/sc_man_scanner.re:61,226`; Zandronum `src/sc_man_scanner.re:36,162`). Server CVAR name length is limited on UZDoom only. UZDoom aborts loading with a fatal error naming the too-long cvar when a `server` CVAR's name exceeds 63 characters: its base cvar constructor checks every `CVAR_SERVERINFO` cvar, which CVARINFO's `server` scope sets (`src/common/console/c_cvars.cpp:147–159`, reached via `src/d_main.cpp:1852–1855` and `C_CreateCVar` at `c_cvars.cpp:1466`). The reason is its server-cvar change net command, which packs the name length into 6 bits (`src/d_netinfo.cpp:664,703–716`). Zandronum has no limit on any live path: neither its parser nor cvar creation checks the length (`src/d_main.cpp:1711–1848`, `src/c_cvars.cpp:104,1670`), and server mod CVAR values reach clients via `SVC2_SETCVAR`, which sends the name as a null-terminated string (`src/sv_commands.cpp:5212–5218`, `src/cl_main.cpp:2320–2338`). Zandronum still has the inherited 6-bit encoder, but its only call site is commented out (`src/d_netinfo.cpp:1195–1216`, `src/c_cvars.cpp:321`). Keep `server` names to 63 characters or fewer in any mod that also targets UZDoom.
 
 ## Default values
 
@@ -56,7 +56,7 @@ Type-checking is enforced at parse time: numeric types require a valid literal o
 
 ## Duplicate CVAR handling
 
-If a CVARINFO declares a CVAR name that already exists, Zandronum produces a hard parse error with an error message naming the conflicting CVAR and instructing the player to remove it from their config file (`src/d_main.cpp:1793–1803`, re-confirmed this pass). **Exception:** if the existing CVAR has flags exactly `CVAR_ARCHIVE|CVAR_UNSETTABLE|CVAR_AUTO` (created by a raw `ConsoleCommand` call, marked as [AK]), Zandronum deletes it and allows the CVARINFO-declared CVAR to replace it. This deletion happens silently (Zandronum 3.2.1+, commit c9d8c2ee8, `[AK] Added a flag check...`).
+If a CVARINFO declares a CVAR name that already exists, Zandronum produces a hard parse error with an error message naming the conflicting CVAR and instructing the player to remove it from their config file (`src/d_main.cpp:1791–1801`, re-confirmed this pass). **Exception:** if the existing CVAR has flags exactly `CVAR_ARCHIVE|CVAR_UNSETTABLE|CVAR_AUTO` (created by a raw `ConsoleCommand` call, marked as [AK]), Zandronum deletes it and allows the CVARINFO-declared CVAR to replace it. This deletion happens silently (present since Zandronum 3.1, commit 3e1628c62).
 
 ## Engine-family divergence: Duplicate CVAR handling
 

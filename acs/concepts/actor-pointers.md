@@ -2,12 +2,14 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `Actor pointer - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
 `https://zdoom.org/w/index.php?title=Actor_pointer&oldid=54704`) + source-verified against the Zandronum source's `src/actorptrselect.h`/`.cpp`
 (`COPY_AAPTR`, `ASSIGN_AAPTR`, `AAPTR` enum), `p_acs.cpp` (`ACSF_SetPointer` ~5938,
 `ACSF_SetActivator` ~5952, `ACSF_SetActivatorToTarget` ~5963, `ACSF_IsPointerEqual` ~6916,
-`ACSF_SetActivatorToPlayer` ~7504, `ACS_GetScriptDamagePointers` ~13729), and
+`ACSF_SetActivatorToPlayer` ~7504, `ACS_GetScriptDamagePointers` ~13729; damage-pointer setup
+~13103-13117, current-script marker set/cleared ~9224/~13045, `ACS_WANTRESULT` inline run
+~13264-13266; `p_lnspec.cpp:1840`), `actorptrselect.cpp:109-140` (`VerifyTargetChain` missile gate), and
 `zt-bcc/lib/zcommon.bcs:757-774,1276-1278` (`AAPTR_*` constant availability). Git ancestry for the
 damage-pointer/floaty-icon/camera additions checked against `28f736fb3` (3.2.1 version-bump
 commit) via `git merge-base --is-ancestor`.
@@ -16,8 +18,9 @@ commit) via `git merge-base --is-ancestor`.
 In ACS/BCS there is no pointer *type* and no `target`/`master`/`tracer` field access syntax like
 DECORATE or ZScript have. Instead, an actor relationship is always resolved at call time by
 passing an `AAPTR_*` selector constant into one of a handful of extension functions
-(`SetPointer`, `SetActivator`, `SetActivatorToTarget`, `SetActivatorToPlayer`,
-`IsPointerEqual` — see [IsPointerEqual](../functions/ispointerequal.md)); none of the wiki's
+(`SetPointer`, `SetActivator`, `IsPointerEqual`; see [IsPointerEqual](../functions/ispointerequal.md)).
+`SetActivatorToTarget(tid)` and the Zandronum-only `SetActivatorToPlayer(playernum)` are related
+fixed-relationship helpers that take no selector at all. None of the wiki's
 ZScript-side material (`self`/`owner`/`invoker`, class-scoped pointer variables, casting with
 `let`/`SpecificClass(...)`) applies to ACS/BCS code on either engine — **the Zandronum engine fork
 has no ZScript at all**, matching the "no ZScript" note already recorded in
@@ -26,7 +29,8 @@ that ACS still has no pointer-field access syntax through.
 
 ## Resolution mechanism: `COPY_AAPTR`
 
-Every `AAPTR_*` selector passed from ACS is resolved server-side by a single C++ function,
+Every `AAPTR_*` selector passed from ACS is resolved, on whichever machine runs the script, by a
+single C++ function,
 `COPY_AAPTR(AActor *origin, int selector)` (`actorptrselect.cpp`), not by a per-function switch —
 so its priority order applies uniformly to every ACS function that takes a selector:
 
@@ -45,8 +49,9 @@ so its priority order applies uniformly to every ACS function that takes a selec
 Selectors can be bitwise-OR'd (e.g. `AAPTR_TARGET|AAPTR_PLAYER_GETTARGET`, the wiki's documented
 pattern for "get the target, or the player's aim-target if the origin is a player") because each
 priority tier masks the selector against its own bitmask (`selector & AAPTR_GENERAL_SELECTORS`,
-etc.) before switching on it — combining selectors from *different* tiers is meaningful, combining
-two from the *same* tier is not (only one can win per tier).
+etc.) before switching on it. Combining selectors from *different* tiers is meaningful. Combining
+two from the *same* tier is not: the masked value matches no `case`, so that tier yields nothing
+and resolution falls through to the next one.
 
 ## `AAPTR_GET_LINETARGET` is a trap in ACS/BCS
 
@@ -55,8 +60,8 @@ that takes an `int` selector — but `COPY_AAPTR` has **no case for it in any of
 switches** (general/player/static). Passed alone, it falls through every tier and hits the step-5
 fallback, silently returning `origin` unchanged instead of "the actor being aimed at." The wiki's
 own DECORATE/ACS table already hints at this by listing the ZScript analog as "None — see
-`AimTarget`," but doesn't say the ACS constant is dead weight if actually used; this is Zandronum
-`3.2.1`-verified, not a wiki-vs-fork gap. If you need line-of-sight targeting from ACS, there is no
+`AimTarget`," but doesn't say the ACS constant is dead weight if actually used; this is
+Zandronum-verified at the 3.3-alpha checkout, not a wiki-vs-fork gap. If you need line-of-sight targeting from ACS, there is no
 `AAPTR_GET_LINETARGET`-based path — combine `AAPTR_PLAYER_GETTARGET` (works for a player origin,
 via `P_BulletSlope`) with your own aim-trace extension function for non-player origins.
 
@@ -67,9 +72,9 @@ via `P_BulletSlope`) with your own aim-trace extension function for non-player o
 ACS, though: `SetPointer`/`SetActivator`/`IsPointerEqual` all take the selector as a plain `int`
 parameter (`zcommon.bcs`'s `-38:SetPointer(int,int;int,int):bool` and similar), so a raw literal
 `0x4000000` (or a script-defined `enum`/`#define` wrapping it) reaches Zandronum's `COPY_AAPTR`
-exactly like any named selector — `COPY_AAPTR` has no way to distinguish an ACS-originated call
-from a DECORATE-originated one in the first place; Zandronum has exactly one `COPY_AAPTR` entry
-point, with no caller-origin parameter. The real limitation is narrower than "not usable from ACS":
+exactly like any named selector. Zandronum has exactly one `COPY_AAPTR` entry point, with no
+caller-origin parameter. Its only caller-context check is the damage-selector gate (see below),
+which the player tier never consults. The real limitation is narrower than "not usable from ACS":
 it's "the wiki's own name for it, and zt-bcc's compiler-level convenience of a named constant,
 aren't available — write the raw hex value yourself." `AAPTR_PLAYER_GETCAMERA` (`0x8000000`), by
 contrast, **is** exposed in `zcommon.bcs` under a real name and works from ACS the ordinary way.
@@ -81,11 +86,19 @@ addition absent from the ZDoom wiki page entirely (added for the `GAMEEVENT_ACTO
 script type — see [EVENT scripts](event-scripts.md) for how that script type itself is gated).
 `COPY_AAPTR` special-cases them before anything else: if the selector matches one of the three and
 `ACS_IsCalledFromScript()` is true, it returns `ACS_GetScriptDamagePointers(selector)`, which reads
-`g_pCurrentScript->pDamageSource`/`pDamageInflictor`/`pDamageTarget` — fields only populated on the
-script instance actually running as the `GAMEEVENT_ACTOR_DAMAGED` handler. Calling with one of
-these selectors from any other script (or from a damage-event script after control has passed to
-a called function whose `g_pCurrentScript` differs) silently returns `NULL`, same as an unresolved
-TID — there's no error, just a quiet no-op. Git ancestry check: the introducing commit
+`g_pCurrentScript->pDamageSource`/`pDamageInflictor`/`pDamageTarget`. Those fields are populated
+only on a script instance started as a `GAMEEVENT_ACTOR_DAMAGED` or
+`GAMEEVENT_ACTOR_DAMAGED_PREMOD` handler, and only when not in client mode. Calling with one of
+these selectors from any other running script silently returns `NULL`, same as an unresolved TID.
+There's no error, just a quiet no-op.
+
+When no script is marked as running, the damage check is skipped. The damage bits belong to no
+other tier's mask, so the selector then falls through to the step-5 fallback and returns `origin`,
+not `NULL`. That covers non-ACS callers, and also one ACS case: the current-script marker is set
+when a script's run starts and cleared to `NULL` when any run ends. A nested synchronous start
+(`ACS_ExecuteWithResult` or `ACS_NamedExecuteWithResult`, which run the called script inline) therefore clears it on return, and
+for the rest of the calling damage-event script's run that tic its damage selectors return
+`origin`. Git ancestry check: the introducing commit
 (`2a12c5931`, plus the two later `AAPTR_PLAYER_GETFLOATYICON`/`AAPTR_PLAYER_GETCAMERA` additions,
 `756e6e5f4`/`9b65e2ddc`) are all ancestors of `28f736fb3` (the 3.2.1 version-bump commit), so this
 whole selector set is present in the 3.2.1 target, not a `3.3-alpha`-only feature.
@@ -97,7 +110,10 @@ writing `target`/`master` (not `tracer`, which has no loop guard at all) unless 
 the `PTROP_UNSAFETARGET`/`PTROP_UNSAFEMASTER` flag bits — matching the wiki's "prevention may
 involve... setting the pointer to NULL," but concretely: a chain that would create a target/master
 cycle gets silently reset to `NULL` on the *assigning* actor, not rejected with an error, and only
-for those two fields.
+for those two fields. The `target` guard is narrower still: it does nothing unless the assigning
+actor is a missile, and it only follows `target` links through missiles, so a cycle among
+non-missile actors is never broken. The `master` guard applies to any actor. Both engines share
+this missile gate.
 
 ## Engine-family divergence
 

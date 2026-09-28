@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `SetLineBlocking - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
 `https://zdoom.org/w/index.php?title=SetLineBlocking&oldid=52803`) + source-verified against `p_acs.cpp:11441-11478`, `p_spec.cpp:281-288`,
 `doomdata.h:118,143-146`, and `zt-bcc/lib/zcommon.bcs:21-22,70-76`/`src/builtin.c:54,202`. One

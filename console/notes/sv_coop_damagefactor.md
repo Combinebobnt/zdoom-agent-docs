@@ -2,20 +2,20 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes — the exact `sv_coop_damagefactor` cvar and its `ApplyCoopDamagefactor()` gate don't exist on UZDoom, but a differently-shaped set of cvars covers similar ground; see the divergence section below.
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-17)
-**Provenance:** Zandronum source `src/p_interaction.cpp` (CUSTOM_CVAR declaration and ApplyCoopDamagefactor implementation), verified against engine behavior.
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** Zandronum source `src/p_interaction.cpp` (CUSTOM_CVAR declaration and ApplyCoopDamagefactor implementation), verified against engine behavior. Skill-factor ordering: `src/p_interaction.cpp:1267-1271` and `:1504` (`P_DamageMobj`), `:2075-2078` (`P_PoisonDamage`).
 
 Damage multiplier applied to damage **dealt to players by monsters**. Higher values increase monster damage; lower values reduce it. Default 1.0 leaves monster damage unchanged. Despite the `coop_` in its name, the multiplier is not itself gated on cooperative game mode — `ApplyCoopDamagefactor()` is called unconditionally from `P_DamageMobj()`'s player-target branch and only checks that the damage source is a monster, not what game mode is active; in practice it matters most in coop because that's where monsters are commonly damaging players, but the cvar has no `GMF_COOPERATIVE` check of its own.
 
 ## Application and direction
 
-This cvar only affects damage **from monsters to players**, not player-to-player or player-to-monster damage. It is applied via the `ApplyCoopDamagefactor()` function (`src/p_interaction.cpp:1138-1142`): `damage = int(damage * sv_coop_damagefactor)`.
+This cvar only affects damage **from monsters to players**, not player-to-player or player-to-monster damage. It is applied via the `ApplyCoopDamagefactor()` function (`src/p_interaction.cpp:1138-1142`): `damage = int(damage * sv_coop_damagefactor)`. Both `P_DamageMobj()` and `P_PoisonDamage()` call it, after the skill's `DamageFactor` has already been applied.
 
 For example:
 - `sv_coop_damagefactor 2.0` doubles all damage dealt to players by monsters.
 - `sv_coop_damagefactor 0.5` halves monster damage to players.
 
-**Correction:** `sv_coop_damagefactor 0.0` does *not* prevent monster-to-player damage. The cvar's own `CUSTOM_CVAR` callback (`src/p_interaction.cpp:1128-1135`) clamps any attempted value `<= 0` back up to `1.0f` (the default, unscaled) — so trying to set `0` (or a negative value) silently resets the cvar to `1.0` instead of zeroing out damage. To reduce monster damage toward (but not to) zero, use a small positive fraction such as `0.01`.
+**Correction:** `sv_coop_damagefactor 0.0` does *not* prevent monster-to-player damage. The cvar's own `CUSTOM_CVAR` callback (`src/p_interaction.cpp:1128-1135`) clamps any attempted value `<= 0` back up to `1.0f` (the default, unscaled) — so trying to set `0` (or a negative value) resets the cvar to `1.0` with no error or warning instead of zeroing out damage. To cut monster damage sharply, use a small positive fraction such as `0.01`. The scaled value is truncated to an integer, so any hit whose scaled damage is below 1 becomes 0.
 
 The multiplier applies only when the damage source (`source`) is flagged with `MF3_ISMONSTER` (`src/p_interaction.cpp:1140`).
 
@@ -26,7 +26,7 @@ Marked `CVAR_SERVERINFO | CVAR_GAMEPLAYSETTING`, so the value is replicated to c
 ## Related cvars and flags
 
 - **`sv_forcerespawn`** / **`sv_forcerespawntime`** — control respawn behavior independently of damage scaling.
-- **`sv_defaultdmflags`** — sets baseline deathmatch/cooperative flags, affecting monster spawning and other gameplay.
+- **`sv_defaultdmflags`** — a `Bool`; when on, applies the game mode's default dmflags at map start outside campaigns (in deathmatch and team modes that includes `DF_NO_MONSTERS`). It doesn't touch damage scaling.
 
 ## Engine-family divergence: no direct UZDoom equivalent, but overlapping cvars exist
 
@@ -34,8 +34,8 @@ Marked `CVAR_SERVERINFO | CVAR_GAMEPLAYSETTING`, so the value is replicated to c
 
 The shape differs from Zandronum's single monster-to-player multiplier in several ways:
 - UZDoom's `sv_damagefactorplayer` scales **any** damage dealt to a player, regardless of the source's type — it is not restricted to monster-sourced damage the way Zandronum's `MF3_ISMONSTER` check restricts `sv_coop_damagefactor`.
-- It's applied multiplicatively together with the current skill's `DamageFactor` property (via `G_SkillProperty(SKILLP_DamageFactor)`, `src/playsim/p_interaction.cpp:1179`), so skill-level tuning and this cvar compound rather than one being independent of the other.
+- It's applied multiplicatively together with the current skill's `DamageFactor` property (via `G_SkillProperty(SKILLP_DamageFactor)`, `src/playsim/p_interaction.cpp:1179`), so skill-level tuning and this cvar compound rather than one being independent of the other. Zandronum's cvar compounds with the skill `DamageFactor` too. `P_DamageMobj()` applies the skill factor first (for non-`DMG_FORCED` hits of more than 1 and below telefrag damage), then `ApplyCoopDamagefactor()`, so this is not a porting difference.
 - `sv_damagefactormobj` and `sv_damagefactorfriendly` cover the opposite direction (damage dealt *to* non-player targets, split by whether the target itself is `MF_FRIENDLY`) — a case Zandronum's `sv_coop_damagefactor` doesn't touch at all, since it only ever scales damage to players.
 - Like Zandronum's cvar, none of UZDoom's three are gated on cooperative game mode specifically; they apply in any game mode.
 
-A modder porting a Zandronum-side coop damage-scaling setup to UZDoom needs `sv_damagefactorplayer` (not a same-named `sv_coop_damagefactor`), and should account for it also affecting player-vs-player damage and stacking with skill's `DamageFactor` — behavior Zandronum's cvar doesn't have.
+A modder porting a Zandronum-side coop damage-scaling setup to UZDoom needs `sv_damagefactorplayer` (not a same-named `sv_coop_damagefactor`), and should account for it also affecting player-vs-player damage, which Zandronum's cvar doesn't do. Both engines stack their cvar with the skill's `DamageFactor`.

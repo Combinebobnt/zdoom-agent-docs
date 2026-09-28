@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_RaiseChildren` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RaiseChildren&oldid=53237) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4852-4868` and `src/p_things.cpp:527-566`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_RaiseChildren` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RaiseChildren&oldid=53237) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4852-4868` and `src/p_things.cpp:527-566`; raise eligibility from `src/p_mobj.cpp:7849-7868` and `src/p_interaction.cpp:513-518`; `SXF_SETMASTER` gating from `src/thingdef/thingdef_codeptr.cpp:2400-2454`; the no-parentheses parse error from `src/thingdef/thingdef_states.cpp:432-440`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_RaiseChildren)` in `src/thingdef/thingdef_codeptr.cpp`.
 
@@ -22,9 +22,9 @@ When called, this action:
 1. **Iterates all actors in the current map** using a global thinker iterator.
 2. **Identifies children** by checking if `mo->master == self` (the actor's master pointer equals the calling actor).
 3. **Attempts to resurrect each child** by calling `P_Thing_Raise(mo)`, which:
-   - Finds the child's `Raise` state (the entry point for resurrection animation).
-   - Restores the child's height and radius to their default values.
-   - **Checks if there is room** for the resurrected actor at its current position using `P_CheckPosition`. If not enough room, the child remains dead and no further processing occurs for that actor.
+   - Looks up the child's `Raise` state through its raise-eligibility check (see "Resurrection failure conditions" below). A child that is still alive, still playing its death animation, or has no `Raise` state is skipped with no effect.
+   - Zeroes the child's horizontal velocity, temporarily makes it solid, and restores its height and radius to their default values.
+   - **Checks if there is room** for the resurrected actor at its current position using `P_CheckPosition`. If not enough room, its original flags, height and radius are restored, the child remains dead, and no further processing occurs for that actor.
    - Plays the "vile/raise" sound effect.
    - Calls `Revive()` to restore the actor to life.
    - Sets the actor to its `Raise` state.
@@ -32,15 +32,24 @@ When called, this action:
 
 ## Child relationship and scope
 
-A child's master relationship is typically established via `A_SpawnItemEx(..., SXF_SETMASTER)` — this action sets the `master` pointer of the spawned actor to point back to the spawner. The `A_RaiseChildren` action then uses that relationship to identify and resurrect victims.
+A child's master relationship is typically established via `A_SpawnItemEx(..., SXF_SETMASTER)`, which sets the spawned actor's `master` pointer to the spawner. If the spawner is a missile, the master becomes the actor that fired it instead (the engine walks up the missile's `target` chain). The `A_RaiseChildren` action then uses that relationship to identify and resurrect victims.
 
-**Important limitation:** Actors spawned with `A_SpawnProjectile` are **not affected** by `A_RaiseChildren`. The `A_SpawnProjectile` action does not set the `master` pointer and was never designed to spawn creatures targeted by this action. Only use `A_SpawnItemEx` with the `SXF_SETMASTER` flag if you intend to later resurrect spawned actors via `A_RaiseChildren`.
+The two engines differ on when `SXF_SETMASTER` takes effect. On UZDoom it always sets the pointer. On Zandronum it only does so when the spawned actor is a monster (`ISMONSTER`) and the spawner (or the missile's shooter) is also a monster; a non-monster spawner, or a spawned non-monster, gets no master from this flag, so `A_RaiseChildren` will not see it as a child.
+
+**Important limitation:** Actors spawned with `A_SpawnProjectile` (UZDoom) or its Zandronum counterpart `A_CustomMissile` are **not affected** by `A_RaiseChildren`. Neither action sets the `master` pointer, and neither was designed to spawn creatures targeted by this action. Only use `A_SpawnItemEx` with the `SXF_SETMASTER` flag if you intend to later resurrect spawned actors via `A_RaiseChildren`.
 
 ## Resurrection failure conditions
 
-### No Raise state
+### Not eligible to be raised
 
-If a child actor has no `Raise` state defined, `P_Thing_Raise` returns without effect and the child remains dead. This is not an error; it is a silent condition. Many actors do not define a `Raise` state and therefore cannot be resurrected.
+`P_Thing_Raise` returns without effect, and the child stays as it is, unless all of the following hold:
+
+- The child is a corpse (`MF_CORPSE` set). A living child is never affected.
+- Its current state has an infinite duration (it has finished its death animation), or that state is explicitly marked as raisable (`CanRaise`).
+- It is not a player pawn.
+- It has a `Raise` state. Many actors do not define one and therefore cannot be resurrected.
+
+This is not an error; it is a silent condition.
 
 ### No room to raise
 
@@ -55,11 +64,11 @@ If the child's default height and radius would overlap another actor or solid ge
 
 **Neither parameter nor flag constants exist in Zandronum 3.2.1.** The Zandronum version is a no-argument action that always performs the position check and does not modify affiliations — it resurrects the child as-is.
 
-If you port DECORATE code from upstream ZDoom/GZDoom to Zandronum, do not attempt to pass flags to `A_RaiseChildren`. Doing so will result in a "too many arguments" compile error, not a silent no-op.
+If you port DECORATE code from upstream ZDoom/GZDoom to Zandronum, do not attempt to pass flags to `A_RaiseChildren`. Zandronum's DECORATE parser rejects any opening parenthesis after a zero-argument action function with a hard "You cannot pass parameters to ..." parse error, not a silent no-op. That includes empty parentheses: on Zandronum write the call bare, as `A_RaiseChildren`, not `A_RaiseChildren()` (see [state-machine.md](../concepts/state-machine.md)).
 
 ## Monster-only resurrection
 
-The ZDoom Wiki states: "Raise and damage functions only work with monsters." This claim has not been fully verified for Zandronum. The `P_Thing_Raise` function gates resurrection on the presence of a `Raise` state, not on a monster-specific flag check. It is possible for non-monster actors to be resurrected if they have a `Raise` state, though this is an uncommon configuration.
+The ZDoom Wiki states: "Raise and damage functions only work with monsters." For raising, that is looser than the source. Resurrection is gated on the `MF_CORPSE` flag (see "Not eligible to be raised" above), not on `ISMONSTER` directly. At death, an actor gets `MF_CORPSE` if it is a monster, has a `Raise` state, or is a player pawn, unless it has `DONTCORPSE`. So a non-monster actor with a `Raise` state can be resurrected once it dies, though this is an uncommon configuration, and a `DONTCORPSE` monster never can.
 
 ## Engine-family divergence: flags parameter
 
@@ -85,4 +94,4 @@ UZDoom's `P_Thing_Raise` also gates every resurrection behind a `P_CanResurrect(
 - **`A_SpawnItemEx`** — the typical way to spawn actors as children (with `SXF_SETMASTER` to establish the master relationship).
 - **`A_KillChildren`** — destroys all children instead of resurrecting them.
 - **`A_DamageChildren`** — damages all children by a fixed amount.
-- **`A_RemoveChildren`** — removes (without death animation) all children instead of damaging them.
+- **`A_RemoveChildren`** — removes (without death animation) the caller's dead children, or all of them if its `removeall` argument is true.

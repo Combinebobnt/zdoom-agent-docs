@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** wiki pages `GetActorVelX - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=GetActorVelX&oldid=35628`),
 `GetActorVelY - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=GetActorVelY&oldid=36021`), `GetActorVelZ - ZDoom Wiki.html`
 (`https://zdoom.org/w/index.php?title=GetActorVelZ&oldid=35625`) (all `_intake/`, retrieved 2026-07-29) + source-verified against
@@ -64,8 +64,8 @@ the same units [SetActorVelocity](../functions/setactorvelocity.md) expects.
   - Z: positive = upward, negative = downward — `mo->z += mo->velz` once per tic
     (`p_mobj.cpp:2908`).
 - `tid` — **`0` means "the activator"** (`SingleActorFromTID`'s `tid == 0` fallback); the
-  caller-side ternary guards against a NULL activator (e.g. an `OPEN`/`ENTER`-type script with no
-  natural activator), returning `0` silently rather than crashing.
+  caller-side ternary guards against a NULL activator (e.g. an `OPEN` script, which has no
+  activator), returning `0` silently rather than crashing.
 - **`tid != 0`: reads only the first actor matching that TID**, via a single `Next()` call in
   `SingleActorFromTID`. **Asymmetric with `SetActorVelocity`**, which mutates *every* actor
   sharing that TID in one call via `TActorIterator`. In projects where TIDs are deliberately

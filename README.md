@@ -1,7 +1,8 @@
 # zdoom-agent-docs
 
 A hand/agent-maintained documentation tree for the ZDoom-family Doom-engine modding surface —
-ACS/BCS, DECORATE, ZScript, and lump formats like MAPINFO/GLDEFS/SBARINFO/CVARINFO — targeting
+ACS/BCS, DECORATE, ZScript, and lump formats like MAPINFO/GLDEFS/SBARINFO/CVARINFO/MENUDEF/
+Zandronum's own native lumps, plus Zandronum's launcher/master-server/RCON protocols — targeting
 **UZDoom/GZDoom-family** (primary) and **Zandronum** engines, co-equal and fully verified rather
 than grandfathered (most notably ZScript, which doesn't exist in Zandronum at all). It exists to
 answer one recurring question cheaply, generalized past its original ACS-only scope: *given a
@@ -17,7 +18,7 @@ It's project-agnostic: any Zandronum/GZDoom-family mod can read from it, and any
 write back to it. It's built for and consumed by real mod projects but doesn't assume or reference
 any one of them by name.
 
-See `CLAUDE.md`'s routing table for the full scope.
+See `AGENTS.md`'s routing table for the full scope.
 
 ## Where to start
 
@@ -30,25 +31,33 @@ See `CLAUDE.md`'s routing table for the full scope.
   UZDoom/GZDoom/ZScript source), and the Authoring rule for when an entry earns its own file.
 - **`shared/ARCHETYPES.md`** — the three doc schemas every section is built from (Callable /
   Table-of-entries / Concept), with the exact header-block format for each.
-- **`agents/`** — ready-made Agent-tool subagent definitions any consuming project can register.
-  Only `zdoom-docs-lookup` (retrieval) lives here; `zdoom-docs-intake` (wiki-page processing)
-  lives at `maintainer/agents/` instead, since it's inert without that gitignored directory. See
-  `CLAUDE.md`'s "Subagents" section for how.
+- **`agents/`** — ready-made `zdoom-docs-lookup` (retrieval) subagent definitions for Claude
+  Code, Codex, Gemini CLI, OpenCode and Copilot, plus a harness-neutral procedure they're all
+  generated from. `zdoom-docs-intake` (wiki-page processing) lives at `maintainer/agents/`
+  instead, since it's inert without that gitignored directory.
+
+### Using it from an AI agent
+
+Point your agent at `AGENTS.md`. Its "Subagents" section says how to register the lookup subagent
+for your harness, or how to use the procedure without one.
 
 ## Layout
 
 ```text
 acs/       decorate/   zscript/            -- major sections (Callable + Concept archetypes)
-mapinfo/   gldefs/     sbarinfo/  cvarinfo/ -- lump formats  (Table-of-entries + Concept)
-console/   sprites/                        -- runtime & assets
+mapinfo/   gldefs/     sbarinfo/  cvarinfo/  menudef/ -- lump formats (Table-of-entries + Concept)
+zandronum-lumps/                           -- 8 more Zandronum-native lumps (Zandronum-only)
+console/   sprites/    bots/               -- runtime & assets (bots/ is Zandronum-only)
+netcode/                                   -- launcher/master-server/RCON protocols (Zandronum-only)
 shared/    -- AUTHORING.md, ARCHETYPES.md, concepts/ (cross-section only)
-tools/     -- sections.py, lint_docs.py, gen_inventory.py, lookup.py
-agents/    -- zdoom-docs-lookup.md (Agent-tool subagent def)
+tools/     -- sections.py, lint_docs.py, gen_inventory.py, gen_agents.py, lookup.py, browse.py
+agents/    -- procedures/ (harness-neutral source), zdoom-docs-lookup.md (Claude Code),
+              codex/ gemini/ opencode/ copilot/ (generated per-harness adapters)
 maintainer/ -- gitignored, maintainer-only wiki-intake pipeline (absent in a plain clone);
               its own agents/zdoom-docs-intake.md lives there too
 ```
 
-Each section has its own `INDEX.md` (router for that section) and `CLAUDE.md` (what's specific to
+Each section has its own `INDEX.md` (router for that section) and `AGENTS.md` (what's specific to
 it — its engine-source buckets or inventory extractor, its layout, its worked examples).
 
 ## The tier system
@@ -77,6 +86,15 @@ python3 tools/lookup.py GetActorProperty --long     # signature + parameter info
 Fails loudly with a "did you mean" suggestion for typos — it never silently falls back to
 re-deriving an answer from a compiler/engine table this tree hasn't verified yet.
 
+## Browsing the tree: `tools/browse.py`
+
+Run `./browse.sh` (Linux/macOS) or `browse.bat` (Windows) from the repo root. It serves the tree
+on `http://127.0.0.1:8765/` with a section sidebar, working relative links and search, and opens
+your browser. The first run creates a gitignored `.venv` holding the optional markdown renderer;
+without it (or with a bare `python3 tools/browse.py`) pages show as plain text. Extra arguments
+pass through, e.g. `./browse.sh --port 8766`. The `tools/browse.py` docstring covers `--check` and
+the `--build DIR` static export.
+
 ## Setting up local source checkouts
 
 Doc files cite engine/compiler source by relative path (e.g. `src/p_acs.cpp:123`) and never
@@ -99,6 +117,7 @@ After hand-editing any doc file, or regenerating an inventory:
 ```text
 python3 tools/lint_docs.py
 python3 tools/gen_inventory.py --check   # confirms committed inventories match a fresh extraction
+python3 tools/gen_agents.py --check      # confirms subagent adapters match agents/procedures/
 ```
 
 `lint_docs.py` checks every section's `INDEX.md` links resolve, every doc file is linked and
@@ -117,8 +136,8 @@ tier-B/C entries from primary engine/compiler source are welcome.
 Mixed — see [LICENSE](LICENSE) for the full terms:
 
 1. Original prose and tooling (tier-B/C entries with no wiki provenance, a tier-A entry verified
-   straight from source with no wiki provenance at all, `tools/`, `CLAUDE.md` files, this file)
-   are MIT-licensed.
+   straight from source with no wiki provenance at all, `tools/`, `AGENTS.md`/`CLAUDE.md` files,
+   this file) are MIT-licensed.
 2. Wiki-derived entries (any file whose `Provenance:` cites a wiki page — every tier-A entry,
    plus wiki-sourced tier-B ones) are licensed as whole files, this repo's own contributions
    included, under their source wiki's license:

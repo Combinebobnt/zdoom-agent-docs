@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_DamageMaster` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_DamageMaster&oldid=46969) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4457-4475` and `wadsrc/static/actors/actor.txt:280`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_DamageMaster` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_DamageMaster&oldid=46969) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4457-4475` and `wadsrc/static/actors/actor.txt:280`; telefrag, frozen-corpse and network corrections from `src/p_interaction.cpp:1190-1210, 1261, 1310-1352, 1695-1700, 1745-1749, 1755, 1785-1787, 1837-1839`; extra-argument error from `src/thingdef/thingdef_states.cpp:430`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:4457` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_DamageMaster)`).
 
@@ -11,7 +11,7 @@ Damages the calling actor's master (spawner) by a specified amount; negative amo
 
 ## Parameters
 
-- **`amount`** — the amount of damage to inflict (required). Positive values damage; negative values heal. An amount of 1,000,000 or higher is treated specially via the `TELEFRAG_DAMAGE` mechanism and results in killing the target regardless of health or damage resistance.
+- **`amount`** — the amount of damage to inflict (required). Positive values damage; negative values heal. An amount of 1,000,000 or higher (`TELEFRAG_DAMAGE`) skips the `+INVULNERABLE` check. On UZDoom, damage factors and protection also can't reduce it unless the master has `+LAXTELEFRAGDMG`, so it kills regardless of resistance. On Zandronum they still can: `DamageFactor`, per-damage-type factors and protection powerups apply to it like any other damage (`src/p_interaction.cpp:1310-1352`), so a resistant master can survive it. A `+DORMANT` master takes no damage on either engine.
 - **`damagetype`** — the name of the damage type to use when processing damage (default `"none"`). Passed to `P_DamageMobj` as the `mod` parameter, which determines whether a special death state (e.g., `Death.Fire`) is triggered instead of the default `Death` state. Death states for custom damage types are resolved in the actor's state table.
 
 ## Behavior
@@ -27,10 +27,10 @@ The calling actor's `master` pointer (the actor that spawned this one via `A_Spa
 
 ### Damage behavior
 
-- **Invulnerability:** An `+INVULNERABLE` master **will not be harmed**. The function uses only `DMG_NO_ARMOR` and not `DMG_FORCED`, so `P_DamageMobj` rejects the damage when the target has the `MF2_INVULNERABLE` flag set. No flags exist in Zandronum to bypass invulnerability as they do in GZDoom/UZDoom.
+- **Invulnerability:** An `+INVULNERABLE` master **will not be harmed**. The function uses only `DMG_NO_ARMOR` and not `DMG_FORCED`, so `P_DamageMobj` rejects the damage when the target has the `MF2_INVULNERABLE` flag set. Zandronum's `P_DamageMobj` does have an internal `DMG_FOILINVUL` flag (`src/p_local.h:606`), but `A_DamageMaster` takes no flags parameter to request it, unlike UZDoom's `DMSS_FOILINVUL`. This is not absolute for a non-player target: `P_DamageMobj` only rejects the damage when the inflictor lacks `+FOILINVUL`, and the inflictor here is the calling actor, so a caller with `+FOILINVUL` bypasses the target's invulnerability (`p_interaction.cpp:1212-1220`).
 - **Armor:** Damage bypasses armor entirely — the `DMG_NO_ARMOR` flag prevents armor from reducing the damage.
 - **Damage factors:** Unlike `A_KillMaster`, damage factors **are applied** — properties like `DamageFactor` and damage-type-specific factor tables will modify the final damage taken. There is no `DMSS_NOFACTOR`-equivalent flag in Zandronum.
-- **Telefrag damage:** If `amount >= 1000000` (the `TELEFRAG_DAMAGE` constant), the damage check bypasses all damage resistance and invulnerability checks, forcing a kill under normal conditions.
+- **Telefrag damage:** If `amount >= 1000000` (the `TELEFRAG_DAMAGE` constant), the `+INVULNERABLE` check is skipped. For a player master, the skill damage factor is skipped too, and god mode and buddha don't protect as long as the amount is still at least `TELEFRAG_DAMAGE` after factors. It is not a guaranteed kill in Zandronum: `DamageFactor`, per-damage-type factors and protection powerups still reduce it (`p_interaction.cpp:1310-1352`), and a `+DORMANT` master is still immune (`p_interaction.cpp:1261`).
 
 ### Healing behavior
 
@@ -41,11 +41,11 @@ Negative `amount` values trigger the healing path via `P_GiveBody`, which:
 
 ## Dead targets and edge cases
 
-If the target's health is already 0 or below, or if the target is dead (`playerstate == PST_DEAD`), no damage or healing occurs and the function returns without effect.
+If the target's health is already 0 or below, or if the target is dead (`playerstate == PST_DEAD`), no damage or healing occurs and the function returns without effect. One exception: positive damage on a frozen (ice) corpse master shatters it. In Zandronum that happens for any damage type except `"Ice"` (`p_interaction.cpp:1190-1210`). UZDoom also shatters it with `"Ice"` when the caller has `+ICESHATTER`.
 
 ## Network behavior
 
-**Zandronum multiplayer:** The action carries no explicit network synchronization guard in the action function itself — `P_DamageMobj` and `P_GiveBody` are responsible for server/client state replication. On servers, damage is applied and propagated to clients via normal actor-death replication. On network clients, execution depends on the actor's `+CLIENTSIDEONLY` flag and the normal Zandronum actor-replication rules — this is a potential source of desyncs if not used carefully on non-client-side-only actors.
+**Zandronum multiplayer:** The action function itself has no client/server guard, so any network handling comes from `P_DamageMobj` and `P_GiveBody`. When the action runs on a client, `P_DamageMobj` still lowers the master's health locally but leaves the kill to the server (`Die` only runs outside client mode, `p_interaction.cpp:1745-1749`) and skips the wound and pain states (`p_interaction.cpp:1755`, `1785-1787`) and the wake-up and retarget logic (`p_interaction.cpp:1837-1839`). On a client, `P_GiveBody` refuses to heal a player master whose health that client isn't allowed to know (`src/g_shared/a_pickups.cpp:234`). On the server, a player master's damage is sent to clients (`p_interaction.cpp:1697-1699`) and a kill goes through `Die`.
 
 ## Engine-family divergence
 
@@ -80,7 +80,7 @@ Both engines otherwise agree: healing is refused outright if the target's health
 
 **Special god/buddha resistance notes:** The wiki claims this function respects `god2` and `buddha2` protective effects on players. These flags **do not exist in Zandronum at all** — they are GZDoom/UZDoom-only additions. In Zandronum, only the basic `CF_GODMODE` and `CF_BUDDHA` cheats exist (handled by `P_DamageMobj`), plus the `+INVULNERABLE` flag for actors.
 
-**If you port code from the wiki to Zandronum,** compilation will fail with "unknown identifier" errors for any `DMSS_*` flags, and passing more than two arguments to `A_DamageMaster` will fail with a "too many arguments" error. The wiki's example code using extended parameters **will not compile** in Zandronum.
+**If you port code from the wiki to Zandronum,** no `DMSS_*` constant exists at all, and passing more than two arguments to `A_DamageMaster` fails at parse time with `Expected ')', got ','.` at the comma before the third argument (`src/thingdef/thingdef_states.cpp:430`). The wiki's example code using extended parameters **will not compile** in Zandronum.
 
 ## Related functions
 

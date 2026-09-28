@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-18)
-**Provenance:** Zandronum Wiki `SetPlayerWeaponZoomFactor` (retrieved 2026-08-18, https://wiki.zandronum.com/w/index.php?title=SetPlayerWeaponZoomFactor&oldid=2268) + verified against the Zandronum source at the 3.2.1 tag (28f736fb3) for the ACS extension function (`case ACSF_SetPlayerWeaponZoomFactor` in `src/p_acs.cpp`) and implementation (`P_SetPlayerWeaponZoomFactor` in `src/g_shared/a_weapons.cpp:2056-2075`).
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** Zandronum Wiki `SetPlayerWeaponZoomFactor` (retrieved 2026-08-18, https://wiki.zandronum.com/w/index.php?title=SetPlayerWeaponZoomFactor&oldid=2268) + verified against the Zandronum source at the 3.3-alpha checkout (bdd0f7beb) for the ACS extension function (`case ACSF_SetPlayerWeaponZoomFactor` in `src/p_acs.cpp`) and implementation (`P_SetPlayerWeaponZoomFactor` in `src/g_shared/a_weapons.cpp:2056-2075`).
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function (index -174; dispatched as `ACSF_SetPlayerWeaponZoomFactor`).
 

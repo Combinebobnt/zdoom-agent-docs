@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_RaiseMaster` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RaiseMaster&oldid=53235) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4835-4848`, `src/p_things.cpp:555-591` (P_Thing_Raise implementation), `src/p_mobj.cpp:7849-7868` (AActor::GetRaiseState), and `wadsrc/static/actors/actor.txt:245`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_RaiseMaster` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RaiseMaster&oldid=53235) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4835-4845`, `src/p_things.cpp:527-566` (P_Thing_Raise implementation), `src/p_mobj.cpp:7849-7868` (AActor::GetRaiseState), `src/p_mobj.cpp:7870-7911` (AActor::Revive), `src/thingdef/thingdef_states.cpp:432-438` (zero-argument call parse error), and `wadsrc/static/actors/actor.txt:245`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:4835` (`DEFINE_ACTION_FUNCTION(AActor, A_RaiseMaster)`).
 
@@ -11,7 +11,7 @@ Resurrects the calling actor's master (spawner) from a corpse, provided the corp
 
 ## Parameters
 
-None. The function takes no arguments in Zandronum, so calls like `A_RaiseMaster(RF_TRANSFERFRIENDLINESS)` result in a parse error.
+None. The function takes no arguments in Zandronum, so calls like `A_RaiseMaster(RF_TRANSFERFRIENDLINESS)` result in a parse error. Because the declared signature is empty, even bare empty parentheses (`A_RaiseMaster()`) trigger the same error on Zandronum; write `A_RaiseMaster` with no parentheses.
 
 ## Behavior
 
@@ -40,13 +40,13 @@ When called, the action:
      requirement on top of it.
    - If any of the above conditions fail, the function returns `true` (treats as success, does nothing).
 
-3. **Prepare spatial properties.** Temporarily saves the actor's current height and radius, then sets them to their defaults via the actor's default-state copy (retrieved via `GetDefault()`). This ensures the spatial check uses the "full" actor size, not any reduced size from the corpse state.
+3. **Prepare spatial properties.** Zeroes the actor's horizontal velocity, saves its current flags, height and radius, then sets `MF_SOLID` and sets height and radius to the class defaults (from `GetDefault()`). This ensures the spatial check uses the "full" actor size, not any reduced size from the corpse state. The saved values are restored only if the position check fails; on success the actor keeps its default height and radius.
 
-4. **Check position.** Calls `P_CheckPosition(target, target->x, target->y)` to verify the actor has room to stand. If the check fails and the caller is a server (not a client), the spatial properties are restored and the function returns `false` (silently does nothing — DECORATE has no way to detect this failure).
+4. **Check position.** Calls `P_CheckPosition(target, target->x, target->y)` to verify the actor has room to stand. If the check fails and the call was not made with `byClient=true`, the saved flags, height and radius are restored and the function returns `false` (silently does nothing — DECORATE has no way to detect this failure). The `A_RaiseMaster` path always passes `byClient=false`, so this applies in singleplayer as well as on a server.
 
 5. **Play sound and revive.** If the position check passes (or is bypassed for clients):
-   - Plays the "vile/raise" sound at the actor's location (organ music).
-   - Calls `target->Revive()`, which resets all actor flags, fields, and properties to their defaults, clears the `target` and `lastenemy` pointers, restores health, and increments `level.total_monsters`. **This grows the kill-percentage denominator, not the kill counter itself** (`killed_monsters` is untouched) — the raised actor must be killed again for the level's kill count to reflect it.
+   - Plays the "vile/raise" sound at the actor's location.
+   - Calls `target->Revive()`, which resets the flag words (`flags` through `flags7`, plus Zandronum's `STFlags` and `NetworkFlags`) and `DamageType` to the class defaults, restores health, and clears the `target` and `lastenemy` pointers. It does not reset other fields. If the actor counts as a kill (`CountsAsKill()`), it also increments `level.total_monsters`. **This grows the kill-percentage denominator, not the kill counter itself** (`killed_monsters` is untouched) — the raised actor must be killed again for the level's kill count to reflect it.
    - On the server, sends a `SERVERCOMMANDS_SetThingState(target, STATE_RAISE)` command to all clients (see "Network behavior" below).
    - Sets the actor to the `Raise` state.
 
@@ -56,7 +56,7 @@ When called, the action:
 
 - **Server side:** The resurrection proceeds normally, checks position, plays sounds, calls `Revive()`, and broadcasts `SERVERCOMMANDS_SetThingState` to clients to synchronize the state transition and sound.
 - **Client side:** The early exit means clients never execute the resurrection logic. Clients receive the state-change via the server's `SERVERCOMMANDS_SetThingState` command, which internally calls `P_Thing_Raise(..., byClient=true)`. The `byClient=true` flag causes `P_Thing_Raise` to:
-  - Skip the `GetRaiseState()` check and instead call `FindState(NAME_Raise)` directly (bypassing the `tics != -1` and `CanRaise` guards).
+  - Skip the `GetRaiseState()` check and instead call `FindState(NAME_Raise)` directly (bypassing the `MF_CORPSE`, not-a-player, and `tics != -1`/`CanRaise` guards).
   - Skip the `P_CheckPosition` check entirely (since position validity was verified server-side).
   - Proceed directly to `Revive()` and state-setting.
 
@@ -75,9 +75,9 @@ When `Revive()` completes:
 
 - **Flags:** All actor flags (`MF_*`, `MF2_*`, ..., `MF7_*`) are reset to the actor's default-class values, including `MF_CORPSE` (which is cleared, transitioning the actor back to "alive").
 - **Health:** Restored to `SpawnHealth()` (the actor's full health at spawn).
-- **Pointers:** The `target` and `lastenemy` pointers are cleared (set to NULL). The `master` pointer, if any, is preserved (the resurrected actor keeps its master relationship). **Wiki note:** The wiki states "the resurrected actors will change their affiliation to match that of the calling actor" if the `RF_TRANSFERFRIENDLINESS` flag is used. **This flag does not exist in Zandronum** and cannot be used. There is no other mechanism to change the resurrected actor's allegiance.
-- **Level-spawned flag:** The `STFL_LEVELSPAWNED` flag is preserved from the corpse state (so level-spawned actors revived during gameplay retain this flag, which affects map-reset cleanup).
-- **Position:** The actor is revived at its current `x`/`y` coordinates (height/radius are set to defaults as part of `Revive()`).
+- **Pointers:** The `target` and `lastenemy` pointers are cleared (set to NULL). The `master` pointer, if any, is preserved (the resurrected actor keeps its master relationship). **Wiki note:** The wiki states "the resurrected actors will change their affiliation to match that of the calling actor" if the `RF_TRANSFERFRIENDLINESS` flag is used. **This flag does not exist in Zandronum** and cannot be used. `A_RaiseMaster` itself has no other mechanism to change the resurrected actor's allegiance.
+- **Level-spawned flag:** On Zandronum, the `STFL_LEVELSPAWNED` and `STFL_POSITIONCHANGED` flags are preserved from the corpse state (so level-spawned actors revived during gameplay retain them, which affects map-reset cleanup).
+- **Position:** The actor is revived at its current `x`/`y` coordinates. Its height and radius were already set to the class defaults by `P_Thing_Raise` before the position check, not by `Revive()`.
 
 ## Resurrectable actors (requirements)
 
@@ -106,7 +106,7 @@ Monsters that don't meet these requirements will simply be skipped (function ret
 action native A_RaiseMaster();
 ```
 
-If you attempt to call `A_RaiseMaster(RF_NOCHECKPOSITION)` or `A_RaiseMaster(RF_TRANSFERFRIENDLINESS)` in Zandronum DECORATE, the compiler will emit a parse error ("too many arguments to function"). There is no way to disable the position check or override the resurrected actor's allegiance in Zandronum.
+If you attempt to call `A_RaiseMaster(RF_NOCHECKPOSITION)` or `A_RaiseMaster(RF_TRANSFERFRIENDLINESS)` in Zandronum DECORATE, the DECORATE parser raises a fatal script error ("You cannot pass parameters to '...'"), as it does for any `(` after a function with an empty signature. There is no way to disable the position check or override the resurrected actor's allegiance in Zandronum.
 
 Additionally, the wiki's claim that "the only function that sets the necessary information is `A_SpawnItemEx`" is outdated — `A_RearrangePointers` and `A_TransferPointer` can also assign the `master` pointer, establishing a spawner relationship post-spawn.
 

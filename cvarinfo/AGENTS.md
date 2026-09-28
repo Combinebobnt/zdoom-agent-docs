@@ -7,9 +7,9 @@ that section for the actual `AddBot`-style cvar inventory). This section covers 
 mechanism* itself — types, flags, default-value syntax. **Read `../shared/AUTHORING.md` and
 `../shared/ARCHETYPES.md` first.**
 
-If the `zdoom-docs-lookup` subagent is registered, prefer delegating a lookup question to it
-instead of reading this tree by hand — see the root [`AGENTS.md`](../AGENTS.md)'s "Subagents"
-section.
+If your agent harness has the `zdoom-docs-lookup` subagent registered (adapters for several
+harnesses ship in `../agents/`), prefer delegating a lookup question to it instead of reading
+this tree by hand — see the root [`AGENTS.md`](../AGENTS.md)'s "Subagents" section.
 
 ## Layout
 

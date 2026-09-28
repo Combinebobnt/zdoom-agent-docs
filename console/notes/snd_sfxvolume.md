@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-16); Zandronum 3.2.1 @28f736fb3 (2026-08-02)
-**Provenance:** Zandronum source `src/sound/i_sound.cpp`, verified 2026-08-02.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-16); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** Zandronum source `src/sound/i_sound.cpp`, verified 2026-08-02; `src/c_cvars.cpp:777-790` and `src/sound/i_sound.cpp:275` (startup callback), `src/sound/fmodsound.cpp:1430-1433` (SFX group volume).
 
 Volume multiplier for sound effects.
 
@@ -13,7 +13,7 @@ The cvar accepts values in the range 0.0–1.0; any value outside this range is 
 
 **Default:** 1.0.
 
-**Flags:** `CVAR_ARCHIVE | CVAR_GLOBALCONFIG | CVAR_NOINITCALL` — the `CVAR_NOINITCALL` flag prevents the callback from executing during engine startup (before the sound system is initialized), avoiding operations on a null sound renderer.
+**Flags:** `CVAR_ARCHIVE | CVAR_GLOBALCONFIG | CVAR_NOINITCALL`. `CVAR_NOINITCALL` skips this cvar in the startup pass that runs every cvar's callback once callbacks are enabled (`FBaseCVar::EnableCallbacks`). The callback guards against a missing renderer on its own; the stored value first reaches the renderer when `I_InitSound` calls the callback explicitly after creating it.
 
 ## Engine-family divergence: UZDoom multiplies by a separate `snd_mastervolume` cvar Zandronum doesn't have
 
@@ -21,4 +21,4 @@ The clamping, default, range, and flags described above hold identically on UZDo
 
 `snd_mastervolume` is a UZDoom-only `CUSTOM_CVAR(Float, ..., 0.5f, CVAR_ARCHIVE|CVAR_GLOBALCONFIG|CVAR_NOINITCALL)`, itself clamped to [0,1], that also feeds into the music-volume path and is re-applied by re-invoking `snd_sfxvolume`'s (and `snd_musicvolume`'s) callback whenever it changes.
 
-**Practical impact:** on UZDoom, the effective sound-effects gain at the renderer is `snd_sfxvolume * snd_mastervolume`, not `snd_sfxvolume` alone. Since `snd_mastervolume` defaults to 0.5, a stock UZDoom install with `snd_sfxvolume 1` plays sound effects at roughly half the raw gain a Zandronum install with the same `snd_sfxvolume` setting would (assuming Zandronum's own master-mixing, if any, is not itself in play).
+**Practical impact:** on UZDoom, the effective sound-effects gain at the renderer is `snd_sfxvolume * snd_mastervolume`, not `snd_sfxvolume` alone. Since `snd_mastervolume` defaults to 0.5, a stock UZDoom install with `snd_sfxvolume 1` plays sound effects at roughly half the raw gain a Zandronum install with the same `snd_sfxvolume` setting would. Zandronum applies the value directly as the volume of its FMOD SFX channel group, with no other master scaling in between.

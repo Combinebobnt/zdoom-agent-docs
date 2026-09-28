@@ -4,9 +4,11 @@
 **Applies to:** UZDoom=yes, Zandronum=yes — both engines' `menu_save` CCMD bodies were read this
 pass and are functionally identical (see below); an earlier pass had only name-verified Zandronum's
 side.
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3
-(2026-08-17)
-**Provenance:** Verified against the UZDoom source's `src/menu/doommenu.cpp`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb
+(2026-09-26)
+**Provenance:** Verified against the UZDoom source's `src/menu/doommenu.cpp`. Zandronum save
+screen and refusal paths: `src/menu/menu.cpp:485-493` and `:530-535`, `wadsrc/static/menudef.txt:270`,
+`src/menu/loadsavemenu.cpp:939-966`.
 
 Bound to F2 by default on both engines (UZDoom's `wadsrc/static/engine/commonbinds.txt`;
 Zandronum's `src/c_bind.cpp`). Thin wrapper: opens the control panel and switches straight to the
@@ -29,8 +31,16 @@ is backed by the ZScript-side [`SavegameManager`](../../zscript/classes/savegame
 (`Applies to: UZDoom=yes, Zandronum=no` on that file) — `DoSave()` there calls
 `PerformSaveGame()` → `G_SaveGame()`. On Zandronum, the equivalent screen is the native
 `DSaveMenu` C++ class (`src/menu/loadsavemenu.cpp`): its own `DoSave(FSaveGameNode*)` method
-picks an unused `saveNN` filename for a fresh slot (or reuses the selected node's filename) and
+picks the lowest unused `save<N>.zds` filename (from `G_BuildSaveName`, N counting up from 0) for a
+fresh slot (or reuses the selected node's filename) and
 calls `G_SaveGame()` directly — same eventual save-writing call, reached through native code
-instead of a ZScript struct. A Zandronum-side caller has no `SavegameManager` to reach at all; the
+instead of a ZScript struct.
+
+On Zandronum the screen can refuse to open at all. `M_SetMenu` shows the `SAVEDEAD` message
+instead when there is no user game, the game state isn't a level, or the player is dead in single
+player (`src/menu/menu.cpp:485-493`). A network client gets the `$SAVENET` message instead, because
+Zandronum's `SaveGameMenu` definition carries a `NetgameMessage` that `M_SetMenu` shows whenever the
+network state is client and no demo is playing (`wadsrc/static/menudef.txt:270`,
+`src/menu/menu.cpp:530-535`). So `menu_save` never reaches `DoSave()` on a Zandronum client. A Zandronum-side caller has no `SavegameManager` to reach at all; the
 [`SavegameManager`](../../zscript/classes/savegamemanager.md) doc's `Zandronum=no` claim is not
 just "unverified there," it's a genuine absence.

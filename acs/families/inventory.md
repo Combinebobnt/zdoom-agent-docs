@@ -6,7 +6,7 @@ see below). Two source-only additions with no wiki starting point are tier B: th
 starting inventory" section.
 **Applies to:** UZDoom=yes, Zandronum=yes — file-level claim for the majority; `GetMaxInventory`
 specifically is the outlier, confirmed `uzdoom-only` (see its own section below)
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-06)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** ZDoom Wiki pages `ClearInventory` (retrieved 2026-08-06, https://zdoom.org/w/index.php?title=ClearInventory&oldid=40599), `ClearActorInventory` (retrieved 2026-08-06, https://zdoom.org/w/index.php?title=ClearActorInventory&oldid=42468), `GiveInventory` (retrieved 2026-08-07, https://zdoom.org/w/index.php?title=GiveInventory&oldid=52127), `GiveActorInventory` (retrieved 2026-08-07, https://zdoom.org/w/index.php?title=GiveActorInventory&oldid=45630), `TakeInventory` (retrieved 2026-08-07, https://zdoom.org/w/index.php?title=TakeInventory&oldid=52106), `TakeActorInventory` (retrieved 2026-08-07, https://zdoom.org/w/index.php?title=TakeActorInventory&oldid=45631), `CheckInventory` (retrieved 2026-08-07, https://zdoom.org/w/index.php?title=CheckInventory&oldid=35673), `CheckActorInventory` (retrieved 2026-08-07, https://zdoom.org/w/index.php?title=CheckActorInventory&oldid=35649), `UseInventory` (retrieved 2026-08-07, https://zdoom.org/w/index.php?title=UseInventory&oldid=40595), `UseActorInventory` (retrieved 2026-08-07, https://zdoom.org/w/index.php?title=UseActorInventory&oldid=35842), `CheckWeapon` (retrieved 2026-08-07, https://zdoom.org/w/index.php?title=CheckWeapon&oldid=35674), `SetWeapon` (retrieved 2026-08-07, https://zdoom.org/w/index.php?title=SetWeapon&oldid=35978), `GetWeapon` (retrieved 2026-08-07, https://zdoom.org/w/index.php?title=GetWeapon&oldid=48815), `DropItem` (retrieved 2026-08-07, https://zdoom.org/w/index.php?title=DropItem&oldid=48036), `DropInventory` (retrieved 2026-08-07, https://zdoom.org/w/index.php?title=DropInventory&oldid=53653), `GetMaxInventory` (retrieved 2026-08-07, https://zdoom.org/w/index.php?title=GetMaxInventory&oldid=49108). Verified against the Zandronum source throughout.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `ClearInventory`/`ClearActorInventory`/`GiveInventory`/`GiveActorInventory`/
@@ -104,7 +104,7 @@ an ammo check the wiki omits entirely.
 
 ## `void ClearInventory()` / `void ClearActorInventory(int tid)`
 
-`PCD_CLEARINVENTORY` / `PCD_CLEARACTORINVENTORY` (`p_acs.cpp:11677-11701`), both call the shared
+`PCD_CLEARINVENTORY` / `PCD_CLEARACTORINVENTORY` (`p_acs.cpp:11677-11696`), both call the shared
 `ClearInventory(AActor*)` helper (`p_acs.cpp:1249`). No amount/type args — calls the native
 `AActor::ClearInventory()`, which correctly skips `INVENTORY.UNDROPPABLE`-flagged items (matches
 wiki). `ClearActorInventory` fans out over every actor matching `tid` (or all players at `tid==0`
@@ -382,7 +382,7 @@ the same way, with nothing to disagree about.
 ## `int DropItem(int tid, str item [, int dropamount [, int chance]])`
 
 Extension function -74 (`case ACSF_DropItem:`, `p_acs.cpp:6735-6766`). Spawns a **new instance**
-of `item` into the world via `P_DropItem()`/`Spawn()` (`p_enemy.cpp:3463-3491`) — not taken from
+of `item` into the world via `P_DropItem()`/`Spawn()` (`p_enemy.cpp:3463-3533`) — not taken from
 any actor's existing inventory slot; this is the odd one out in the family, world-spawning rather
 than inventory-manipulating. `dropamount` (default `-1`) feeds `ModifyDropAmount`, meaningful only
 for `Inventory`-derived classes. `chance` (default `256`) gates an 8-bit `pr_dropitem()` roll via
@@ -403,7 +403,7 @@ On UZDoom, `ACSF_DropItem` (`p_acs.cpp`) still spawns via `P_DropItem` (`p_enemy
 same 8-bit range, same `<=` comparison, same 1-in-256 result at `chance==0`.
 
 **Provenance:** ZDoom Wiki `DropItem` (retrieved 2026-08-07, https://zdoom.org/w/index.php?title=DropItem&oldid=48036) + source-verified against
-`p_acs.cpp:6735-6766`, `p_enemy.cpp:3463-3491`. **Tier:** A.
+`p_acs.cpp:6735-6766`, `p_enemy.cpp:3463-3533`. **Tier:** A.
 
 ---
 
@@ -411,7 +411,7 @@ same 8-bit range, same `<=` comparison, same 1-in-256 result at `chance==0`.
 
 Extension function -82 (`case ACSF_DropInventory:`, `p_acs.cpp:6768-6802`). Looks up the item via
 `FindInventory` and, if present, calls `AActor::DropInventory` (`p_mobj.cpp:924-958`), which routes
-through `item->CreateTossable()` (`a_pickups.cpp:797-834`): either the item itself becomes the
+through `item->CreateTossable()` (`a_pickups.cpp:797-847`): either the item itself becomes the
 world pickup (`BecomePickup()`) if `Amount==1`, or `Amount` is decremented and a fresh
 `Amount=1` copy is spawned at the owner's position with toss velocity. This is a genuine
 remove-and-spawn-a-tossable path, distinct from `TakeInventory`'s plain destroy/decrement with no
@@ -428,7 +428,7 @@ clamps to `1`, rather than a literal default of `1`) but the net effect — exac
 per call — is identical. No divergence found on UZDoom either.
 
 **Provenance:** ZDoom Wiki `DropInventory` (retrieved 2026-08-07, https://zdoom.org/w/index.php?title=DropInventory&oldid=53653) + source-verified
-against `p_acs.cpp:6768-6802`, `p_mobj.cpp:924-958`, `a_pickups.cpp:797-834`. **Tier:** A.
+against `p_acs.cpp:6768-6802`, `p_mobj.cpp:924-958`, `a_pickups.cpp:797-847`. **Tier:** A.
 
 ---
 

@@ -2,10 +2,10 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `Door_Open - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
 `https://zdoom.org/w/index.php?title=Door_Open&oldid=46912`, ZDoom upstream) + source-verified against Zandronum fork
-(`p_lnspec.cpp:228-232`, `p_doors.cpp:579-698`, `p_doors.cpp:463-530`). The wiki page accurately
+(`p_lnspec.cpp:228-232`, `p_doors.cpp:579-698`, `p_doors.cpp:463-530`, `p_lights.cpp:564-593`, `sv_commands.cpp:4353-4375`). The wiki page accurately
 describes the ceiling-height behavior ("four units below the lowest surrounding ceiling") and the
 parametric meaning (`tag`, `speed`, `lighttag`), and its Doom-linedef conversion table anchors the
 speed values (16 for normal, 64 for fast). The wiki page does **not** document the manual-trigger
@@ -32,8 +32,8 @@ into `EV_DoDoor` (`p_doors.cpp:579`).
     the line exists but has no back sidedef, the function also **plays the `*usefail` sound at the
     activator** (`p_doors.cpp:598`) before returning. If the target sector's ceiling is already
     moving (even for a `doorRaise` type), returns `0` — reopen-a-closing-door logic is **not**
-    available for `Door_Open` (that is gated on `door->m_Type == DDoor::doorRaise`, a check not
-    passed for the `doorOpen` type at `p_doors.cpp:626-627`).
+    available for `Door_Open`. That path requires both the existing door and the requested type
+    to be `doorRaise` (`p_doors.cpp:626-627`), and `Door_Open` always requests `doorOpen`.
 
 - `speed` — **not map-units-per-tic directly.** Passed through the `SPEED(a)` macro
   (`p_lnspec.cpp:76`: `#define SPEED(a) ((a)*(FRACUNIT/8))`), i.e. the raw integer you pass is
@@ -41,8 +41,9 @@ into `EV_DoDoor` (`p_doors.cpp:579`).
   normal-door speed), `64` for 8.0 units/tic (standard Doom fast-door speed).
 
 - `lighttag` *(optional, defaults to 0)* — if non-zero, a gradual lighting effect is applied to
-  sectors matching `lighttag`. The light is gradually changed between the darkest neighboring
-  sector when the door is fully closed and the brightest when fully open. **This effect is
+  sectors matching `lighttag`. As the door moves, each such sector's light is interpolated by how
+  far open the door is: at fully closed it takes the darkest of its own and its neighbors' light
+  levels, at fully open its brightest neighbor's level. **This effect is
   silently disabled if the `COMPATF_NODOORLIGHT` compatibility flag is set** — the flag is checked
   in the `DDoor` constructor (`p_doors.cpp:470-473`) and zeros `m_LightTag` before any lighting
   work is done. The ZDoom wiki page does not document this engine-fork compat-flag gate (present in
@@ -69,8 +70,10 @@ itself.
 (remote), success means at least one sector was affected. For `tag == 0` (manual), success means
 a valid line with a back sector was found and that sector did not already have a moving ceiling.
 
-**Zandronum-specific netcode:** The manual-trigger case (`tag == 0`) replicates the `*usefail`
-sound to clients via `SERVERCOMMANDS_SoundActor` when the activator pushes a one-sided line
-(`p_doors.cpp:601-607`). The remote-trigger case (`tag != 0`) replicates the door motion to
-clients via `SERVERCOMMANDS_DoDoor` for each sector (`p_doors.cpp:689-691`). The ZDoom wiki page
-does not document this netcode behavior.
+**Zandronum-specific netcode:** Offline the special runs locally with no broadcast. On a server,
+every door it starts is replicated to clients via `SERVERCOMMANDS_DoDoor`, in both the manual case
+(`p_doors.cpp:670-671`) and the remote case, once per sector (`p_doors.cpp:689-690`). That command
+carries the light tag as a `Short`. When the manual case hits a one-sided line, the server also
+sends the `*usefail` sound via `SERVERCOMMANDS_SoundActor` (`p_doors.cpp:601-607`). If the
+activator is a player, that player's own client is skipped (`SVCF_SKIPTHISCLIENT`) and every other
+client gets the sound. The ZDoom wiki page does not document this netcode behavior.

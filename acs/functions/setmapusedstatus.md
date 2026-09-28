@@ -39,6 +39,4 @@ This function was added after the Zandronum 3.2.1 release. It is only available 
 
 ## See also
 
-- `GetMapRotationInfo` — reads properties of map-rotation entries (name, lump name, used status, player limits). Same client-side read restriction as this function's client-mode rejection, but returns default values rather than being a no-op.
-- `GetMapRotationSize` — returns the number of entries in the current map rotation.
-- `GetMapPosition` — gets the current or next position in the rotation, separate from querying a specific entry's properties.
+- [Map rotation family](../families/map-rotation.md) — `GetMapRotationSize`, `GetMapRotationInfo` (reads an entry's name, lump name, used status and player limits; unlike this function it has no client-mode check), `GetMapPosition` and `SetNextMapPosition`. Same 1-based position numbering as this function.

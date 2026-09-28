@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
-**Provenance:** `SectorDamage - ZDoom Wiki` (`_intake/SectorDamage - ZDoom Wiki.html`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=SectorDamage&oldid=45035`), verified against fork source (`p_acs.cpp:12703-12715`, `p_spec.cpp:714-783`, `p_spec.h:162-165`, `zt-bcc/src/builtin.c:147,295`, `zt-bcc/lib/zcommon.bcs:379-383`). The wiki's signature, parameter semantics, empty-string protection-item behavior, and the "must set PLAYERS/NONPLAYERS" warning all check out. `DAMAGE_NO_ARMOR` does not — see divergence section above.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
+**Provenance:** `SectorDamage - ZDoom Wiki` (`_intake/SectorDamage - ZDoom Wiki.html`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=SectorDamage&oldid=45035`), verified against fork source (`p_acs.cpp:12703-12715`, `p_spec.cpp:714-787`, `p_spec.h:162-165`, `g_shared/a_armor.cpp:126,531`, `thingdef/thingdef_parse.cpp:1180-1214`, `p_acs.cpp:9059-9063`, `zt-bcc/src/builtin.c:147,295`, `zt-bcc/lib/zcommon.bcs:379-383`). The wiki's signature, parameter semantics, empty-string protection-item behavior, and the "must set PLAYERS/NONPLAYERS" warning all check out. `DAMAGE_NO_ARMOR` does not — see divergence section above.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 
@@ -26,12 +26,14 @@ relying on the pair as a getter/setter-style family.
 ## Parameters
 
 - `tag` — sector tag to affect; resolved via the standard `P_FindSectorFromTag` tag-chain walk
-  (`p_spec.cpp:739`), so it matches every sector with that tag, not just one.
+  (`p_spec.cpp:741`), so it matches every sector with that tag, not just one.
 - `amount` — flat damage amount passed straight through to `P_DamageMobj` (no scaling).
 - `type` — damage type name (`FName`, looked up via `FBehavior::StaticLookupString`); either a
-  builtin ZDoom/Zandronum damage type (`"Fire"`, `"Normal"`, etc.) or any custom type defined on a
-  `DECORATE`/`ZScript` damage-type actor. No validation against a known-types list — an unknown
-  string just becomes an `FName` with no special resistance/vulnerability behavior tied to it.
+  builtin damage type (`"Fire"`, etc.) or any custom name. Custom names need no declaration. No
+  validation against a known-types list. An unknown string just becomes an `FName` whose only
+  effect comes from targets' per-type properties (`DamageFactor` etc.) and any global `DamageType`
+  definition for that name. The string is used literally: DECORATE's `"Normal"` alias for untyped
+  damage is not applied here, so `"Normal"` is a distinct name (untyped damage is `"None"`).
 - `protection_item` — inventory item class name; an actor carrying it is immune. Passing `""`
   (empty string) means "no protection item" — confirmed in source: the lookup uses
   `FName(text, /*noCreate=*/true)` (`p_acs.cpp:12708`), which for an empty string that isn't
@@ -39,7 +41,7 @@ relying on the pair as a getter/setter-style family.
   yields `NULL`, so the protection check is skipped entirely. This matches the wiki's description.
 - `flags` — bitmask, see below. **At least one of `DAMAGE_PLAYERS`/`DAMAGE_NONPLAYERS` must be
   set or nothing is damaged** — confirmed directly in `DoSectorDamage`'s early-out gating
-  (`p_spec.cpp:730-732`), matching the wiki's own warning.
+  (`p_spec.cpp:719-723`), matching the wiki's own warning.
 
 ## Flags (`p_spec.h:162-165`, mirrored in `zt-bcc/lib/zcommon.bcs:379-383`)
 
@@ -47,19 +49,22 @@ relying on the pair as a getter/setter-style family.
 |---|---|---|
 | `DAMAGE_PLAYERS` | `0x1` | Players in the sector take damage. |
 | `DAMAGE_NONPLAYERS` | `0x2` | Shootable non-player actors (`MF_SHOOTABLE`) in the sector take damage. |
-| `DAMAGE_IN_AIR` | `0x4` | Without this, an actor is only damaged if it's touching the sector floor or has nonzero `waterlevel` (`p_spec.cpp:723`) — i.e. "on the ground or in the water," per the wiki. With it, height/water is not checked at all. |
-| `DAMAGE_SUBCLASSES_PROTECT` | `0x8` | Changes the protection check from "must carry that exact class" to "carries that class *or any subclass of it*" (`actor->FindInventory(protectClass, subclassesProtect)`, `p_spec.cpp:727`). |
+| `DAMAGE_IN_AIR` | `0x4` | Without this, an actor is only damaged if it's touching the sector floor or has nonzero `waterlevel` (`p_spec.cpp:725`) — i.e. "on the ground or in the water," per the wiki. With it, height/water is not checked at all. |
+| `DAMAGE_SUBCLASSES_PROTECT` | `0x8` | Changes the protection check from "must carry that exact class" to "carries that class *or any subclass of it*" (`actor->FindInventory(protectClass, subclassesProtect)`, `p_spec.cpp:730`). |
 
 **Divergence — `DAMAGE_NO_ARMOR` is broken/nonexistent in Zandronum, contrary to the wiki:**
 
 1. **Not defined in the engine at all.** `p_spec.h:162-165` only defines the four flags above;
    there is no `DAMAGE_NO_ARMOR` constant anywhere in the Zandronum source's `src`.
 2. **Not checked by the damage logic either way.** `DoSectorDamage` unconditionally calls
-   `P_DamageMobj(actor, NULL, NULL, amount, type)` (`p_spec.cpp:731`) with the damage-flags
+   `P_DamageMobj(actor, NULL, NULL, amount, type)` (`p_spec.cpp:734`) with the damage-flags
    argument omitted (defaults to `0`) — the engine's actual armor-bypass bit, `DMG_NO_ARMOR`
    (`p_local.h:600`, used by `P_DamageMobj`'s own flags parameter), is never set from here. So
-   even if a caller could pass some bit through, nothing downstream would act on it — armor
-   absorption always applies normally for `SectorDamage`, full stop.
+   even if a caller could pass some bit through, nothing downstream would act on it. No `flags`
+   value bypasses armor. The `type` argument can, though: `BasicArmor` and `HexenArmor` skip
+   absorption for any damage type whose global definition sets `NoArmor`
+   (`g_shared/a_armor.cpp:126,531`). That definition is a top-level DECORATE block,
+   `DamageType <name> { NoArmor }` (`thingdef/thingdef_parse.cpp:1180-1214`).
 3. **zt-bcc's own constant is malformed on top of that.** `zcommon.bcs:383` defines
    `DAMAGE_NO_ARMOR = 0x16` — decimal 22, i.e. `0b10110`, not a clean single bit. OR'ing it into
    `flags` doesn't just silently no-op: it also sets `DAMAGE_NONPLAYERS` (`0x2`) and
@@ -69,8 +74,8 @@ relying on the pair as a getter/setter-style family.
    **no** armor-ignoring effect at all.
 
 **Conclusion: treat `DAMAGE_NO_ARMOR` as unusable in Zandronum — don't pass it.** There is no
-working substitute flag in Zandronum's `SectorDamage` for bypassing armor; armor absorption
-cannot be disabled through this function.
+working substitute flag in Zandronum's `SectorDamage` for bypassing armor. To bypass armor, pass
+a damage type declared with `NoArmor` as `type` instead.
 
 ## Engine-family divergence: `DAMAGE_NO_ARMOR` actually works on UZDoom
 
@@ -94,8 +99,10 @@ the Zandronum divergence above, just no longer paired with a totally inert armor
 script that wants armor bypass on UZDoom without those side effects should OR in the literal value
 `16` rather than zt-bcc's `DAMAGE_NO_ARMOR` symbol. Since Zandronum has no working armor-bypass bit
 at all, there is no flag value that behaves identically on both engines — code relying on this
-needs an engine-specific branch (or should avoid depending on armor bypass through `SectorDamage`
-entirely) rather than assuming one constant is portable.
+needs an engine-specific branch rather than assuming one constant is portable. The portable route
+is the `type` argument: UZDoom's armor classes also skip absorption for a damage type defined
+with `NoArmor` (declarable in MAPINFO or DECORATE there), so a `NoArmor` damage type bypasses
+armor on both engines with no flag at all.
 
 Every other aspect of `SectorDamage` checked against UZDoom's implementation matches the
 Zandronum-verified behavior described elsewhere in this file: the same one-shot-per-call
@@ -113,10 +120,10 @@ its own height-range check.
 - **3D-floor aware.** Beyond the sector's own `thinglist`, `P_SectorDamage` also walks any sectors
   attached to it as 3D floors (`sec->e->XFloor.attached`) and applies the same damage to actors
   touching/above those attached floors, with an extra height-range check
-  (`p_spec.cpp:752-780`) — not mentioned by the wiki at all, since 3D floors are a ZDoom-family
+  (`p_spec.cpp:752-785`) — not mentioned by the wiki at all, since 3D floors are a ZDoom-family
   extension the wiki page doesn't call out here.
 - **`MF_SHOOTABLE` gate.** Any actor without `MF_SHOOTABLE` (already dead, non-solid decorations,
-  etc.) is skipped before the player/non-player check (`p_spec.cpp:715-716`).
+  etc.) is skipped before the player/non-player check (`p_spec.cpp:716-717`).
 
 ## Example (from the wiki, still accurate)
 
@@ -141,17 +148,11 @@ script 1 (int tag)
 
 ## Relationship to SetSectorDamage
 
-While researching this function I checked whether `SetSectorDamage` (`ACSF_SetSectorDamage`,
-`zcommon.bcs:1724`, index `-94`) is implemented in Zandronum, since the two names strongly suggest
-a getter/setter-style pair (`SectorDamage` = "damage it right now" vs. `SetSectorDamage` =
-"configure its ongoing damage property"). **It is not implemented in this Zandronum checkout**:
-there is no `ACSF_SetSectorDamage` (nor `case ACSF_SetSectorDamage:`) anywhere in
-the Zandronum source's `src/p_acs.cpp`, and neighboring entries in the same `zcommon.bcs` index range
-(`SetSectorTerrain` at `-95`, `GetMaxInventory` at `-93`) are similarly absent from the engine's
-`EACSFunctions` enum and dispatch `switch`. This looks like a block of newer GZDoom-family
-extension functions that `zt-bcc` lists (for cross-engine compatibility) but this Zandronum fork
-never ported — i.e. calling `SetSectorDamage` from a BCS script would presumably fail to resolve
-at the engine level despite compiling cleanly against `zt-bcc`'s table. This is a fork-existence
-question, not a behavior question, so I'm flagging it here rather than guessing at
-`SetSectorDamage`'s semantics; the sibling doc for that function should verify/state this
-independently rather than treat the two as a working pair.
+The two names suggest a getter/setter-style pair (`SectorDamage` = "damage it right now" vs.
+`SetSectorDamage` = "configure its ongoing damage property"), but **`SetSectorDamage`
+(`zcommon.bcs:1724`, index `-94`) is not implemented in Zandronum**. Its `src/p_acs.cpp` has no
+`ACSF_SetSectorDamage` enum entry or `case`. No `EACSFunctions` member takes a value in 93-99
+(`p_acs.cpp:5449-5465`), so the neighboring zt-bcc entries (`GetMaxInventory`
+at `-93`, `SetSectorTerrain` at `-95`) are missing too. A call compiles cleanly against zt-bcc's
+table, then falls into `CallFunction`'s `default:` case (`p_acs.cpp:9059-9063`): a silent no-op
+that returns 0. See `functions/setsectordamage.md` for that function's own details.

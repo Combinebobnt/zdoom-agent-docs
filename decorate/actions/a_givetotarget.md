@@ -2,17 +2,17 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
-**Provenance:** ZDoom Wiki `A_GiveToTarget` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_GiveToTarget&oldid=43419) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp` lines 2187–2190 and the shared `DoGiveInventory` helper at lines 2120–2180.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** ZDoom Wiki `A_GiveToTarget` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_GiveToTarget&oldid=43419) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp` lines 2187–2190 and the shared `DoGiveInventory` helper at lines 2120–2180; result slot and NULL receiver: `src/thingdef/thingdef_codeptr.cpp:135-150` (`CallStateChain`), `src/thingdef/thingdef.h:435`, `src/actorptrselect.h:85`, `src/actorptrselect.cpp:35-92`; client check: `src/network.cpp:1598-1612`; `MaxAmount` handling: `src/g_shared/a_pickups.cpp:669-697`, `770-785`, `147-190`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:2187-2190` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_GiveToTarget)`, dispatched via a thin wrapper that passes `self->target` to the shared `DoGiveInventory` helper).
 
-Adds inventory items of a specified type to the calling actor's **current target**'s inventory. The function will not add more items than the inventory item's `MaxAmount` property permits.
+Adds inventory items of a specified type to the calling actor's **current target**'s inventory. How far the item's `MaxAmount` property limits the give differs by engine; see "Inventory-limit enforcement" below.
 
 ## Parameters
 
 - **`itemtype`** — the inventory item class to give. This must be a valid class derived from `Inventory`.
-- **`amount`** — the number of samples to give. Default is `0`, which is internally converted to `1` (see "Health items" below). For non-health items, the spawned item's `Amount` field is directly set to this value; if the item's `MaxAmount` is lower, `CallTryPickup` (see "Success/failure" below) will reject it.
+- **`amount`** — the number of samples to give. Default is `0`, which is internally converted to `1` (see "Health items" below). For non-health items, the spawned item's `Amount` field is set to this value before the pickup attempt. See "Inventory-limit enforcement" below for what happens when it exceeds `MaxAmount`.
 - **`giveto`** — an actor pointer selector determining which actor receives the item, with the calling actor's **target as the context** (not the calling actor itself). Default is `AAPTR_DEFAULT`, which corresponds to the calling actor's target. For example, `AAPTR_MASTER` here refers to the target's master, not the calling actor's master. See [Actor pointer selectors](../../acs/concepts/actor-pointers.md) for the full selector set.
 
 ## Health items: special amount handling
@@ -21,26 +21,37 @@ If the item class derives from `Health`, the `amount` parameter is multiplied by
 
 ## Success/failure and return value
 
-The function returns `true` if the item was successfully added to the target's inventory, or `false` if the pickup failed (e.g., the item's `MaxAmount` was exceeded and `CallTryPickup` rejected it, or the item class was invalid). **If the target is NULL**, the function returns early without calling the action-result-setting mechanism; the state-code result slot is not modified in this case, so a subsequent DECORATE `if` branch will use any prior value, not the actual outcome.
+The outcome is `true` if the item was added to the receiver's inventory, or `false` if the pickup failed (e.g. `CallTryPickup` rejected it because the receiver already holds `MaxAmount`) or the item class was invalid. How that outcome is observed differs by engine:
+
+- **UZDoom:** it is the function's `bool` return value.
+- **Zandronum:** DECORATE action functions have no return value. The outcome is written only to the state-chain result of a `CustomInventory` `Pickup`/`Use`/`Drop` chain, and is discarded anywhere else. `CallStateChain` resets that result to `true` before every action, and the chain succeeds if any action leaves it `true`. **If the receiver is NULL**, the function returns early without writing the result, so the call counts as a success in the chain, not a failure.
 
 ## Engine-family divergence: `DoGiveInventory` helper differences
 
-- **NULL-target result behavior.** In UZDoom, `A_GiveToTarget` and the shared `DoGiveInventory` helper are real ZScript functions with a `bool` return type. Every code path — including both NULL-receiver cases (the calling actor has no target at all, or the `giveto` pointer selector resolves to NULL relative to the target) — explicitly `return false`, and callers observe that actual `false` outcome. There is no separate "action result slot" that can be left unmodified. This differs from the Zandronum behavior described above under "Success/failure and return value": there, the underlying C++ codepointer's early `return;` (triggered by the `COPY_AAPTR_NOT_NULL` macro when the resolved receiver is NULL) skips `ACTION_SET_RESULT` entirely, leaving whatever result a prior action function set in place. On UZDoom, a NULL target (or an unresolvable `giveto` pointer) always yields a deterministic `false`, never a stale prior value.
+- **NULL-target result behavior.** In UZDoom, `A_GiveToTarget` and the shared `DoGiveInventory` helper are ZScript functions returning `bool`. Both NULL-receiver cases (the calling actor has no target at all, or the `giveto` selector resolves to NULL relative to the target) return `false`, and callers observe that `false`. On Zandronum, the `COPY_AAPTR_NOT_NULL` macro returns early without setting a result, which a `CustomInventory` chain reads as success (see "Success/failure and return value" above).
 
-- **Zero-vs-negative `amount` clamping.** Zandronum only special-cases `amount == 0` (`if (amount==0) amount=1;`); a negative `amount` passes through unchanged, so `item->Amount = amount` (or, for `Health` items, `Amount *= amount`) ends up negative. UZDoom instead clamps any non-positive value: `if (amount <= 0) { amount = 1; }`, so a negative `amount` is treated the same as `0` and becomes `1`. A DECORATE/ZScript effect that relies on passing a negative `amount` to `A_GiveToTarget` (e.g. to subtract health via a `Health`-derived item) behaves differently between the two engines.
+- **NULL target with a static `giveto` selector.** UZDoom returns `false` as soon as the target is NULL, before the selector is consulted. Zandronum's `COPY_AAPTR` resolves the static selectors (`AAPTR_PLAYER1` to `AAPTR_PLAYER8`, `AAPTR_NULL`) even when the origin actor is NULL. So on Zandronum, `A_GiveToTarget("Medikit", 1, AAPTR_PLAYER1)` from an actor with no target still gives to player 1.
 
-- **Owned-inventory receiver guard.** UZDoom's `DoGiveInventory` has an explicit early-out not present in Zandronum's version: `if (receiver is 'Inventory' && Inventory(receiver).Owner != null) return false;` — i.e. if the resolved receiver is itself an `Inventory` item that is already owned by something, the give is rejected outright. No equivalent check exists in the Zandronum implementation's `DoGiveInventory`. This document does not trace whether Zandronum's `CallTryPickup` path independently rejects this case for an owned-item receiver, only that the explicit helper-level guard itself is UZDoom-specific.
+- **Zero-vs-negative `amount` clamping.** Zandronum only replaces an `amount` of exactly `0` with `1`. A negative `amount` passes through unchanged, so the item's `Amount` (or, for `Health` items, the multiplied `Amount`) ends up negative. UZDoom replaces any non-positive `amount` with `1`, so a negative `amount` behaves like `0`. A DECORATE/ZScript effect that relies on passing a negative `amount` to `A_GiveToTarget` (e.g. to subtract health via a `Health`-derived item) behaves differently between the two engines.
+
+- **Owned-inventory receiver guard.** UZDoom's `DoGiveInventory` has an explicit early-out not present in Zandronum's version. If the resolved receiver is itself an `Inventory` item that already has an owner, the give returns `false` outright. No equivalent check exists in the Zandronum implementation's `DoGiveInventory`. This document does not trace whether Zandronum's `CallTryPickup` path independently rejects this case for an owned-item receiver, only that the explicit helper-level guard itself is UZDoom-specific.
 
 ## Zandronum-specific: client/server behavior
 
-**This is server-authoritative.** On clients:
+**This is server-authoritative, except in weapon states.** The client check looks at the calling actor (`self`), not the receiver:
 
-- **For client-handled actors** (where the calling actor has `MF6_CLIENTSIDE` or similar engine-recognized flag), the function runs to completion and returns the actual result (true/false).
-- **For all other actors**, the function **returns immediately without giving items or setting an explicit result**. The state-code result slot is not modified in this case (any prior value persists), so a DECORATE `if` branch off the return value will use that prior value, not the actual outcome. The server separately syncs inventory changes to clients via `SERVERCOMMANDS_GiveInventoryNotOverwritingAmount`. This matches the general server-authoritative pattern for action functions in Zandronum's netcode.
+- **Called from the player's weapon or flash psprite state:** the client check is skipped, so a client runs the give locally, and the server never sends this give to clients.
+- **Otherwise, on a client, if the calling actor is not client-handled** (it lacks the `CLIENTSIDEONLY` flag and has a nonzero network ID), the function **returns immediately without giving items or writing a result**, which a `CustomInventory` chain reads as success. A client-handled calling actor runs the give locally.
+- **On the server**, a successful give from any other state is sent to clients with `SERVERCOMMANDS_GiveInventoryNotOverwritingAmount`. A failed give sends nothing.
 
 ## Inventory-limit enforcement
 
-The actual pickup attempt is delegated to `CallTryPickup`, which enforces the item's `MaxAmount` inventory limit and any item-specific pickup rules defined in the item's own `TryPickup` override.
+The pickup attempt is delegated to `CallTryPickup`, which applies any item-specific rules in the item's own `TryPickup` override. For generic items, `MaxAmount` works as follows:
+
+- **Receiver already holds the item:** both engines add `amount` and clamp the total to `MaxAmount` (unless `sv_unlimited_pickup` is on). The give fails only when the receiver is already at `MaxAmount`.
+- **Receiver does not hold it yet:** UZDoom clamps the new copy to `MaxAmount`. Zandronum's generic `Inventory` copy is not clamped, so a first give with `amount` above `MaxAmount` leaves the receiver holding more than `MaxAmount`. On Zandronum, `Ammo` clamps in its own copy step (after applying the skill's ammo factor unless `Inventory.IgnoreSkill` is set).
+
+`Health` items and other classes with their own `TryPickup` follow their own rules instead.
 
 ## Use cases
 

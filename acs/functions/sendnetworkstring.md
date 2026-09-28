@@ -2,10 +2,10 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** wiki page `SendNetworkString - Zandronum Wiki.html` (`_intake/`, retrieved
 2026-07-28, `https://wiki.zandronum.com/w/index.php?title=SendNetworkString&oldid=1684`) + source-verified (`p_acs.cpp:1818-1886,7835-7847`, `p_acs.h:358-359`,
-`cl_commands.cpp:787-799`, `cl_main.cpp:1032,3472-3495,7195-7203`, `sv_main.cpp:975-979,5107-5109,7504-7527`,
+`cl_commands.cpp:787-799`, `cl_main.cpp:1032,3472-3495,7195-7206`, `sv_main.cpp:976-980,5107-5110,7504-7527`,
 `servercommands.cpp:11874-11886`, `netcommand.cpp:108-121,280-287`; introducing commit
 `645cce9`). The wiki's three named failure reasons, the offline-local-execution behavior, and the
 "only matters server-side" note on `client` all hold; the asymmetric reliability (reliable
@@ -27,12 +27,15 @@ receiving end with that string as its argument. `NamedSendNetworkString(str scri
 int client])` is the same by script name. Extension functions (`ACSF_SendNetworkString`/
 `ACSF_NamedSendNetworkString`, indices -146/-147 in `zcommon.bcs`), both dispatching
 (the Zandronum source's `src/p_acs.cpp:7835-7847`) into one shared helper, `SendNetworkString`
-(`p_acs.cpp:1818-1886`). Added in commit `645cce9` (2020-12-26); not independently confirmed
-present unmodified in the 3.2.1 release specifically (no version tags past 2.x exist in this
-checkout to pin it), but core ACS engine functions of this vintage are stable across minor
-versions — flag for re-check only if a claim here doesn't hold on an actual 3.2.1 client.
+(`p_acs.cpp:1818-1886`). Added in commit `645cce9` (2020-12-26). No version tags past 2.x exist in
+this checkout to pin a release directly, but the code this doc's behavior claims rest on (the
+dispatch cases, the `SendNetworkString` helper, `CLIENTCOMMANDS_ACSSendString`,
+`server_ReceiveACSString`, and the client-receive `Execute()`) is byte-identical between
+`28f736fb3` (the commit that bumped the version string to 3.2.1) and this doc's `bdd0f7beb`
+checkout. That confirms the function is present unmodified in the 3.2.1 release, not just "stable
+across minor versions" by inference.
 
-- `client` is optional, default `-1` (`p_acs.cpp:7836,7842-7843`), and is **only ever read in the
+- `client` is optional, default `-1` (`p_acs.cpp:7837,7843-7844`), and is **only ever read in the
   `NETSTATE_SERVER` branch** (`p_acs.cpp:1862-1883`) — the client-side send path
   (`CLIENTCOMMANDS_ACSSendString`) takes no client argument at all. Confirms the wiki's "only
   matters when called by the server."
@@ -50,9 +53,9 @@ versions — flag for re-check only if a claim here doesn't hold on an actual 3.
   client→server.** Server→client traffic for this function goes through the normal
   `NetCommand`/`PacketBuffer` path (`ServerCommands::ACSSendString::BuildNetCommand`,
   `servercommands.cpp:11874-11886`, never marked unreliable) and is scheduled for resend via
-  `SavedPackets.ScheduleUnsentPacket` (`sv_main.cpp:975-979`); a client that notices a gap
+  `SavedPackets.ScheduleUnsentPacket` (`sv_main.cpp:976-980`); a client that notices a gap
   requests it back with `CLC_MISSINGPACKET` and the server explicitly resends
-  (`sv_main.cpp:5107-5109`, `server_MissingPacket`) — i.e. this direction is acknowledged and
+  (`sv_main.cpp:5107-5110`, `server_MissingPacket`) — i.e. this direction is acknowledged and
   resend-backed, not fire-and-forget. **Client→server has no such mechanism**:
   `CLIENTCOMMANDS_ACSSendString` writes into the per-tic `g_LocalBuffer`
   (`cl_commands.cpp:787-799`), sent once via a single `NETWORK_LaunchPacket` call with no saved/
@@ -85,7 +88,7 @@ versions — flag for re-check only if a claim here doesn't hold on an actual 3.
   the sender resolves its local string index to text with `FBehavior::StaticLookupString`
   (`p_acs.cpp:1843`) and that text is what's serialized over the wire; the receiver re-inserts the
   text into its *own* string table (`GlobalACSStrings.AddString`, client-receive
-  `cl_main.cpp:7201`, server-receive `sv_main.cpp:7525`) and passes the resulting **new** index as
+  `cl_main.cpp:7203`, server-receive `sv_main.cpp:7526`) and passes the resulting **new** index as
   the script's single argument (`{ stringIndex, 0, 0, 0 }`). The received index is not guaranteed
   to equal the sender's original index — standard ACS string-arg behavior, but easy to assume
   otherwise.

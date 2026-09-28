@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
 **Provenance:** ZDoom Wiki `A_Stop` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_Stop&oldid=40682) + verified against the
 Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3741-3749` and `wadsrc/static/actors/actor.txt`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
@@ -17,16 +17,19 @@ only conditionally transitions from `See` state and does not check for a separat
 
 ## Remarks
 
-- For non-player actors, this function only zeros velocity and returns.
+- For non-player actors, this function only zeros velocity and returns. The player branch requires
+  `self->player->mo == self`, so a voodoo doll also gets only the velocity zeroing.
 - For players, the `Spawn` state transition (when in `See` state) happens via `PlayIdle()`, which
   wraps network synchronization on servers (`SERVERCOMMANDS_SetPlayerState`).
 - Player velocity (`player->velx`, `player->vely`) is zeroed independently of actor velocity — the
   actor's `velz` component is zeroed, but the player struct carries only `velx` and `vely`.
 - Unlike the wiki's reference to "acceleration," this function does not modify any `accel_*`
-  fields; it only affects velocity (`vel_*`). The actor's `Speed` property (if set) is untouched.
+  fields; it only affects velocity (`velx`/`vely`/`velz`). The actor's `Speed` property (if set) is untouched.
 - **Zandronum fork note:** The player check includes a commented-out guard against
-  `CF_PREDICTING` (`/*&& !(self->player->cheats & CF_PREDICTING)*/`), with a code comment
-  indicating Zandronum handles netcode prediction differently than upstream ZDoom.
+  `CF_PREDICTING` (`/*&& !(self->player->cheats & CF_PREDICTING)*/`). `A_Stop` itself carries no
+  explanation. The same guard is also disabled in the neighbouring `CheckStopped()` helper
+  (`thingdef_codeptr.cpp:3751-3762`, used by `A_ScaleVelocity` and `A_ChangeVelocity`, not by
+  `A_Stop`), where a `[BB]` comment says Zandronum handles prediction differently.
 
 ## Zandronum-specific: PlayIdle networking and prediction handling
 
@@ -40,7 +43,7 @@ engines. Two Zandronum-only details in the material above don't hold for UZDoom,
   synchronization on servers (`SERVERCOMMANDS_SetPlayerState`)" — true only for Zandronum's
   `APlayerPawn::PlayIdle` (`src/p_user.cpp:1566`), which checks `NETWORK_GetState() ==
   NETSTATE_SERVER` before transitioning state and broadcasting a `SERVERCOMMANDS_SetPlayerState`
-  update. UZDoom's `PlayIdle()` (`wadsrc/static/zscript/actors/player/player.zs:257`) has no such
+  update (sent with `SVCF_SKIPTHISCLIENT`, so every client except that player's own). UZDoom's `PlayIdle()` (`wadsrc/static/zscript/actors/player/player.zs:257`) has no such
   gate — it evaluates the same `See`-state condition and transitions directly to `SpawnState`,
   with no client/server distinction or replication call anywhere in the function. UZDoom's source
   tree has no `SERVERCOMMANDS_*`-equivalent mechanism at all (zero occurrences tree-wide),

@@ -2,8 +2,8 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-28)
-**Provenance:** Zandronum Wiki `RemoveBot` (retrieved 2026-08-18, `https://wiki.zandronum.com/w/index.php?title=RemoveBot&oldid=2552`) + source-verified against the Zandronum source's `src/p_acs.cpp:8583-8649`.
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** Zandronum Wiki `RemoveBot` (retrieved 2026-08-18, `https://wiki.zandronum.com/w/index.php?title=RemoveBot&oldid=2552`) + source-verified against the Zandronum source's `src/p_acs.cpp:8583-8649`, including a git-ancestry check of the version-gated features below against the 3.2.1 version-bump commit `28f736fb3` (2026-09-25).
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function (index -169; dispatched as `ACSF_RemoveBot`).
 
@@ -38,8 +38,8 @@ The function returns `0` if any of the following conditions are met:
 
 RemoveBot exists in stable Zandronum 3.2.1 and earlier, but the wiki page documents features specific to the 3.3-alpha development version:
 
-- **Two-parameter form (3.3-alpha and above only).** The development version accepts an optional second parameter `int index` to specify the player index of the bot to remove. Stable 3.2.1 does not support this parameter — only single-parameter calls are available. Attempting to call the two-parameter form on 3.2.1 results in a compile error.
-- **Empty string random-removal behavior (3.3-alpha and above only).** In 3.3-alpha and above, passing an empty string as the `name` parameter is equivalent to passing no name, triggering random bot removal. In stable 3.2.1, the behavior for empty strings is not confirmed as matching this description.
+- **Two-parameter form (3.3-alpha and above only).** The development version accepts an optional second parameter `int index` to specify the player index of the bot to remove. Stable 3.2.1 does not support this parameter — only single-parameter calls are available. Attempting to call the two-parameter form on 3.2.1 results in a compile error. Added by commit `967f65f6c` ("Added an optional parameter to the ACS function \"RemoveBot\" to specify the index of the bot to remove."), which postdates the 3.2.1 version-bump commit `28f736fb3`.
+- **Empty string random-removal behavior (3.3-alpha and above only).** In 3.3-alpha and above, passing an empty string as the `name` parameter is equivalent to passing no name, triggering random bot removal. Stable 3.2.1 has no such special case. An empty string is compared literally against player names there, so it fails to match and returns `0` (unless a player is literally named the empty string) instead of triggering random removal. Added by commit `b2373efb7` ("Fix more RemoveBot edge cases, namely around empty and color-coded inputs"), which also postdates `28f736fb3`.
 
 The compiler-generated signature in `zt-bcc`'s `lib/zcommon.bcs` currently declares `RemoveBot(;str):bool` (single optional parameter, no index form), reflecting the stable baseline.
 

@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** wiki page `SetResultValue - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28,
 `https://zdoom.org/w/index.php?title=SetResultValue&oldid=48425`) + source-verified against `zt-bcc/src/builtin.c:119` and the Zandronum source
 (`p_acs.cpp:9120-9158,10461-10470,13050,13662-13671`, `gamemode.cpp:1369-1379`,

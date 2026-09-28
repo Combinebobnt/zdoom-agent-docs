@@ -9,12 +9,12 @@ not a confirmed "no such page exists" - this tree's own rules prohibit fetching 
 directly to check, so treat this as source-verified-only (tier B) unless someone supplies a real
 wiki page for it via the intake pipeline.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** `GetPlayerAccountName` - wiki page `GetPlayerAccountName - Zandronum Wiki.html`
 (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetPlayerAccountName&oldid=1298`) + source-verified. `PlayerIsLoggedIn` -
 source-verified only, no wiki page found (see Tier note above). Both:
 (`p_acs.cpp:7258-7278`, `sv_main.cpp:3190-3197, 7650-7663, 2700-2720, 5310-5325`,
-`sv_commands.cpp:648-659`, `sv_main.h:385`, `network.h:270-279`).
+`sv_commands.cpp:648-660`, `sv_main.h:385`, `network.h:270-279`).
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** both extension functions, adjacent `case` blocks in `src/p_acs.cpp` (`ACSF_PlayerIsLoggedIn`
 index -113 at `p_acs.cpp:7258-7265`; `ACSF_GetPlayerAccountName` index -114 at `p_acs.cpp:7268-7278`).
@@ -118,7 +118,7 @@ case ACSF_GetPlayerAccountName:
   Zandronum has a separate client-side privacy toggle (`CLC_SETWANTHIDEINFO` with
   `HIDEINFO_ACCOUNTNAME`, `sv_main.cpp:5310-5325`) that sets `CLIENT_s::WantHideAccount`
   (`sv_main.h:385`). That flag *is* respected by the normal network broadcast path
-  (`SERVERCOMMANDS_SetPlayerAccountName`, `sv_commands.cpp:648-659`, sends `""` to other clients
+  (`SERVERCOMMANDS_SetPlayerAccountName`, `sv_commands.cpp:648-660`, sends `""` to other clients
   when the flag is set) — but `ACSF_GetPlayerAccountName` reads
   `SERVER_GetClient(ulPlayer)->GetAccountName()` directly and never checks `WantHideAccount`.
   A server-side script can therefore read a player's real account name via ACS even when that

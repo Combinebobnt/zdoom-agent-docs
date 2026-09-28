@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
-**Provenance:** ZDoom Wiki `A_Tracer2` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_Tracer2&oldid=34282) + verified against the Zandronum source's `src/g_strife/a_spectral.cpp:99-173` and `src/g_doom/a_revenant.cpp:50-149` (for comparison with `A_Tracer`).
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** ZDoom Wiki `A_Tracer2` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_Tracer2&oldid=34282) + verified against the Zandronum source's `src/g_strife/a_spectral.cpp:99-173` and `src/g_doom/a_revenant.cpp:50-149` (for comparison with `A_Tracer`), plus `src/p_mobj.cpp:1932-1942` (`CanSeek`).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_Tracer2)` in `src/g_strife/a_spectral.cpp`.
 
@@ -21,7 +21,7 @@ void A_Tracer2()
 
 When called, `A_Tracer2` performs the following on the server side (clients are bypassed entirely):
 
-1. **Target validation**: Checks that the actor has a valid `tracer` field, the target is alive (`dest->health > 0`), the actor has a non-zero speed, and the target passes `CanSeek()` checks (which reject invisible or `CANTSEEK`-flagged targets). Returns early if any check fails.
+1. **Target validation**: Checks that the actor has a valid `tracer` field, the target is alive (`dest->health > 0`), the actor has a non-zero speed, and the target passes `CanSeek()` (`src/p_mobj.cpp:1932-1942`), which always rejects `+CANTSEEK` targets and rejects shadowed or invisible targets only when the missile itself has `+DONTSEEKINVISIBLE`. Returns early if any check fails.
 
 2. **Angle adjustment**: Calculates the exact angle toward the target. If the target is not directly in front of the missile, applies a turning rate of approximately **19.69 degrees per call** (defined as `TRACEANGLE = 0xe000000` in the source). The missile turns left or right as needed to close the angle, but never overshoots the target.
 
@@ -38,7 +38,7 @@ The key differences between `A_Tracer2` and the functionally similar `A_Tracer` 
 | Property | A_Tracer | A_Tracer2 |
 |---|---|---|
 | **Gametic gate** | 1-in-4 (runs only every 4 tics) | None (runs every call) |
-| **Puff spawn** | Yes, spawns `RevenantTracerSmoke` trail | No puffs |
+| **Puff spawn** | Yes, a `BulletPuff` plus a `RevenantTracerSmoke` trail | No puffs |
 | **Turning rate** | ~16.88° per call | ~19.69° per call |
 | **Game origin** | Doom (Revenant) | Strife (Spectral Projectile) |
 
@@ -46,7 +46,7 @@ Because `A_Tracer2` has no gametic gate, a 1-tic state will adjust angle every t
 
 ## SEEKERMISSILE flag semantics
 
-The wiki states "this only works for missiles with the SEEKERMISSILE flag," which requires clarification: **`A_Tracer2` does not check the flag itself**. Instead, the flag is a convention; it controls whether missile-spawning actions populate the `tracer` field in the first place. The engine sets `tracer` when firing a missile with the `SEEKERMISSILE` flag (see `src/thingdef/thingdef_codeptr.cpp:1719-1720` and similar sites), and `A_Tracer2` only requires a valid `tracer` pointer — it can be set by any code, not just flag-based firing paths. If you manually set `tracer` on any actor, `A_Tracer2` will home toward it regardless of flags.
+The wiki states "this only works for missiles with the SEEKERMISSILE flag," which requires clarification: **`A_Tracer2` does not check the flag itself**. Instead, the flag is a convention; it controls whether missile-spawning actions populate the `tracer` field in the first place. The engine sets `tracer` when firing a missile with the `SEEKERMISSILE` flag (e.g. `A_CustomMissile` sets it to the shooter's `target` at `src/thingdef/thingdef_codeptr.cpp:1454-1457`, and `A_FireCustomMissile` sets it to the autoaim target at `:1719`), and `A_Tracer2` only requires a valid `tracer` pointer — it can be set by any code, not just flag-based firing paths. If you manually set `tracer` on any actor, `A_Tracer2` will home toward it regardless of flags.
 
 For conventional homing missiles, declaring `+SEEKERMISSILE` is the standard practice because it integrates with engine missile-spawning paths; omitting it is possible but non-standard.
 
@@ -64,7 +64,7 @@ More significantly, `A_Tracer` (the Revenant homing function) is no longer an in
 
 ## Engine-family divergence: floating-point steering math
 
-Zandronum's `A_Tracer2` works in fixed-point `angle_t` BAM units and `finesine`/`finecosine` lookup tables, and derives its vertical-seek divisor from `P_AproxDistance` (an octagonal distance approximation, not true Euclidean distance). UZDoom's version is fully floating-point: `AngleTo`/`deltaangle` compute the facing delta as a `double` degree value directly (no BAM conversion), `VelFromAngle()` derives velocity from that angle and the actor's `Speed`, and the vertical-seek divisor comes from `AActor::DistanceBySpeed` — `max(1, Distance2D(dest) / speed)`, true 2D Euclidean distance rather than the octagonal table approximation. The two engines converge on the same turn-rate constants and the same ±1/8-unit-per-call vertical step, so trajectories track closely, but exact per-tic angle and pitch values can differ slightly, most noticeably at short range where the octagonal approximation's error from true distance is largest.
+Zandronum's `A_Tracer2` works in fixed-point `angle_t` BAM units and `finesine`/`finecosine` lookup tables, and derives its vertical-seek divisor from `P_AproxDistance` (an octagonal distance approximation, not true Euclidean distance). UZDoom's version is fully floating-point: `AngleTo`/`deltaangle` compute the facing delta as a `double` degree value directly (no BAM conversion), `VelFromAngle()` derives velocity from that angle and the actor's `Speed`, and the vertical-seek divisor comes from `AActor::DistanceBySpeed` — `max(1, Distance2D(dest) / speed)`, true 2D Euclidean distance rather than the octagonal table approximation. The two engines converge on the same turn-rate constants and the same ±1/8-unit-per-call vertical step, so trajectories track closely, but exact per-tic angle and pitch values can differ slightly. The octagonal approximation's relative error depends on direction, not range. Zandronum also truncates the distance-over-speed divisor to a whole number, so its divisor departs most from UZDoom's fractional one at short range.
 
 ## Engine-family divergence: no client/server execution gate
 
@@ -100,4 +100,4 @@ actor StriveHominMissile : Actor
 }
 ```
 
-The `SEEKERMISSILE` flag allows action functions that fire this missile (such as `A_CustomMissile` or `A_SpawnProjectile`) to automatically set the `tracer` field. Each frame in `Spawn:` runs `A_Tracer2` to home toward the target.
+The `SEEKERMISSILE` flag allows action functions that fire this missile (such as `A_CustomMissile` or `A_FireCustomMissile`) to automatically set the `tracer` field. Each frame in `Spawn:` runs `A_Tracer2` to home toward the target.

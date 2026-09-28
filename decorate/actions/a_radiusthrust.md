@@ -2,12 +2,12 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_RadiusThrust` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RadiusThrust&oldid=54717) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1076-1109` and internal `P_RadiusAttack` in `src/p_map.cpp:5728-5910`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** ZDoom Wiki `A_RadiusThrust` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RadiusThrust&oldid=54717) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1076-1109` and internal `P_RadiusAttack` in `src/p_map.cpp:5728-5910`, its vertical-thrust gate at `src/p_map.cpp:5919-5920`, and the `MF2_BLASTED` effects at `src/p_map.cpp:716-749`, `src/p_map.cpp:1049-1067`, `src/p_map.cpp:2264-2267`, `src/p_mobj.cpp:2283`, `src/p_mobj.cpp:4393-4395` and `src/p_enemy.cpp:443-446`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_RadiusThrust)` in `src/thingdef/thingdef_codeptr.cpp`.
 
-Applies a radial thrust (knockback) to nearby actors without damage, pushing them away from the calling actor's center. This is equivalent to `A_Explode` with only the thrust component and no damage. The underlying mechanism is the engine's internal `P_RadiusAttack` function.
+Applies a radial thrust (knockback) to nearby actors without damage, pushing them away from the calling actor's center. This is equivalent to `A_Explode` with only its horizontal thrust component and no damage (see Behavior notes for the missing vertical push). The underlying mechanism is the engine's internal `P_RadiusAttack` function.
 
 ## Engine-family divergence
 
@@ -27,8 +27,8 @@ Everything else described in this file — the force-substitution-on-zero fallba
 - **`force`** — The raw power of the thrust, determining how fast affected actors are pushed away. Velocity imparted to a target is calculated as `force / (2 * mass)`, so a force of 40000 pushes a 1000-mass actor (Baron of Hell) with velocity 20 units/tic (rocket speed). Negative values push actors toward the source instead of away. Default (when omitted in DECORATE) is 128, per the native declaration in `actor.txt`. Separately, the function has a runtime safety net: if `force` evaluates to exactly 0 (e.g. an expression that resolves to zero), it is replaced with 128 rather than producing a no-op thrust.
 - **`distance`** — Radius (in map units) of the thrust effect. At the center, actors receive the full force of the blast. At the outer edge (`distance` units away), actors receive no thrust. If `distance` is 0 or negative at runtime, it defaults to `abs(force)`. Default is -1 (triggers the fallback).
 - **`flags`** — Bitfield altering the function's behavior. Supported flags (constants from `constants.txt`):
-  - `RTF_AFFECTSOURCE` (value 1, the default) — If set, the damage source (the `target` of the calling actor, or the caller itself if `RTF_NOTMISSILE` is set) is affected by the thrust. If unset, the source is immune.
-  - `RTF_NOIMPACTDAMAGE` (value 2) — If set, actors thrust by the blast do not inflict melee damage when they collide with walls or other actors. Collision physics still apply; this flag only suppresses the damage dealt on impact.
+  - `RTF_AFFECTSOURCE` (value 1, the default) — If set, the damage source (the `target` of the calling actor, or the caller itself if `RTF_NOTMISSILE` is set) is affected by the thrust. If unset, the source is immune, and so is the calling actor itself.
+  - `RTF_NOIMPACTDAMAGE` (value 2) — By default, every non-player actor the blast pushes is marked `MF2_BLASTED` (server-side) until its horizontal velocity reaches zero. While blasted, it takes `Mass / 32` melee damage each time a wall blocks it. Running at speed into a shootable, non-boss monster without `+DONTBLAST` passes its velocity on and damages both actors. It also slides along walls, and a blasted monster makes no walking moves of its own. This flag skips setting `MF2_BLASTED`, so none of that happens and the target is simply pushed. Players are never marked blasted, so the flag changes nothing for them.
   - `RTF_NOTMISSILE` (value 4) — Treat the calling actor as the damage/thrust source directly. By default, the engine assumes the calling actor is a projectile and uses its `target` field as the source; setting this flag overrides that assumption (the caller becomes the source itself).
 - **`fullthrustdistance`** — Inner radius (in map units) within which the full blast force is applied without falloff. Targets outside this radius receive linearly-reduced thrust as they approach the outer `distance` boundary. Default is 0 (no inner radius; thrust falls off from the center outward). The engine clamps this to `[0, distance - 1]`.
 
@@ -38,9 +38,10 @@ Everything else described in this file — the force-substitution-on-zero fallba
 - **Default parameter 1 fallback:** If `force` is 0, the engine substitutes 128 (a moderate blast).
 - **Default parameter 2 fallback:** If `distance` is 0 or negative, the engine uses `abs(force)` instead, making the radius proportional to the blast strength.
 - **`MF2_NODMGTHRUST` temporary negation:** Only when `RTF_NOTMISSILE` is **not** set (the default, "calling actor is a projectile" mode) and `self->target` is non-NULL: if `self->target` has `MF2_NODMGTHRUST` set, the engine clears it for the duration of the thrust call and restores it afterward. This prevents a shooter's own thrust-immunity flag from making the function a no-op on their own projectiles. When `RTF_NOTMISSILE` **is** set, this negation is skipped entirely — the caller itself is the source and its own `MF2_NODMGTHRUST` (if any) is left untouched.
-- **Triggers terrain splashes:** `A_RadiusThrust` calls `P_CheckSplash(self, distance << FRACBITS)` after the thrust pass, identically to `A_Explode` — a terrain splash can still occur even though this function deals no damage.
+- **Horizontal push only:** `P_RadiusAttack` adds vertical velocity only when `RADF_NODAMAGE` is clear, and this function always sets it, so `A_RadiusThrust` never changes a target's Z velocity. `A_Explode`'s push normally does include a vertical component.
+- **Triggers terrain splashes:** `A_RadiusThrust` calls `P_CheckSplash(self, distance << FRACBITS)` after the thrust pass, identically to `A_Explode` — a terrain splash can still occur even though this function deals no damage. As in `A_Explode`, the distance is shifted by `FRACBITS` twice (once here, once inside `P_CheckSplash`, `src/p_mobj.cpp:7052-7061`), which overflows, so in practice only a caller at floor height splashes.
 
 ## See also
 
 - `A_Explode` — performs a radius attack with damage, plus optional nail/hitscan components; both wrap the same internal `P_RadiusAttack` engine function.
-- `RadiusAttack` — the underlying ACS function exposing the same mechanism via script.
+- `RadiusAttack` — not an ACS function on either engine. On UZDoom it is a ZScript `Actor` method exposing the same mechanism; Zandronum has no script-level equivalent.

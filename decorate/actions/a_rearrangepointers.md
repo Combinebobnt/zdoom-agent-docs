@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_RearrangePointers` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RearrangePointers&oldid=50165) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:203-263`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** ZDoom Wiki `A_RearrangePointers` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RearrangePointers&oldid=50165) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:203-263`, `wadsrc/static/actors/actor.txt:316` (signature defaults), `src/actorptrselect.cpp:109-140` and `:142-166` (chain checks), `src/thingdef/thingdef_codeptr.cpp:3915-3920` (`A_ClearTarget`) and `:765-785` (`A_Jump`, for the example).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_RearrangePointers)` in `src/thingdef/thingdef_codeptr.cpp`.
 
@@ -12,8 +12,10 @@ Reassigns the calling actor's `target`, `master`, and `tracer` pointers to any o
 ## Signature
 
 ```text
-void A_RearrangePointers(int target, int master, int tracer, int flags = 0)
+void A_RearrangePointers(int target, int master = AAPTR_DEFAULT, int tracer = AAPTR_DEFAULT, int flags = 0)
 ```
+
+Only `target` is required. Omitted `master` and `tracer` default to `AAPTR_DEFAULT`, which leaves that field unchanged.
 
 ## Parameters
 
@@ -21,11 +23,11 @@ void A_RearrangePointers(int target, int master, int tracer, int flags = 0)
 
 The new value for the calling actor's `target` field. Must be one of the `AAPTR_*` constants (see "Pointer values" below). The actor's original `target` is fetched *before* any modifications, so all three parameters see the pre-modification state.
 
-### `master` (int — AAPTR value)
+### `master` (int — AAPTR value, optional)
 
 The new value for the calling actor's `master` field. See `target` for fetch-order semantics.
 
-### `tracer` (int — AAPTR value)
+### `tracer` (int — AAPTR value, optional)
 
 The new value for the calling actor's `tracer` field. See `target` for fetch-order semantics. Note that unlike `target` and `master`, no loop-verification functions are called on `tracer` changes, because the engine never follows a `tracer` chain.
 
@@ -47,13 +49,15 @@ These constants (AAPTR_*) control what each pointer field is set to. All are fet
 
 - **`AAPTR_TRACER` (0x8)** — Set to the actor's current `tracer` (if any; otherwise `NULL`).
 
+Any other `AAPTR_*` value (the player selectors, `AAPTR_FRIENDPLAYER`, and so on) is ignored and leaves the field unchanged.
+
 **Important note:** The semantics of `target`/`master`/`tracer` vary by actor type. For example, in missiles, `target` points to the owner; in regular monsters, `target` points to the current enemy. Always verify actor-type semantics before assuming pointer meanings.
 
 ## Safeguards and flags
 
 By default, `A_RearrangePointers` prevents **infinite pointer chains** by nullifying assignments that would create circular references:
 
-- **For `target`**: An assignment is nullified (target set to `NULL`) if the actor being assigned is a missile and the assignment would create an infinite loop in the target chain (e.g., A → B → A). Checked by `VerifyTargetChain()` in the Zandronum source (`src/actorptrselect.cpp`).
+- **For `target`**: The check runs only when the *calling* actor is a missile (it has `MISSILE` now, or its class default has it). It walks the `target` chain only while each next actor is also a missile. If that walk returns to an actor already in the chain (e.g., A → B → A), the caller's `target` is set to `NULL`. A loop passing through a non-missile is not detected. Checked by `VerifyTargetChain()` in the Zandronum source (`src/actorptrselect.cpp`).
 
 - **For `master`**: An assignment is nullified if it would create an infinite loop in the master chain (checked for all actors, not just missiles). Checked by `VerifyMasterChain()`.
 
@@ -71,7 +75,7 @@ The following flags allow disabling these safeguards:
 
 ## Caveat: A_ClearTarget
 
-Setting `target` to `AAPTR_NULL` using `A_RearrangePointers` *only* sets the `target` field to `NULL`. It does **not** perform the additional cleanup that `A_ClearTarget` does (e.g., clearing related targeting fields or triggering related state changes). If you need full target clearing, use `A_ClearTarget` instead.
+Setting `target` to `AAPTR_NULL` using `A_RearrangePointers` *only* sets the `target` field to `NULL`. It does **not** perform the additional cleanup that `A_ClearTarget` does, which also sets `LastHeard` and `lastenemy` to `NULL` (it triggers no state change). If you need full target clearing, use `A_ClearTarget` instead.
 
 ## Example (Zandronum DECORATE)
 
@@ -89,7 +93,7 @@ ACTOR AmnesiacImp : DoomImp
 }
 ```
 
-This imp has a 4/256 chance per state to "forget" its current target and master, while leaving its tracer unchanged. On the 4-in-256 chance, it jumps to the second `TROO A 0` line and clears both pointers. Otherwise, it skips to the normal chase sequence.
+Each pass through `See` (once per trip around the `Loop`), this imp has a 4/256 chance to "forget" its current target and master, while leaving its tracer unchanged. `A_Jump(252, 2)` jumps 252 times in 256 to offset 2, the `A_Chase` line, skipping the rearrange. In the remaining 4 in 256 it falls through to the `A_RearrangePointers` line and clears both pointers.
 
 ## See also
 

@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-17)
-**Provenance:** Extracted from ZDoom Wiki (https://zdoom.org/w/index.php?title=Sector_Set3dFloor&oldid=51021); Zandronum implementation verified against `p_3dfloors.cpp` and `p_lnspec.cpp`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
+**Provenance:** Extracted from ZDoom Wiki (https://zdoom.org/w/index.php?title=Sector_Set3dFloor&oldid=51021); Zandronum implementation verified against `p_3dfloors.cpp` (`P_Set3DFloor`, `src/p_3dfloors.cpp:216-310`) and `p_lnspec.cpp`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 ## Wiki/engine divergence: this special is a no-op when invoked dynamically from ACS, on both engines
@@ -11,14 +11,19 @@
 This is not a Zandronum-only quirk — a from-scratch re-check of the UZDoom source found the exact
 same architecture. On **both** UZDoom and Zandronum, `Sector_Set3DFloor` is **only implemented as
 a linedef type**, processed once at map load (Zandronum's `P_Spawn3DFloors()` in `p_3dfloors.cpp`;
-UZDoom's equivalent `MapLoader::Spawn3DFloors()` in `src/maploader/specials.cpp`). As an **ACS
-action special** (callable via `ACS_ExecuteAlways`, `ActionSpecial`, etc.), special 160 maps to
+UZDoom's equivalent `MapLoader::Spawn3DFloors()` in `src/maploader/specials.cpp`). Invoked at
+runtime (a thing special, a line special assigned with `SetLineSpecial`/`SetThingSpecial` and
+then activated, or DECORATE's `A_CallSpecial`), special 160 maps to
 `LS_NOP` in both engines' line-special dispatch table (Zandronum's `src/p_lnspec.cpp:3760`; UZDoom's
 `src/playsim/p_lnspec.cpp:3707`) and silently returns `false` — the 3D floor is never created. ACS
 in both engines reaches this same table via `P_ExecuteSpecial()`, so there is no separate ACS-only
 code path that could behave differently from the linedef-time NOP. The ZDoom wiki page this entry
 was extracted from assumes the special can be called dynamically from ACS; on neither engine
 checked here can it.
+
+A direct `Sector_Set3dFloor(...)` call in a script doesn't get that far with zt-bcc: its
+`lib/zcommon.bcs:1505` entry ends in `:0` (not script-callable), so the compiler stops with
+"action-special `Sector_Set3dFloor` called from script" (`src/semantic/expr.c:2411-2420`).
 
 **Signature**
 
@@ -29,30 +34,35 @@ Sector_Set3dFloor(int tag, int type, int flags, int alpha, int hi_tag_or_line_id
 **Parameters**
 
 - **tag**: Sector tag of affected sectors (the sectors that will have the 3D floor).
-- **type**: Type of 3D floor (see Types below). If bit 3 (value 8) is set, `hi_tag_or_line_id` is treated as a line ID; otherwise it's a high byte for the tag.
-- **flags**: Flags controlling behavior (see Flags below).
-- **alpha**: Translucency (0 = invisible, 255 = opaque).
-- **hi_tag_or_line_id**: Either a high byte for multi-sector tags (Doom/Hexen format) or a line ID (if type has 8 added to it); unused in UDMF.
+- **type**: Type of 3D floor (see Types below). In Hexen-format maps, if bit 3 (value 8) is set, `hi_tag_or_line_id` is treated as a line ID; otherwise it's a high byte for the tag. Bit 3 is masked off before the type is interpreted in every map format.
+- **flags**: Flags controlling behavior (see Flags below). Ignored for an exact type 0. For an exact type 4, Zandronum ignores it and UZDoom reads only bit 1 (see Types).
+- **alpha**: Translucency (0 = invisible, 255 = opaque). Ignored for an exact type 0 or 4.
+- **hi_tag_or_line_id**: Either a high byte for the tag or a line ID (if type has 8 added to it). Only read in Hexen-format maps; in Doom format the translator supplies full values, and in UDMF it's unused.
 
 **Types**
 
-Verified identical on both engines — Zandronum's `P_Set3DFloor()` (`p_3dfloors.cpp`) and UZDoom's
-`MapLoader::Set3DFloor()` (`src/maploader/specials.cpp`) build the flags word from `type` (masked
-to drop the line-ID bit) via the same `defflags[type & 3]` table plus the same `+4`/`+16`/`+32`
-modifier checks:
+Zandronum's `P_Set3DFloor()` (`src/p_3dfloors.cpp:216-310`) and UZDoom's
+`MapLoader::Set3DFloor()` (`src/maploader/specials.cpp`) interpret `type` the same way, after
+masking off the line-ID bit 8. An exact `0` and an exact `4` are special cases with their own fixed
+flags word. Every other value is built from the same `defflags[type & 3]` table plus the same
+`+4`/`+16`/`+32` modifier checks. So `+4` on type 0 gives type 4, not Vavoom-style with inside
+rendering, and `+16`/`+32` on type 0 leave the Vavoom branch entirely (they act on `defflags[0]`,
+which has no solid/swimmable bits).
 
-- **0**: Vavoom-style (control sector's ceiling is 3D floor's bottom, floor is top; control sector needs negative height).
+- **0**: Vavoom-style (control sector's ceiling is 3D floor's bottom, floor is top; control sector needs negative height). The `flags` and `alpha` arguments are ignored. Solidity, translucency and liquid contents come from a `Sector_SetContents` line on the control sector instead, if one exists.
+- **4** (exact): Hole-patching mode (`FF_FIX`). The 3D floor's top plane is the tagged sector's own floor, its bottom the control sector's floor, it renders planes only with no shading, and alpha is forced to 255. On Zandronum the `flags` argument is ignored entirely; on UZDoom, `flags` bit 1 is read as a marker (it sets `FF_SEETHROUGH`) and every other bit is ignored.
 - **1**: Solid.
 - **2**: Swimmable.
 - **3**: Non-solid.
-- **+4**: Render inside as well (normally only for liquids).
+- **+4**: Render inside as well (normally only for liquids). Not a modifier on a bare type 0: an exact 4 is the hole-patching mode above. It does apply to 5-7, and to 4 combined with `+16`/`+32`.
 - **+16**: Invert visibility rules (opposite of default).
 - **+32**: Invert shootability rules (opposite of default).
 
 **Flags**
 
-Verified against `P_Set3DFloor()` (Zandronum) / `MapLoader::Set3DFloor()` (UZDoom) — both build the
-same flags word from the `flags` argument bit-for-bit, up through bit 512. Bits 1024 and 2048
+Verified against `P_Set3DFloor()` (Zandronum) / `MapLoader::Set3DFloor()` (UZDoom). For every
+type except an exact 0 or 4 (see Types above), both build the same flags word from the `flags` argument
+bit-for-bit, up through bit 512. Bit 256 is never tested on either engine. Bits 1024 and 2048
 diverge between the two engines; see the divergence section below.
 
 - **1**: Disable lighting effects (`FF_NOSHADE`). Same on both engines.
@@ -69,8 +79,8 @@ diverge between the two engines; see the divergence section below.
 
 **Return Value**
 
-`0` (false) on both engines — the special is dispatched to `LS_NOP`, whose body is `return false;`
-verbatim in both `p_lnspec.cpp` files. The ZDoom wiki suggests true on success for the (unreachable,
+`0` (false) on both engines. The special is dispatched to `LS_NOP`, which just returns false in
+both `p_lnspec.cpp` files. The ZDoom wiki suggests true on success for the (unreachable,
 on these engines) dynamic-ACS case; that claim was never checkable here and still isn't.
 
 **Behavior**
@@ -83,8 +93,8 @@ This is the only way 3D floors get created from this special on either engine.
 
 ## Engine-family divergence: flags 1024 and 2048 don't exist on Zandronum
 
-UZDoom's `src/playsim/p_3dfloors.h` defines `FF_RESET = 0x80000000` ("light effect is completely
-reset, once interrupted") and `FF_NODAMAGE = 0x100000` ("no damage transfers"), and its
+UZDoom's `src/playsim/p_3dfloors.h` defines `FF_RESET = 0x80000000` (fully resets the light
+effect once it is interrupted) and `FF_NODAMAGE = 0x100000` (stops damage from transferring), and its
 `Set3DFloor()` sets them from `flags & 1024` and `flags & 2048` respectively. Zandronum's
 `src/p_3dfloors.h` defines neither constant at all — its enum stops at `FF_THISINSIDE`, and its
 `P_Set3DFloor()` in `p_3dfloors.cpp` stops checking flag bits after `flags & 512` (`FF_FADEWALLS`).

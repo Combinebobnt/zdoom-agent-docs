@@ -5,7 +5,7 @@
 bare name (it's a `zt-bcc` macro with no opcode of its own, see Bucket below), but both of its
 expansion components (`Acs_NamedExecute`, an ACSF present on both engines; `PCD_SCRIPTWAITNAMED`,
 a base PCD present on both engines) are fully portable, so the macro is too
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki pages `ACS_NamedExecute - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=ACS_NamedExecute&oldid=35683`),
 `ACS_NamedExecuteAlways - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=ACS_NamedExecuteAlways&oldid=40212`), `ACS_NamedExecuteWait - ZDoom Wiki.html`
 (`https://zdoom.org/w/index.php?title=ACS_NamedExecuteWait&oldid=36649`), `ACS_NamedExecuteWithResult - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=ACS_NamedExecuteWithResult&oldid=46388`) (all `_intake/`,
@@ -38,10 +38,14 @@ has figured out yet).
 - The script name is resolved via `-FName(FBehavior::StaticLookupString(args[0]))`
   (`p_acs.cpp:6347`) into a negative script number, then handled by ordinary `P_StartScript`
   machinery — same lookup failure mode (console message, silent `false`/`0`) across all of them.
-- Each has a Zandronum-specific clientside/netcode carve-out the ZDoom wiki has no reason to
+- Each of the three engine-backed functions has a Zandronum-specific clientside/netcode carve-out the ZDoom wiki has no reason to
   mention (ZDoom has no client/server split): if the *server* is calling on behalf of a script
   flagged `CLIENTSIDE`, the server never actually runs the script — it broadcasts
-  `SERVERCOMMANDS_ACSScriptExecute(...)` for clients to run it themselves. The **polarity of the
+  `SERVERCOMMANDS_ACSScriptExecute(...)` for clients to run it themselves. A `NET` script counts
+  as clientside too while the `ZACOMPATF_NETSCRIPTS_ARE_CLIENTSIDE` compat flag is set
+  (`p_acs.cpp:13684-13697`). The broadcast sends nothing for a script with no net ID, and its map
+  number travels in a `Byte` field (`sv_commands.cpp:3567-3605`, `protocolspec/spec.misc.txt`), so
+  clients see a `levelnum` above 255 truncated. The **polarity of the
   fallback return value differs per function** — see each section below; this is not uniform
   across the family and has bitten at least one doc draft already.
 - None of the fork-specific caveats below are documented on the ZDoom wiki, which predates or
@@ -64,23 +68,24 @@ special-casing, no return-value override — so the
 per-function polarity differences documented below (unconditional `true` for
 `Acs_NamedExecute`/`Acs_NamedExecuteAlways`, unconditional `false`/`0` for
 `Acs_NamedExecuteWithResult`) describe Zandronum-only behavior that UZDoom's dispatch path never
-actually reaches. `Acs_NamedExecuteWait` needs no mention of its own here, since it already discards
-`Acs_NamedExecute`'s return value before this carve-out could matter either way.
+actually reaches. On UZDoom, `Acs_NamedExecuteWait` therefore needs no mention of its own here.
+On Zandronum the carve-out does matter to it: a server waiting on a `CLIENTSIDE` target stalls,
+since the target never starts on the server (see that function's section below).
 
 ---
 
 ## `bool Acs_NamedExecute(str script; int map, raw s_arg1, raw s_arg2, raw s_arg3)`
 
 Named-script variant of the numbered `Acs_Execute` — runs the exact same
-`FUNC(LS_ACS_Execute)` code (`p_lnspec.cpp:1753-1778`) as the numbered action special, just with
+`FUNC(LS_ACS_Execute)` code (`p_lnspec.cpp:1753-1782`) as the numbered action special, just with
 the name pre-resolved to a number first.
 
 - `map` — **not a map/lump name** despite the wiki's generic "map which contains the script"
   phrasing. It's a numeric MAPINFO `levelnum`, resolved via `FindLevelByNum` (`g_mapinfo.cpp:128`,
   a linear scan of `wadlevelinfos[].levelnum`). `0` means "the current map" and skips the lookup
-  entirely (`p_lnspec.cpp:1768-1769`). **If `map` is nonzero and no loaded level has that
+  entirely (`p_lnspec.cpp:1769-1771`). **If `map` is nonzero and no loaded level has that
   `levelnum`, the call fails immediately — returns `false`, without even attempting to defer**
-  (`p_lnspec.cpp:1775-1777`). A typo'd/unconfigured map number is silently indistinguishable from
+  (`p_lnspec.cpp:1777-1779`). A typo'd/unconfigured map number is silently indistinguishable from
   "script not found" (both return `false`), not a deferred-and-eventually-run case.
 - `s_arg1`/`s_arg2`/`s_arg3` — passed through as the script's own args; in `zt-bcc`'s signature
   these are optional (after the `;`) and default to `0` if omitted, unlike the wiki's C-style
@@ -93,13 +98,15 @@ the name pre-resolved to a number first.
     start/failure result.
 - **Clientside carve-out:** server-side call for a `CLIENTSIDE`-flagged script unconditionally
   returns **`true`** — success is reported regardless of whether any client actually
-  has/loads the script.
+  has/loads the script. The check runs before the `map` lookup (`p_lnspec.cpp:1762-1767`), so
+  an unresolvable `map` still returns `true` on the server. Clients then just print a
+  "Couldn't find map by levelnum" warning (`cl_main.cpp:7163-7182`).
   - Zandronum only; this carve-out is dead code on UZDoom — see "Engine-family divergence:
     CLIENTSIDE carve-out is dead code on UZDoom" above.
 
 **Provenance:** wiki page `ACS_NamedExecute - ZDoom Wiki.html` (`_intake/`, `https://zdoom.org/w/index.php?title=ACS_NamedExecute&oldid=35683`) +
 source-verified against `zt-bcc/lib/zcommon.bcs:1667`, `p_acs.cpp:5400,6339-6353,13234-13284`,
-`p_lnspec.cpp:86-92,1753-1778`, `g_mapinfo.cpp:128-134`.
+`p_lnspec.cpp:86-92,1753-1782`, `g_mapinfo.cpp:128-134`.
 
 ---
 
@@ -201,16 +208,25 @@ the wait half.
   `SCRIPT_ScriptWait` once `RunningScripts.CheckKey(statedata) != NULL` — no timeout, no path back
   to `SCRIPT_Running` if the key never appears. `Acs_NamedExecute`'s `bool` success/failure return
   is discarded by the `PCD_DROP` above, so the caller has no way to detect a bad name. A
-  misspelled name, a `#library`-scoped name that doesn't resolve from the caller's compilation
-  unit, or a named script that fails to start for any other reason (e.g. already running as a
-  non-repeatable/singleton instance) all produce the same result: the calling script silently
-  hangs in `SCRIPT_ScriptWaitPre` for the rest of the map — a permanent stall, not a clean
-  failure.
+  misspelled name or a `#library`-scoped name that doesn't resolve from the caller's compilation
+  unit produces the same result: the calling script silently hangs in `SCRIPT_ScriptWaitPre`
+  until something else starts a script by that name, normally for the rest of the map. That is a
+  stall, not a clean failure.
+- **A target that is already running doesn't stall the caller.** `Acs_NamedExecute` fails to
+  start a second instance (`P_GetScriptGoing`, `p_acs.cpp:13061-13069`), but the existing
+  instance is still in `RunningScripts`, so the wait finds it and the caller resumes when that
+  instance finishes (`p_acs.cpp:10656-10665`). A suspended instance is resumed instead.
+- **Zandronum server: waiting on a `CLIENTSIDE` target stalls.** The clientside carve-out in
+  `LS_ACS_Execute` (`p_lnspec.cpp:1762-1767`) hands the script to clients and never starts it
+  on the server, so the server's waiting script sits in `SCRIPT_ScriptWaitPre` for the rest of
+  the map. On UZDoom that carve-out is dead code (see the divergence section above), so the wait
+  behaves normally there.
 - The map-number restriction the wiki calls out ("you can only wait on scripts in the current
   map") isn't a documented rule being followed — it falls straight out of the hardcoded literal
   `0` above; there's no other map number this macro is capable of producing.
-- Unlike its two siblings above, this one has **no clientside/netcode carve-out of its own** to
-  document — it's a thin macro over `Acs_NamedExecute` (which does have one) plus a wait opcode.
+- Unlike its two siblings above, this one has **no clientside/netcode carve-out of its own**.
+  It's a thin macro over `Acs_NamedExecute` (which does have one) plus a wait opcode, and it
+  inherits that carve-out's server-side stall described above.
 
 **Wiki's worked example** (unmodified, matches zt-bcc's actual expansion):
 ```text
@@ -234,7 +250,8 @@ named script actually ran.
 **Provenance:** wiki page `ACS_NamedExecuteWait - ZDoom Wiki.html` (`_intake/`, retrieved
 2026-07-28, `https://zdoom.org/w/index.php?title=ACS_NamedExecuteWait&oldid=36649`) + source-verified against `zt-bcc` codegen
 (`src/builtin.c:178,331-332`, `src/codegen/expr.c:1991-2033`, `src/parse/token/info.c:166`) and
-the Zandronum source's `src/p_acs.cpp:6339-6360,9190-9200,10672-10674`.
+the Zandronum source's `src/p_acs.cpp:6339-6360,9190-9200,10656-10665,10672-10674,13061-13069`,
+`src/p_lnspec.cpp:1762-1767`.
 
 ---
 
@@ -263,7 +280,8 @@ start/fail `bool` like `Acs_NamedExecute`/`Acs_NamedExecuteAlways` do. Target sp
   way to retrieve its eventual real result**. Concretely:
   - A script that never calls `SetResultValue` at all before terminating returns **`1`, not
     `0`** — easy to mistake for "success" boolean semantics when it's actually just the
-    uninitialized default.
+    uninitialized default. Exception on Zandronum: an `EVENT` script starts from the current
+    game event's result value instead (`p_acs.cpp:9153-9155`).
   - A script that `Delay`s/waits *before* calling `SetResultValue` returns whatever `resultValue`
     was at that pause point (`1` if nothing was set yet), **not** the value it eventually computes.
 - **Unresolved script name returns `0` but does print a console message** — indistinguishable *by

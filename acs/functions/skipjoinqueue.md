@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** `SkipJoinQueue - Zandronum Wiki.html` (`https://wiki.zandronum.com/w/index.php?title=SkipJoinQueue&oldid=2269`), verified against the Zandronum source's `src/p_acs.cpp` (ACSF_SkipJoinQueue), `src/p_interaction.cpp` (`PLAYER_IsTrueSpectator`), and `src/joinqueue.cpp` on 2026-07-29.
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 

@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** wiki page `GetPlayerInfo - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
 `https://zdoom.org/w/index.php?title=GetPlayerInfo&oldid=54371`) + source-verified against `p_acs.cpp:12665-12692`, `d_player.h:362-432` (userinfo_t
 getters), `zt-bcc/lib/zcommon.bcs:358-367`. Wiki/fork discrepancies: `PLAYERINFO_FVIEWBOB` is
@@ -81,7 +81,7 @@ All properties below are implemented and verified except `PLAYERINFO_FVIEWBOB` (
 
 The ZDoom wiki lists `PLAYERINFO_FVIEWBOB` (first-person view bob) as the 8th property. **This
 constant is not defined in zt-bcc's `zcommon.bcs`** (enum stops at `PLAYERINFO_DESIREDFOV` —
-`zcommon.bcs:366`), and **the Zandronum engine switch has no case for it either** (`p_acs.cpp:12674-12689`
+`zcommon.bcs:367`), and **the Zandronum engine switch has no case for it either** (`p_acs.cpp:12674-12689`
 implements only the 10 above) — calling it silently falls through to `default: return 0;` and
 does nothing. Use a workaround from upstream ZDoom documentation or skip this property entirely
 in Zandronum mods.

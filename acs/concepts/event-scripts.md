@@ -1,9 +1,9 @@
 # EVENT scripts
 
-**Tier:** B (wiki-sourced concept page; the load-bearing/version-sensitive claims were traced to source and to git history, but result-value ordering across multiple scripts, network-traffic performance claims, and the leave-reason enum values were not independently traced — see notes above for exactly which parts are untraced).
+**Tier:** B (wiki-sourced concept page; the load-bearing/version-sensitive claims were traced to source and to git history, including result-value chaining across multiple scripts and the leave-reason enum values. Not traced: which disconnect path passes which leave reason, and the claim that the version-bump commit dates are synthetic).
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-28)
-**Provenance:** wiki page `EVENT scripts - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-28, `https://wiki.zandronum.com/w/index.php?title=EVENT_scripts&oldid=2562`) + verified against the Zandronum source (`gamemode.h`, `gamemode.cpp`, `gi.cpp`, `actor.h`, `p_acs.h`) and the zt-bcc source's `lib/zcommon.bcs`, including a git-ancestry check against the 3.2.1→3.3-alpha version-bump commits (2026-07-28).
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
+**Provenance:** wiki page `EVENT scripts - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-28, `https://wiki.zandronum.com/w/index.php?title=EVENT_scripts&oldid=2562`) + verified against the Zandronum source (`gamemode.h`, `gamemode.cpp`, `gi.cpp`, `actor.h`, `p_acs.h`; re-verification: `p_acs.cpp` `StartTypedScripts`/`PCD_SETRESULTVALUE`, `sv_main.h:191-203`) and the zt-bcc source's `lib/zcommon.bcs`, including a git-ancestry check against the 3.2.1→3.3-alpha version-bump commits (2026-07-28).
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 
 Zandronum's own script type (`SCRIPT_Event = 16`, tagged `[BB]` in `p_acs.h` — not part of the
@@ -13,9 +13,10 @@ ZDoom script-type set, see [Script types](script-types.md)) for hooking game eve
 
 ## Version-gap warning (why this page needed extra care)
 
-This entry targets Zandronum 3.2.1 (per `../../shared/AUTHORING.md`'s "Engine scope" — Zandronum
-stays co-equal and fully verified even though UZDoom is the tree's primary engine), but the only
-local checkout is a `master` HEAD that reports `3.3-alpha` in `version.h`. Two `GAMEEVENT_*`
+Zandronum's `master` reports `3.3-alpha` in `version.h`, ahead of the `3.2.1` release that
+consuming projects still ship on (per
+`../../shared/AUTHORING.md`'s "Engine scope" — Zandronum stays co-equal and fully verified even
+though UZDoom is the tree's primary engine). Two `GAMEEVENT_*`
 events on the wiki page are recent enough that this gap actually matters here — resolved by
 checking topological ancestry
 in the Zandronum source's git history against the commit that set `version.h` to the `3.2.1`
@@ -30,7 +31,7 @@ ancestry, not date, is what was checked):
   as real named BCS constants. Safe to use.
 - **`GAMEEVENT_PLAYERJOINS` (20)** — the wiki page itself already flags this as "development
   version 3.3-alpha and above only," and that held up: its commit (`de253db6d`) is **not** an
-  ancestor of the 3.2.1 bump. Confirmed real and wired into gameplay in the current checkout
+  ancestor of the 3.2.1 bump. Confirmed real and wired into gameplay at `3.3-alpha`
   (`gamemode.cpp:1361`, `GAMEEVENT_e` in `gamemode.h:128`), but **not exposed as a named BCS
   constant in `zt-bcc/lib/zcommon.bcs`** — the compiler-side enum stops at
   `GAMEEVENT_DOMINATION_CONTEST`. Do not use `GAMEEVENT_PLAYERJOINS` when targeting Zandronum
@@ -60,30 +61,41 @@ Every other `GAMEEVENT_*` value on the wiki page (0-17) is well below this gap a
 - **`GetEventResult`** — confirmed real, extension function `zcommon.bcs:1782` (`ACSF` index
   -152). `SetResultValue` is a separate, already-documented tier-C compiler builtin (see
   `INDEX.md`'s signature-only block).
-- **Client-mode dispatch: stronger claim than the wiki states.** `GAMEMODE_HandleEvent()`
-  (`gamemode.cpp:1245`) opens with `if (NETWORK_InClientMode()) return 1;` — i.e. the event
-  dispatch function itself never even attempts to run `StaticStartTypedScripts(SCRIPT_Event,
-  ...)` when called in client mode; only the server ever originates an `EVENT` script trigger.
-  The wiki's narrower claim ("event handling does not work at all in CLIENTSIDE scripts," meaning
-  specifically the `SetResultValue`-based result-override feature) is a special case of this: a
-  `CLIENTSIDE`-flagged `EVENT` script still gets *triggered* by the server and relayed down via
-  the same per-script clientside-execution replication path documented in
-  [Client-side scripting](clientside-scripting.md), but the result-value round-trip described
-  below never crosses back from a client since the client-side call into `GAMEMODE_HandleEvent`
-  is the one that no-ops.
-- **Result-value chaining ("last script fired decides the outcome")** — plausible from the
-  `OverrideResult`/`lOldResult` save-restore logic around the `StaticStartTypedScripts` call in
-  `GAMEMODE_HandleEvent`, which lets nested/re-entrant event calls each see and modify a shared
-  result value, but the exact "scripts run in this order" claim was not traced through
-  `StartTypedScripts`'s per-module iteration order to independently confirm — treat as
-  plausible-but-untraced.
+- **Where events dispatch, and why `CLIENTSIDE` event scripts can't set the result.** Two
+  independent gates apply.
+  - `GAMEMODE_HandleEvent()` (`gamemode.cpp:1245-1249`) returns 1 at once when
+    `NETWORK_InClientMode()` is true (a client or client-demo playback), so a client never starts
+    `EVENT` scripts itself. Only the server, or an offline game, dispatches events.
+  - On the server, `StartTypedScripts` (`p_acs.cpp:3403-3411`) forwards every `CLIENTSIDE`-flagged
+    script to clients via `SERVERCOMMANDS_ACSScriptExecute` and skips running it on the server,
+    as described in [Client-side scripting](clientside-scripting.md). A `CLIENTSIDE` `EVENT`
+    script therefore still runs on clients, but its `SetResultValue` only touches the client's
+    own local copy of the event result and never reaches the server's outcome. That is the
+    mechanism behind the wiki's "event handling does not work at all in CLIENTSIDE scripts."
+  - Offline, nothing is forwarded, so a `CLIENTSIDE` `EVENT` script runs locally like any other
+    and its result does count. The wiki's claim holds in a network game, not offline.
+- **Result-value chaining ("last script fired decides the outcome")** confirmed, with an order
+  and a first-tic qualifier. `GAMEMODE_HandleEvent` saves the current event result, presets it
+  to `OverrideResult` (1 by default, the incoming damage for the damage events), starts the
+  scripts, reads the result back, then restores the saved value (`gamemode.cpp:1251-1268`). The
+  save/restore isolates a nested event (one fired from inside another event's script) so the
+  outer event's result is untouched. Scripts start module by module in load order
+  (`p_acs.cpp:3378-3381`), and within a module in ascending script number, since each module's
+  script list is sorted by number (`p_acs.cpp:2929`, `3021`, `3025-3030`). Each `EVENT` script's
+  first tic seeds its result from the current event result (`p_acs.cpp:9150-9157`), and
+  `SetResultValue` on that first tic writes it back (`p_acs.cpp:10461-10468`). So the last
+  script to call `SetResultValue` before it first yields (e.g. a `Delay`) wins; a call after
+  that is too late. This only matters for calls that pass `bRunNow` (medals, chat, spawn, damage,
+  domination point/precontrol/contest, player joins, level init). The other events
+  (`PLAYERFRAGS`, `CAPTURES`, `TOUCHES`, `RETURNS`, `ROUND_*`, `PLAYERCONNECT`,
+  `PLAYERLEAVESSERVER`, `DOMINATION_CONTROL`, `JOINQUEUECHANGED`) return before any script has
+  run, so no script can change their result.
 
 ## Leave reasons (`GAMEEVENT_PLAYERLEAVESSERVER`'s `arg2`)
 
-Not independently re-verified value-by-value in this pass (`LEAVEREASON_LEFT`/`_KICKED`/
-`_ERROR`/`_TIMEOUT`/`_RECONNECT` = 0-4) — spot-checking every disconnect code path was out of
-scope; flagged here as wiki-sourced, not fork-verified, in case a future session needs to trust
-or distrust a specific `arg2` value.
+`LEAVEREASON_LEFT`/`_KICKED`/`_ERROR`/`_TIMEOUT`/`_RECONNECT` = 0-4, verified as the implicit
+values of `LEAVEREASON_e` (`sv_main.h:191-203`), identical at the 3.2.1 bump. Which disconnect
+path passes which reason was not traced call site by call site.
 
 ## Engine-family divergence
 

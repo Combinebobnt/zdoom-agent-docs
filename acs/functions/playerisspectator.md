@@ -2,10 +2,10 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** wiki page `PlayerIsSpectator - Zandronum Wiki.html` (`_intake/`, retrieved
 2026-07-28, `https://wiki.zandronum.com/w/index.php?title=PlayerIsSpectator&oldid=1320`) + source-verified (`p_acs.cpp:7148-7161`, `d_player.h:736-740`,
-`gamemode_enums.h:72`, `p_interaction.cpp:2441-2453,3006-3014`). The wiki's 0/1/2 mapping holds
+`gamemode_enums.h:72`, `p_interaction.cpp:2522-2523,3006-3014`). The wiki's 0/1/2 mapping holds
 exactly; the mode-gating on `2` and the invalid-index-vs-non-spectator ambiguity are this doc's
 source-verified additions.
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
@@ -38,7 +38,7 @@ case ACSF_PlayerIsSpectator:
   (`gamemode_enums.h:72`) *and* `player_t::bDeadSpectator` (`d_player.h:739-740`, "This player is
   currently spectating after dying in LMS or survival co-op") to be set. `bDeadSpectator` is a
   qualifier on `bSpectating`, not an independent state — `PLAYER_SetSpectator()`
-  (`p_interaction.cpp:2441-2453`) only ever sets it while `bSpectating` is also true. Practical
+  (`p_interaction.cpp:2522-2523`) only ever sets it while `bSpectating` is also true. Practical
   effect: in a game mode *without* `GMF_DEADSPECTATORS` (most non-LMS/non-survival modes), a
   player who is mechanically in this "waiting to respawn" state still reads back as plain `1`
   ("true spectator"), not `2` — the distinction only surfaces in modes that support it.

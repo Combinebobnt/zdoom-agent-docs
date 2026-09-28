@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** `restart - ZDoom Wiki.html`
 (`https://zdoom.org/w/index.php?title=Restart&oldid=38214`), verified against
 the Zandronum source's `src/p_acs.cpp` and the zt-bcc source's `src` on 2026-07-29. The wiki page is a
@@ -49,6 +49,16 @@ fresh re-invocation.
   budget in the same tic and gets force-terminated; a `Delay(N>=1)` (or other latent call) before
   the `restart` is what actually yields and resets the counter on the next tic — see
   [Delay](delay.md) for the `Delay(0)`-is-not-a-safe-no-op trap that defeats this same guard.
+- **This guard grew an exemption after 3.2.1: a script flagged `SCRIPTF_Busy` skips it
+  entirely.** `SCRIPTF_Busy` (`p_acs.h:360`, "Not affected by the runaway script limit") and the
+  check's `!(ptr->Flags & SCRIPTF_Busy)` clause were added in `1291d585c` (commit message: `Add
+  support for the "BUSY" script flag`), with a same-day evaluation-order fix in `f52c24dc4`; both
+  are dated
+  2025-10-16 and neither is an ancestor of the 3.2.1 version-bump commit (`28f736fb3`,
+  2025-08-04). On a real 3.2.1 client this flag does not exist, so every script is subject to the
+  2,000,000-instruction cap above with no exception. Only at this checkout can a script compiled
+  with that flag set loop on `restart;` indefinitely without being force-removed by this
+  particular guard.
 - **Cross-reference for a future family consolidation:** `restart`/`terminate`/`suspend` are
   literally the same grammar production in `bcc` (`SCRIPT_JUMP_*`, `semantic/stmt.c:869`) and
   share the identical "outside script" / "inside msgbuild block" restrictions — a natural

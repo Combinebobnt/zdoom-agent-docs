@@ -2,8 +2,8 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
-**Provenance:** wiki page `SetActorPitch - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=SetActorPitch&oldid=22666`) + source-verified against `p_acs.cpp:5869-5895,12039-12044,12599-12601`, `p_mobj.cpp:3929-3937`, `p_user.cpp:3336-4014`, `zt-bcc/src/builtin.c:150`. Wiki's `int pitch` typing corrected to `fixed` per the actual builtin signature; wiki's implied "there is a valid range" note confirmed true in *convention* but not enforced by this function (no clamp in source).
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** wiki page `SetActorPitch - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=SetActorPitch&oldid=22666`) + source-verified against `p_acs.cpp:5869-5895,12039-12044,12599-12601`, `p_mobj.cpp:3929-3937`, `p_user.cpp:3958-4006`, `zt-bcc/src/builtin.c:150`. Wiki's `int pitch` typing corrected to `fixed` per the actual builtin signature; wiki's implied "there is a valid range" note confirmed true in *convention* but not enforced by this function (no clamp in source).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
@@ -21,7 +21,7 @@ bool interpolate)` at the Zandronum source's `src/p_acs.cpp:5869-5895`, called f
   The wiki page types this parameter as plain `int`, but `zcommon.bcs`'s own declaration and
   `builtin.c`'s `;if` signature both agree it's `fixed`, matching the type actually pushed on the
   ACS stack and left-shifted by 16 into the engine's internal BAM-style pitch representation
-  (`angle << 16`, `p_acs.cpp:5891`/`5893`) before being stored in `AActor::pitch`.
+  (`angle << 16`, `p_acs.cpp:5875`/`5889`) before being stored in `AActor::pitch`.
 
 ## `tid != 0` sets **every** actor with that TID — this is a real, verified divergence from `GetActorPitch`
 
@@ -40,7 +40,7 @@ while ((actor = iterator.Next()))
 }
 ```
 
-(`p_acs.cpp:5886-5895`) — so calling `SetActorPitch(tid, p)` with a TID shared by multiple actors
+(`p_acs.cpp:5884-5894`) — so calling `SetActorPitch(tid, p)` with a TID shared by multiple actors
 sets **all of them**, while `GetActorPitch(tid)` would only ever have read the first one. Don't
 assume Get/Set are symmetric for a shared TID.
 
@@ -62,8 +62,10 @@ void AActor::SetPitch(int p, bool interpolate)
 ```
 
 (`p_mobj.cpp:3929-3937`) — a plain assignment. Ordinary player mouselook pitch *is* clamped
-elsewhere (e.g. the `ANGLE_1*90` bound in `P_PlayerThink`/camera code, `p_user.cpp:3336-4014`), but
-that clamp lives in the mlook input path, not in `SetPitch`/`SetActorPitch`. Calling
+elsewhere: `P_PlayerThink`'s look up/down handling clamps it with a `pitchLimit`: a fixed
+-32/+56 degrees on a server, and the active renderer's `Renderer->GetMaxViewPitch` on a client (`p_user.cpp:3969`: "The player's view pitch
+is clamped between -32 and +56 degrees", enforced at `p_user.cpp:3986-4000`). That clamp lives in
+the mlook input path, not in `SetPitch`/`SetActorPitch`. Calling
 `SetActorPitch` from ACS with a value outside `-0.25`..`0.25` is not rejected or wrapped by this
 function — it will set an out-of-normal-range pitch verbatim, which can flip the view/aim past
 straight up or down.
@@ -104,7 +106,7 @@ the pitch snaps instantly.
 ## Netcode: server-authoritative, replicated per matching actor
 
 After each `SetPitch` call, if this is running on the server it also does
-`SERVERCOMMANDS_MoveThingExact(actor, CM_PITCH)` (`p_acs.cpp:5890`/`5894`) to sync the new pitch to
+`SERVERCOMMANDS_MoveThingExact(actor, CM_PITCH)` (`p_acs.cpp:5879`/`5893`) to sync the new pitch to
 clients. On a listen/dedicated server this replicates correctly; if called from a `CLIENTSIDE`
 script on a non-server client, the local pitch still changes but nothing is sent out — the usual
 Zandronum clientside caveat (state stays local, doesn't propagate).

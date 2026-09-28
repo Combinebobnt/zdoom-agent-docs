@@ -10,9 +10,9 @@ engine-source bucket table, this section's layout, and the ACS-only tier-A intak
 the `Applies to:`/`Verified against:` engine-claim fields, licensing, and the Authoring rule are
 defined once, there, for every section.
 
-If the `zdoom-docs-lookup` subagent is registered, prefer delegating a lookup question to it
-instead of reading this tree by hand — see the root [`AGENTS.md`](../AGENTS.md)'s "Subagents"
-section.
+If your agent harness has the `zdoom-docs-lookup` subagent registered (adapters for several
+harnesses ship in `../agents/`), prefer delegating a lookup question to it instead of reading
+this tree by hand — see the root [`AGENTS.md`](../AGENTS.md)'s "Subagents" section.
 
 ## Layout
 

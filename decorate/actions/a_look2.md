@@ -2,48 +2,47 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
-**Provenance:** ZDoom Wiki `A_Look2` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_Look2&oldid=35060) + verified against Zandronum source `src/p_enemy.cpp:2351-2423`. Also present in UZDoom 4.15pre (`src/playsim/p_enemy.cpp:2306`) with identical target-acquisition logic but without the Zandronum network-specific divergence documented below.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** ZDoom Wiki `A_Look2` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_Look2&oldid=35060) + verified against Zandronum source `src/p_enemy.cpp:2351-2423`, `src/p_sight.cpp:262-287` (`SF_SEEPASTBLOCKEVERYTHING`), `src/p_mobj.cpp:502-603` (`SetState`), `src/cl_main.cpp:5722-5761` (client `SetThingFrame`) and the stock Strife actors in `wadsrc/static/actors/strife/`. Also present in UZDoom 4.15pre (`src/playsim/p_enemy.cpp:2306`) with identical target-acquisition logic but without the Zandronum network-specific divergence documented below.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/p_enemy.cpp:2351` (`DEFINE_ACTION_FUNCTION(AActor, A_Look2)`).
 
-Sound-based target-acquisition action for monsters: wakes on detected sound from a shootable actor (`LastHeard`), ignoring visual contact. If no target is acquired, animates the actor through fixed state offsets (see below). Used in Strife and Strife-aligned actor definitions.
+Sound-based target-acquisition action for monsters: wakes on a sound heard from a shootable actor (`LastHeard`). If no target is acquired, it randomly moves the actor to one of three fixed states after its `SpawnState` (see below). Used by the stock Strife humans (Peasant, Rebel, Acolyte, Templar, Macil, merchants).
 
 ## Target acquisition
 
-If `self->LastHeard` is non-null and its owning actor is shootable:
+`threshold` is reset to 0 on every call. Then, if `self->LastHeard` is non-null, alive (`health > 0`; a dead `LastHeard` is treated as `NULL`) and `+SHOOTABLE`:
 
-- **If the actor is an enemy** (aligned opposite to this actor, or `LEVEL_NOALLIES` flag set): sets `self->target` and jumps to `SeeState`. If the `+AMBUSH` flag is set, first checks line-of-sight with `SF_SEEPASTBLOCKEVERYTHING` (allowing sightlines through glass and closed doors); fails if sight fails.
-- **If the actor is an ally** (same faction): calls `P_LookForPlayers(... MF4_LOOKALLAROUND ...)` to perform a **visual** search. This contradicts the wiki's claim that A_Look2 "only reacts to sound." The actual behavior is: `LastHeard` gates entry to the branch, but friendly targets fall through to a sight-based player lookup. If that succeeds, jumps to `SeeState`.
+- **If the heard actor is hostile** (its `+FRIENDLY` flag differs from this actor's, or the map sets `LEVEL_NOALLIES`): sets `self->target` to it, sets `threshold` to 10 and jumps to `SeeState`. If `+AMBUSH` is set, it first needs line of sight to the heard actor, checked with `SF_SEEPASTBLOCKEVERYTHING`; if sight fails it falls through to the idle branch below. That flag does not let sight pass closed doors or solid walls. It only lets sight cross a block-everything line that is impact-activated and runs `ACS_Execute`/`ACS_ExecuteAlways` on the current map (a scripted breakable line such as Strife glass).
+- **If the heard actor is on the same side**: runs the regular `P_LookForPlayers` search (the one `A_Look` uses), all-around if `+LOOKALLAROUND` is set. That search picks its own target and needs sight in most modes. This contradicts the wiki's claim that A_Look2 "only reacts to sound": `LastHeard` only gates entry to this branch. If the search succeeds, jumps to `SeeState` and sets `+INCOMBAT`; `threshold` stays 0. If it fails, falls through to the idle branch.
 
-In either case, `threshold` is set to 10 on target acquisition. If `LastHeard` points to a dead actor, it's treated as `NULL`.
-
-**Early-out:** If the `+INCONVERSATION` flag is set, the function returns immediately without any other behavior.
+**Early-outs:** If `+INCONVERSATION` is set, the function returns immediately with no other effect. On Zandronum it also returns immediately on clients; the whole action runs on the server.
 
 ## State animation when no target found
 
-When no target is acquired (the `nosee:` fallback):
+When no target is acquired (the `nosee:` fallback), two independent rolls run:
 
-- **Approximately 11.7% of calls** (RNG roll < 30/256): jumps to `SpawnState + 1` or `SpawnState + 2` with equal probability, controlled by `(pr_look2() & 1)`.
-- **Independently, if the `+STANDSTILL` flag is not set, approximately 15.6% of calls** (RNG roll < 40/256): overrides to `SpawnState + 3`. If `+STANDSTILL` is set, this branch is skipped entirely, and the RNG is not consumed.
+- **30/256 of calls (about 11.7%):** `SetState` to `SpawnState + 1` or `SpawnState + 2` with equal probability, chosen by `(pr_look2() & 1)`.
+- **Then, if `+STANDSTILL` is not set, 40/256 of calls (about 15.6%):** `SetState` to `SpawnState + 3`. If `+STANDSTILL` is set, this roll is skipped and no RNG value is consumed.
+
+Both can fire in one call. Each `SetState` runs the entered state's action immediately (and chains through any 0-tic states), so the `+1`/`+2` state's action runs and then the `+3` state's action runs, all in the same tic. The actor ends in the `+3` state.
 
 ## Wiki/engine divergence: "three states after this function call"
 
-**The wiki's language is ambiguous.** It says "the three states after this function call are reserved; the function jumps to the states following the call." The code actually uses hardcoded offsets from the actor's `SpawnState` — e.g. `SpawnState + 3` — not relative to the state that invoked A_Look2. This means:
+The wiki says "the three states after this function call are reserved". The code actually uses fixed offsets from the actor's `SpawnState` (the first state under `Spawn:`), not from the state that called A_Look2. The two only coincide when A_Look2 is on the first `Spawn:` state, as in every stock actor.
 
-1. If an actor's `Spawn:` state sequence has fewer than three states, `SpawnState + 3` lands in whatever states follow in the contiguous actor state table (typically the actor's `See:`, `Pain:`, or `Death:` state), producing undefined animation. This is a classic DECORATE footgun.
-2. The wiki's own Peasant example (`Spawn: PEAS A 10 A_Look2 / Loop`) shows a non-idiomatic use case — the example doesn't visibly reserve three separate animation states, instead relying on `Loop` to control pacing. A proper use of A_Look2 requires three idle-animation state frames immediately following the call.
+Offsets count states, not lines: `Loop`, `Wait`, `Goto` and labels are not states. So `SpawnState + 3` is the third real state after the first `Spawn:` state, wherever it sits in the actor's state list. The stock actors use this in two ways:
+
+1. **Rebel, Templar, Macil, Acolyte, merchants:** `Spawn:` holds the A_Look2 state, then two unlabeled single-state idle blocks each ending in `Loop` (back to `Spawn:`), then a longer unlabeled sequence. So `+1`/`+2` are brief idle poses. `+3` starts an `A_Wander` sequence, except for merchants, where it is a longer idle animation.
+2. **Peasant:** `Spawn:` is only `PEAS A 10 A_Look2` / `Loop`. `+1`, `+2` and `+3` are the first three states of its `See:` block (`A_Wander` frames), so an idle peasant randomly starts wandering. This is deliberate, not a mistake.
+
+If you write your own A_Look2 user, put the three states you want right after the first `Spawn:` state. Otherwise the offsets land in whichever states happen to follow in the actor's state list.
 
 ## Zandronum-specific: multiple calls to SetState and RNG frame desync
 
-**When the animation `nosee:` path executes on a Zandronum server**, if the first condition (RNG < 30) fires:
+On acquiring a target, the server sends clients `SetThingState` (`STATE_SEE`) before its own `SetState(SeeState)`. In the `nosee:` branch it sends `SetThingFrame` with the new state before each `SetState`, and the client runs that state's action on receipt.
 
-- Line 2411 broadcasts `SERVERCOMMANDS_SetThingFrame(... SpawnState + (pr_look2() & 1) + 1)` with one RNG roll.
-- Line 2413 calls `SetState(... SpawnState + (pr_look2() & 1) + 1)` with an **independent second RNG roll** ~50ms later on the same tic (in local server time).
-
-The frame sent to clients and the frame the server actually sets are **independent RNG results** and disagree ~50% of the time this branch runs. This is a visual-only client/server desync; game state is unaffected.
-
-**Further untraced:** both `SetState` calls (lines 2413 and 2354) run on the same tic, and ZDoom's `SetState` runs the new state's action by default — it's untraced whether this executes two state-action functions per tic (one per `SetState` call), or whether the second `SetState` overrides the first and only one runs.
+For the first idle roll (lines 2411 and 2413), the frame sent to clients and the frame the server sets each call `pr_look2()` separately. They are two independent RNG results, so client and server pick different states (`+1` vs `+2`) about half the time this branch runs. If the `+3` roll also fires, a second `SetThingFrame` puts both sides on `SpawnState + 3`. The server stays authoritative, so the mismatch only affects what clients show.
 
 ## See also
 

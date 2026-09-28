@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-14)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** wiki page `ACS_ExecuteWithResult - ZDoom Wiki.html` (`_intake/`, retrieved 2026-08-14, `https://zdoom.org/w/index.php?title=ACS_ExecuteWithResult&oldid=50130`) + source-verified against `p_lnspec.cpp:1833-1851`, `p_acs.cpp:9120-13050,13234-13288`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Action special (index 84 in the special table). Implementation: `FUNC(LS_ACS_ExecuteWithResult)` at the Zandronum source's `src/p_lnspec.cpp:1833-1851`, dispatched via `P_StartScript` with flags `ACS_ALWAYS | ACS_WANTRESULT | (optionally ACS_BACKSIDE)`.
@@ -31,7 +31,7 @@ Returns an `int` — whatever value the target script passed to `SetResultValue(
 - **Runs synchronously, in-line, in the caller's own tic** — not deferred to next tic like `ACS_Execute`/`ACS_ExecuteAlways`. The `ACS_WANTRESULT` flag passed to `P_StartScript` causes it to call the script's `RunScript()` method directly instead of just scheduling it (`p_acs.cpp:13264-13266`).
 - **Always executes on the current map** — the hardcoded `level.mapname` passed to `P_StartScript` means the deferred cross-map execution path (`addDefered` at `p_acs.cpp:13282-13285`) is unreachable for this special, even though `ACS_ALWAYS` is set in the flags. A script number referring to a *different* map's script is simply not found, and the call returns `0`.
 - **Always spawns a fresh script instance** — the `ACS_ALWAYS` flag means any existing instance of the target script is left untouched; a new instance runs alongside the old one. An `ACS_Execute` call (without `ALWAYS`) would instead resume a suspended instance if one exists, but `ACS_ExecuteWithResult` never does that.
-- **Activator context**: The calling actor (activator) is preserved and passed to the script. In `OPEN`/`ENTER`-style script contexts with no activator, the script receives `NULL` for its activator pointer.
+- **Activator context**: The calling actor (activator) is preserved and passed to the script. In a script with no activator (e.g. `OPEN`), the script receives `NULL` for its activator pointer.
 - **Line context**: If the action special is invoked from a UDMF line special (not from bytecode), the line pointer and backside flag are captured in the created script instance and are readable via `GetLineSpecial()`/`LineSide()` (though `LineSide()` only returns meaningful values for actual line-originated scripts; `ACS_ExecuteWithResult` invoked from bytecode sets `backSide` to `false`).
 
 ## Wiki/engine divergence: ZScript return-value conversions

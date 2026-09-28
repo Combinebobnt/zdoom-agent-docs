@@ -2,10 +2,10 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `Thing_ChangeTID - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
 `https://zdoom.org/w/index.php?title=Thing_ChangeTID&oldid=43784`) + source-verified against the Zandronum source (`p_lnspec.cpp:1081-1121`,
-`sv_commands.cpp:2044-2053`, `dobject.h:214`) and `zt-bcc/lib/zcommon.bcs:1515`. The wiki's
+`sv_commands.cpp:2044-2053`, `sv_commands.cpp:99-112`, `p_mobj.cpp:5054-5063`, `dobject.h:214`) and `zt-bcc/lib/zcommon.bcs:176`. The wiki's
 `oldtid`/`newtid` semantics and multiplayer TID-collision warning both hold exactly against the
 Zandronum fork's source; the always-`true` return value, the `OF_EuthanizeMe` skip, and the
 `SERVERCOMMANDS_SetThingTID` client-sync call are this doc's source-verified additions, not
@@ -40,9 +40,13 @@ Changes the TID of one or more actors. Action special (positive index 176 in `zc
   `SERVERCOMMANDS_SetThingTID(actor)` (`p_lnspec.cpp:1093-1094`, `:1114-1116`) to push the new TID
   to clients (`sv_commands.cpp:2044-2053`). This is automatic — callers don't need to do anything
   extra for the TID change to be visible clientside — except that
-  `SERVERCOMMANDS_SetThingTID` silently no-ops if the actor doesn't have a net ID yet
-  (`EnsureActorHasNetID` fails, `sv_commands.cpp:2046-2047`), a case that shouldn't arise for a
-  normal, already-spawned actor.
+  `SERVERCOMMANDS_SetThingTID` sends nothing for an actor with no net ID (`EnsureActorHasNetID`
+  fails, `sv_commands.cpp:2046-2047`). That is by design for actors spawned with
+  `NETFL_NONETID` or `NETFL_SERVERSIDEONLY`, which never get one (`p_mobj.cpp:5054-5063`), so
+  clients keep such an actor's old TID. It isn't always silent: with `sv_showwarnings` on
+  (default off) the server prints a "doesn't have a netID" warning unless the actor is
+  `NETFL_SERVERSIDEONLY` (`sv_commands.cpp:99-112`). The client applies the command with the
+  same `OF_EuthanizeMe` guard (`cl_main.cpp:5695-5704`).
 
 ## Engine-family divergence: the `OF_EuthanizeMe` guard clears the TID instead of preserving it
 

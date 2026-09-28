@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_RemoveChildren` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RemoveChildren&oldid=46803) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4790-4804` and actor declaration (`wadsrc/static/actors/actor.txt:240`).
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_RemoveChildren` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RemoveChildren&oldid=46803) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4790-4804` and actor declaration (`wadsrc/static/actors/actor.txt:240`), with `P_RemoveThing` at `src/p_things.cpp:504-519` and `AActor::HideOrDestroyIfSafe` at `src/p_mobj.cpp:619-647` for the network behavior.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_RemoveChildren)` in `src/thingdef/thingdef_codeptr.cpp` — callable from any actor's state table.
 
@@ -42,9 +42,9 @@ Removal is performed via `P_RemoveThing`, which handles:
 
 ## Network behavior
 
-In Zandronum multiplayer, `P_RemoveThing` broadcasts actor destruction to clients via `SERVERCOMMANDS_DestroyThing` when called on the server. The removal is **server-authoritative** — the server decides which actors to remove, and clients receive the destruction command.
+In Zandronum multiplayer, `P_RemoveThing` broadcasts actor destruction to clients via `SERVERCOMMANDS_DestroyThing` when called on the server. Clients that receive that command destroy the actor too (`src/cl_main.cpp:5449-5468`).
 
-Unlike `A_RaiseChildren`, which has an explicit `NETWORK_InClientMode()` guard, `A_RemoveChildren` does not explicitly check for client mode; the netcode handling is implicit in `P_RemoveThing`. On clients, the action executes but has no effect since `P_RemoveThing` checks the network state internally.
+Unlike `A_RaiseChildren`, which has an explicit `NETWORK_InClientMode()` guard, `A_RemoveChildren` has no client-mode check, and neither does `P_RemoveThing` (`src/p_things.cpp:504-519`). Its only network check gates the server-side broadcast. If this action runs on a client, the client still clears counters and removes the matching children locally, just without broadcasting. On a client the removal is always a plain `Destroy()`: the map-reset hide path in `HideOrDestroyIfSafe` requires not being in client mode (`src/p_mobj.cpp:619-647`). In practice this only reaches actors the client spawned itself: the protocol never sends `master`, so a server-spawned child's `master` is NULL on the client and matches nothing.
 
 ## Health vs. death state
 
@@ -69,7 +69,7 @@ All of `RMVF_MISSILES`, `RMVF_NOMONSTERS`, `RMVF_MISC`, `RMVF_EVERYTHING`, `RMVF
 
 So `A_RemoveChildren(true)` called with every other parameter left at its default only removes children flagged as monsters; a non-monster, non-missile child (e.g. a plain decoration or pickup spawned with `SXF_SETMASTER`) survives unless the caller explicitly passes `RMVF_MISC` or `RMVF_EVERYTHING`. This is the opposite of the existing Zandronum-specific section's claim that "Zandronum's version removes any actor with `master == self` regardless of type" — that statement is Zandronum-only; it does not hold for UZDoom's default-flags call.
 
-**No client/server split exists anywhere in UZDoom's source tree** — there is no `NETWORK_InClientMode()`-equivalent guard and no `SERVERCOMMANDS_DestroyThing`-equivalent broadcast. UZDoom's `P_RemoveThing` (`src/playsim/p_things.cpp:422-435`) just refuses to remove a live player's own body or a non-map actor (owned inventory), clears kill/item/secret counters, and calls `Destroy()` directly — no network role check, no server-authoritative/client-prediction distinction. The existing "Network behavior" section above describes a real Zandronum-only mechanism (`SERVERCOMMANDS_DestroyThing`, implicit client-mode handling inside `P_RemoveThing`) that has no UZDoom counterpart at all, not a differently-implemented version of the same mechanism.
+**No client/server split exists anywhere in UZDoom's source tree** — there is no `NETWORK_InClientMode()`-equivalent guard and no `SERVERCOMMANDS_DestroyThing`-equivalent broadcast. UZDoom's `P_RemoveThing` (`src/playsim/p_things.cpp:422-435`) just refuses to remove a live player's own body or a non-map actor (owned inventory), clears kill/item/secret counters, and calls `Destroy()` directly — no network role check, no server-authoritative/client-prediction distinction. The existing "Network behavior" section above describes a real Zandronum-only mechanism (the server-only `SERVERCOMMANDS_DestroyThing` broadcast inside `P_RemoveThing`) that has no UZDoom counterpart at all, not a differently-implemented version of the same mechanism.
 
 ## Related actions
 
@@ -85,6 +85,8 @@ A classic pattern: spawn children via a missile action, then remove dead spawns 
 ```text
 ACTOR VoodooLeaderImp : DoomImp
 {
+    States
+    {
     Missile:
         TROO G 6 A_SpawnItemEx("ChildImp", 50, 50, 60, 0, 0, 0, 0, SXF_SETMASTER)
         Goto See
@@ -95,6 +97,7 @@ ACTOR VoodooLeaderImp : DoomImp
         TROO L 6 A_NoBlocking
         TROO M -1
         Stop
+    }
 }
 ```
 

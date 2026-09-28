@@ -81,7 +81,7 @@ If the target's health is already 0 or below, or if it is otherwise already dead
 - **`A_DamageChildren`** — damages all child actors (`master == self`). **Zandronum only: 2-parameter simplified version.**
 - **`A_DamageSiblings`** — damages all sibling actors (shared `master`). **Zandronum only: 2-parameter simplified version.**
 - **`A_KillTarget`** — kills the target outright (damage = target's health).
-- **`A_GiveToTarget`** — gives inventory items to the target (UZDoom/GZDoom-family only).
+- **`A_GiveToTarget`** — gives inventory items to the target (exists on both engines).
 - **`A_TakeFromTarget`** — removes inventory items from the target (UZDoom/GZDoom-family only).
 
 ## Engine-family divergence

@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-07)
-**Provenance:** ZDoom Wiki `GetScreenWidth` (https://zdoom.org/w/index.php?title=GetScreenWidth&oldid=37388, retrieved 2026-08-07) + original source-verified on 2026-08-05 against the Zandronum source's `src/p_acs.cpp:12425-12451` (PCD_GETSCREENWIDTH case handler) and the UZDoom source's `src/playsim/p_acs.cpp:9885-9892` (same case handler). Re-verified against wiki 2026-08-07.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
+**Provenance:** ZDoom Wiki `GetScreenWidth` (https://zdoom.org/w/index.php?title=GetScreenWidth&oldid=37388, retrieved 2026-08-07) + original source-verified on 2026-08-05 against the Zandronum source's `src/p_acs.cpp:12425-12444` (PCD_GETSCREENWIDTH case handler) and the UZDoom source's `src/playsim/p_acs.cpp:9885-9892` (same case handler). Re-verified against wiki 2026-08-07.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin — `zt-bcc/src/builtin.c:113` (`{ "getscreenwidth", "i" }`, zero-arg, returns `int`), compiles to `PCD_GETSCREENWIDTH`. Not a `zcommon.bcs` `special`-table entry.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
@@ -34,7 +34,7 @@ This is the finding worth writing down: on Zandronum, `GetScreenWidth`/`GetScree
 require a `CLIENTSIDE` script to get a real answer, contrary to what "the server doesn't have a
 screen" (the handler's own comment) suggests at first read.
 
-Zandronum `src/p_acs.cpp:12425-12451` (PCD_GETSCREENWIDTH case handler):
+Zandronum `src/p_acs.cpp:12425-12444` (PCD_GETSCREENWIDTH case handler):
 
 ```cpp
 case PCD_GETSCREENWIDTH:
@@ -59,7 +59,7 @@ case PCD_GETSCREENWIDTH:
     break;
 ```
 
-(`PCD_GETSCREENHEIGHT` is the byte-for-byte same shape at `src/p_acs.cpp:12446-12468`, substituting `ScreenHeight`/`SCREENHEIGHT`.)
+(`PCD_GETSCREENHEIGHT` is the byte-for-byte same shape at `src/p_acs.cpp:12446-12465`, substituting `ScreenHeight`/`SCREENHEIGHT`.)
 
 Three states, not two:
 

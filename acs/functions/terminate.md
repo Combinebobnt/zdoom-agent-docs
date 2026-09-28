@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** `Terminate - ZDoom Wiki.html`
 (`https://zdoom.org/w/index.php?title=Terminate&oldid=35855`), verified against
 the Zandronum source's `src/p_acs.cpp` and the zt-bcc source's `src` on 2026-07-29.

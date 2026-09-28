@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_AlertMonsters` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_AlertMonsters&oldid=44133) + verified against the Zandronum source's `src/g_strife/a_strifeweapons.cpp:172` and `src/p_enemy.cpp:132-234`. **Accuracy note (2026-08-02):** the `AMF_TARGETEMITTER` guard originally documented here (an "alive and SHOOTABLE" precondition) is not present in the Zandronum source and has been removed — see "Flags" below. **Accuracy note (2026-08-02, second pass):** the "Compatibility caveats" section previously claimed `maxdist` still applies under `compat_soundtarget`; re-verified against `p_enemy.cpp:143` vs `:149` and corrected — `maxdist` is bypassed entirely in that mode.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** ZDoom Wiki `A_AlertMonsters` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_AlertMonsters&oldid=44133) + verified against the Zandronum source's `src/g_strife/a_strifeweapons.cpp:172` and `src/p_enemy.cpp:132-234`, plus `src/p_maputl.cpp:59-64` (`P_AproxDistance`) and `src/p_enemy.cpp:2133-2138`/`:2287-2290` (`LastHeard` clearing). **Accuracy note (2026-08-02):** the `AMF_TARGETEMITTER` guard originally documented here (an "alive and SHOOTABLE" precondition) is not present in the Zandronum source and has been removed — see "Flags" below. **Accuracy note (2026-08-02, second pass):** the "Compatibility caveats" section previously claimed `maxdist` still applies under `compat_soundtarget`; re-verified against `p_enemy.cpp:143` vs `:149` and corrected — `maxdist` is bypassed entirely in that mode.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_AlertMonsters)` in the Zandronum source's `src/g_strife/a_strifeweapons.cpp:172`. Callable from any actor's state table despite the Strife-specific filename.
 
@@ -17,11 +17,11 @@ The underlying algorithm otherwise matches: target selection, the `AMF_*` flags,
 
 ## Engine-family divergence: `maxdist` distance check
 
-Zandronum's per-actor gate uses `P_AproxDistance(actor->x - emitter->x, actor->y - emitter->y) <= maxdist` (`p_enemy.cpp:149`) — the classic octagonal distance approximation (`dx + dy - min(dx,dy)/2`), which overestimates true 2D distance by up to ~8% at 45°. UZDoom's equivalent gate uses `actor->Distance2D(emitter) <= maxdist` (`src/playsim/p_enemy.cpp:137`), an exact Euclidean 2D distance. Both still ignore the vertical component and both still gate only the per-actor `LastHeard` write (not the `Sector->SoundTarget` write, and not sector traversal) as described in "Compatibility caveats" below — but a monster near the `maxdist` boundary off-axis can be alerted under one engine's check and not the other's.
+Zandronum's per-actor gate uses `P_AproxDistance(actor->x - emitter->x, actor->y - emitter->y) <= maxdist` (`p_enemy.cpp:149`) — the classic octagonal distance approximation (`dx + dy - min(dx,dy)/2`), which never under-estimates true 2D distance and over-estimates it by up to about 11.8% (near 26.6° off an axis). UZDoom's equivalent gate uses `actor->Distance2D(emitter) <= maxdist` (`src/playsim/p_enemy.cpp:137`), an exact Euclidean 2D distance. Both still ignore the vertical component and both still gate only the per-actor `LastHeard` write (not the `Sector->SoundTarget` write, and not sector traversal) as described in "Compatibility caveats" below — but a monster near the `maxdist` boundary off-axis can be alerted under one engine's check and not the other's.
 
 ## Parameters
 
-- **`maxdist`** (float, default `0`) — maximum distance from the **emitter** at which monsters can be alerted, measured as 2D horizontal distance (vertical component ignored). A value of `0` means unlimited range; any non-zero value triggers a distance check via `P_AproxDistance(actor - emitter, maxdist)` (`p_enemy.cpp:149`). Note that the sound-alerting mechanism in `P_NoiseAlert` still propagates through connected sectors regardless of this distance; `maxdist` controls only which individual actors in those sectors get their `LastHeard` field updated.
+- **`maxdist`** (float, default `0`) — maximum distance from the **emitter** at which monsters can be alerted, measured as 2D horizontal distance (vertical component ignored). A value of `0` means unlimited range; any non-zero value makes each actor's 2D distance to the emitter (`P_AproxDistance` on Zandronum, `p_enemy.cpp:149`; see the divergence section above for UZDoom) be compared against `maxdist`. Note that the sound-alerting mechanism in `P_NoiseAlert` still propagates through connected sectors regardless of this distance; `maxdist` controls only which individual actors in those sectors get their `LastHeard` field updated.
 - **`flags`** (int, default `0`) — Optional flags controlling target and emitter selection. Combine multiple flags with the `|` operator.
 
 ## Flags
@@ -42,7 +42,7 @@ Note: The wiki's statement "does nothing on monsters which already have a target
 
 ## Compatibility caveats
 
-**Default path (`compat_soundtarget` disabled — the default):** each alerted monster's own `LastHeard` field is stamped with the noise target when `NoiseMarkSector` walks the sector's thinglist during the alert (`p_enemy.cpp:145-152`), and only then. `A_Look`/`A_LookEx` read `LastHeard` (`p_enemy.cpp:1968-1970`, `:2119-2120`) to decide whether to wake. Because the stamp is per-actor and written only at the moment the alert fires, it does **not** persist as sector state: a monster that enters the flooded sector afterward, or that isn't ticking `A_Look` at that instant, never sees it. Treat the alert as a one-shot snapshot under this (default) path, not a lingering "this room is alerted" flag.
+**Default path (`compat_soundtarget` disabled — the default):** each alerted monster's own `LastHeard` field is stamped with the noise target when `NoiseMarkSector` walks the sector's thinglist during the alert (`p_enemy.cpp:145-152`), and only then. `A_Look`/`A_LookEx` read `LastHeard` (`p_enemy.cpp:1968-1970`, `:2119-2120`) to decide whether to wake. Because the stamp is per-actor and written only at the moment the alert fires, it does **not** persist as sector state: a monster that enters the flooded sector afterward never sees it. The stamp does persist on each actor that received it. A monster that was in range but not calling `A_Look` at that instant still reacts on its next `A_Look` call, unless its `LastHeard` was overwritten or cleared first (for example by `A_ClearLastHeard`, `p_enemy.cpp:2287-2290`, or by `A_LookEx`'s `maxheardist` check, `:2133-2138`). Treat the alert as a per-actor snapshot of who was in the flooded sectors at that moment, not a lingering "this room is alerted" flag.
 
 **`compat_soundtarget` mode:** If enabled, monsters instead read `Sector->SoundTarget`, which is written unconditionally at `p_enemy.cpp:143` — *before*, and independently of, the `maxdist`-gated per-actor loop that follows. Because it's sector state rather than a per-actor stamp, a monster that enters the sector later still picks it up, unlike the default path. **This also means `maxdist` is bypassed entirely in this mode**, not merely unaffected: `maxdist` is checked only at `p_enemy.cpp:149`, which gates the per-actor `LastHeard` assignment — it has no bearing on the `Sector->SoundTarget` write at `:143` that compat mode actually reads. (A previous revision of this doc stated the `maxdist` limit "still applies" under `compat_soundtarget`; that was incorrect and has been corrected here.)
 
@@ -62,15 +62,15 @@ None.
 ## Example
 
 ```decorate
-Projectile
-// ...
-States
+// Fire from a player weapon (e.g. A_FireCustomMissile) so the projectile's target is the player.
+Actor NoisyImpBall : DoomImpBall
 {
-Death:
-  ZAP1 A 3 A_AlertMonsters
-  ZAP1 BCDEFE 3
-  ZAP1 DCB 2
-  ZAP1 A 1
-  Stop
+  States
+  {
+  Death:
+    BAL1 C 6 Bright A_AlertMonsters
+    BAL1 DE 6 Bright
+    Stop
+  }
 }
 ```

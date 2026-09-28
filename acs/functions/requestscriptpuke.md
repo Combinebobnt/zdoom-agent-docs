@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** wiki page `RequestScriptPuke - Zandronum Wiki.html` (`_intake/`, retrieved
 2026-07-28, `https://wiki.zandronum.com/w/index.php?title=RequestScriptPuke&oldid=1312`) + source-verified (`p_acs.cpp:1338-1340,1378-1386,1705-1748,5487,5491,
 7348-7356,13701-13717`, `p_acs.h:358`, `cl_commands.cpp:757-783`,

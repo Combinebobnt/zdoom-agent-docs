@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes — UZDoom hardcodes a flat one-second (`TICRATE` tics) respawn delay with no configurable cvar equivalent; see divergence section below.
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-17)
-**Provenance:** Zandronum source `src/sv_main.cpp` (CUSTOM_CVAR declaration) + verified against engine spawn logic.
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** Zandronum source `src/sv_main.cpp` (CUSTOM_CVAR declaration) + verified against engine spawn logic; forced-respawn behavior from `src/p_interaction.cpp:777-778` and `src/p_user.cpp:3471-3473`.
 
 Cooldown period (in seconds) that a player must wait after dying before they can respawn. Allows fractional (decimal) values, enabling sub-second delays if desired (e.g., `0.5` for half a second).
 
@@ -13,7 +13,7 @@ Although `sv_respawndelaytime` is most commonly set to integer seconds (1, 2, 3,
 
 The delay isn't applied as a continuous float, though: `AActor::Die` converts it with `static_cast<int>( sv_respawndelaytime * TICRATE )` (`src/p_interaction.cpp:758`, `TICRATE` is 35), which truncates to a whole number of tics rather than rounding. `0.1` (`0.1 * 35 = 3.5`) truncates to 3 tics (~85.7 ms, not 100 ms); `0.5` (`17.5`) truncates to 17 tics (~485.7 ms, not 500 ms) — sub-second values are quantized down to the nearest tic, not applied exactly.
 
-The cvar's `CUSTOM_CVAR` callback (`src/sv_main.cpp:419-429`) separately clamps any value `<= 0.0` up to `1.0f / TICRATE` — one tic — rather than letting `0` or a negative value disable the delay outright, so the minimum effective delay is always at least a single tic long.
+The cvar's `CUSTOM_CVAR` callback (`src/sv_main.cpp:419-430`) separately clamps any value `<= 0.0` up to `1.0f / TICRATE` — one tic — rather than letting `0` or a negative value disable the delay outright, so the minimum effective delay is always at least a single tic long.
 
 ## Spawn-telefrag exemption
 
@@ -27,8 +27,8 @@ Marked `CVAR_ARCHIVE | CVAR_SERVERINFO | CVAR_GAMEPLAYSETTING`, so the value per
 
 ## Related cvars
 
-- **`sv_forcerespawn`** — a DMFlag that forces players to respawn automatically if alive for too long without manual respawn input.
-- **`sv_forcerespawntime`** — complementary setting controlling how long a player can avoid respawning before being forced to respawn.
+- **`sv_forcerespawn`** — a DMFlag that makes dead players respawn automatically once their respawn time passes, without needing respawn input.
+- **`sv_forcerespawntime`** — extra seconds added on top of the respawn delay before a forced respawn happens (`0` means half a second, unless `compat_instantrespawn` is on). The player can still respawn manually once the normal delay has passed.
 
 ## Engine-family divergence: no configurable respawn delay on UZDoom
 

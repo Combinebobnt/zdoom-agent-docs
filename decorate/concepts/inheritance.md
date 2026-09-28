@@ -4,8 +4,8 @@
 **Applies to:** UZDoom=yes, Zandronum=yes — `SKIP_SUPER`'s restriction rule differs between the two,
 see "Engine-family divergence" below; the rest of this file's inheritance/replaces/doomednum
 mechanics apply to both
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
-**Provenance:** ZDoom Wiki "Using inheritance" (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=Using_inheritance&oldid=53923), cross-checked against the Zandronum source's class-creation and actor-parsing machinery (`src/dobjtype.cpp:273-315`, `src/thingdef/thingdef.cpp:80-174`, `src/thingdef/thingdef_properties.cpp:448-467`, `src/p_mobj.cpp:7633-7652`). Per `../../shared/AUTHORING.md`'s engine-scope caveats, the local checkout is a `master` HEAD reporting `3.3-alpha` in `version.h`, not a pristine 3.2.1 checkout — the files cited here (`dobjtype.cpp`, `thingdef.cpp`, `p_mobj.cpp`) are not touched by the applied ZandronumMCP patch.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki "Using inheritance" (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=Using_inheritance&oldid=53923), cross-checked against the Zandronum source's class-creation and actor-parsing machinery (`src/dobjtype.cpp:273-315`, `src/thingdef/thingdef.cpp:80-174`, `src/thingdef/thingdef_properties.cpp:448-467`, `src/p_mobj.cpp:7633-7652`), plus `src/p_states.cpp:539-554` and `src/p_states.cpp:649-691` for `SKIP_SUPER`'s state-label reset, `src/p_map.cpp:1153-1213` and `src/p_map.cpp:5765-5775` for same-species damage, and `src/p_mobj.cpp:4853-4869` for where `replaces` is applied. Per `../../shared/AUTHORING.md`'s engine-scope caveats, the local checkout is a `master` HEAD reporting `3.3-alpha` in `version.h`, not a pristine 3.2.1 checkout.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
@@ -45,12 +45,12 @@ DEFINE_PROPERTY(skip_super, 0, Actor)
 }
 ```
 
-**Three caveats:**
+**Four caveats:**
 
 - **Reset target**: `SKIP_SUPER` copies `AActor`'s defaults wholesale, not zero values. An actor using `SKIP_SUPER` gets `AActor`'s own properties (zero health, default flags, etc.), not a blank slate.
 - **Ordering**: `SKIP_SUPER` must appear before any `States{ }` block in the definition (`thingdef_properties.cpp:456-459`). A parse-time warning is issued if it appears after state definitions.
 - **Inventory exception**: `SKIP_SUPER` is ignored for actors descended from `AInventory` — a parse-time warning is issued if an inventory item tries to use it (`thingdef_properties.cpp:450-454`).
-- **State label table**: The inherited state-label table is **not** reset by `SKIP_SUPER`. The parent's states remain available for `Goto` and other state-jump mechanisms, even though the properties have been reset. (See `state-machine.md` for how state labels are inherited separately.)
+- **State label table**: In Zandronum, `SKIP_SUPER` **also resets** the state-label table being built. It calls `ResetBaggage` with `AActor` as the state class (`thingdef_properties.cpp:468`), which rebuilds the working labels from `AActor`'s own list and drops the parent's (`p_states.cpp:539-554`). A plain `Goto Death` then resolves against that reset table, not the parent's labels (`p_states.cpp:691`). `Goto Super::Label` and `Goto Ancestor::Label` still reach the parent's states, because they look up the real parent class (`p_states.cpp:649-653`). It also discards any `DropItem` list set so far (`thingdef_properties.cpp:464-467`). (See `state-machine.md` for how state labels are inherited separately.)
 
 ## Species and same-ancestry monsters
 
@@ -70,13 +70,13 @@ if (GetDefaultByType(thistype)->flags3 & MF3_ISMONSTER)
 return Species = thistype->TypeName;
 ```
 
-**Wiki divergence:** The ZDoom Wiki states that "monsters within the same species cannot hurt each other with projectiles" as if it were automatic. In Zandronum, this behavior is **not automatic** — it requires the `MF6_DONTHARMSPECIES` flag (`actor.h:313`) to be explicitly set on actors that should follow this rule. Species are determined automatically by inheritance, but the projectile-blocking mechanic is flag-gated, not unconditional. No shipped actor in Zandronum has this flag set by default.
+**Same-species projectiles:** The ZDoom Wiki's statement that "monsters within the same species cannot hurt each other with projectiles" holds in Zandronum, and it is automatic (`p_map.cpp:1153-1213`). When neither the shooter nor the target is a player and infighting is at its default setting, a missile passes through a target of the shooter's species. The exceptions are a target with `+DOHARMSPECIES` (`actor.h:334`), a target that is hostile to the shooter, and a target the shooter hates via its TID. MAPINFO's total-infighting flag lets any shot hurt anything, and the no-infighting flag (also forced in invasion mode) takes a stricter path. The separate `+DONTHARMSPECIES` flag (`actor.h:313`) covers splash damage instead: a monster with it cannot hurt its own species with explosions (`p_map.cpp:5765-5775`).
 
 ## The `replaces` keyword and doomednum — two separate mechanisms
 
 The `replaces` keyword and the trailing doomednum in an actor header are **two independent mechanisms**:
 
-**`replaces` — actor substitution:** The `replaces` keyword (`thingdef_parse.cpp:1065-1076`) names another actor to replace. When that named actor is spawned (map-spawned only — not created via inventory, script, or other means), the replacement is used instead. The replacement is bidirectional: the replaced class's `Replacee` field points to the replacement, and the replacement's `Replacement` field points back (the relationship is set up in `SetReplacement`, `thingdef.cpp:203-204`):
+**`replaces` — actor substitution:** The `replaces` keyword (`thingdef_parse.cpp:1065-1076`) names another actor to replace. When that named actor is spawned, the replacement is used instead. This is not limited to map things: `AActor::StaticSpawn` applies it to any spawn that allows replacement (`p_mobj.cpp:4853-4869`), which includes ACS `Spawn`, the `Thing_Spawn` specials, `A_SpawnItem`-style action functions, monster drops and `summon`. The exception is an inventory item created straight into an inventory (ACS `GiveInventory`, `A_GiveInventory` and similar), which spawns with replacement disabled. The replacement is bidirectional: the replaced class's `Replacement` field points to the replacement, and the replacement's `Replacee` field points back (the relationship is set up in `SetReplacement`, `thingdef.cpp:203-204`):
 
 ```text
 replacee->ActorInfo->Replacement = info;
@@ -116,7 +116,7 @@ documents (`PClass::CreateDerivedClass` `memcpy`-ing the parent's `Defaults` buf
 enforcement (`src/scripting/decorate/thingdef_parse.cpp`) are all present in UZDoom essentially
 unchanged from what's documented above for Zandronum.
 
-`SKIP_SUPER`'s restriction differs, though. Zandronum (per this file's "Three caveats" above)
+`SKIP_SUPER`'s restriction differs, though. Zandronum (per this file's "Four caveats" above)
 ignores `SKIP_SUPER` specifically for classes descended from `AInventory`. UZDoom's `skip_super`
 property (`src/scripting/thingdef_properties.cpp`) instead rejects it — with an `MSG_OPTERROR`,
 not a hard abort — on **any** class whose instance size no longer matches base `AActor`'s

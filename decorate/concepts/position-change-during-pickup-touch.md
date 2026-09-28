@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** The mechanism itself (the call-stack trace and the position-overwrite behavior) is
 source-verified end-to-end against `src/p_map.cpp`, `src/p_interaction.cpp`,
 `src/g_shared/a_pickups.cpp`, and `src/p_acs.cpp` (2026-08-01) and holds regardless of what
@@ -55,7 +55,7 @@ computing and stamps `thing->x = x; thing->y = y;` unconditionally.
 Pickup items are non-solid (`MF_SPECIAL`, not `MF_SOLID`), so `PIT_CheckThing` never treats a
 touch as blocking regardless of whether the touched item's `TryPickup` ultimately returns true or
 false — see the `solid = ...` computation and the unconditional `P_TouchSpecialThing` call in
-`PIT_CheckThing`, `src/p_map.cpp:1338-1351`. `P_CheckPosition` therefore returns `true` and
+`PIT_CheckThing`, `src/p_map.cpp:1340-1354`. `P_CheckPosition` therefore returns `true` and
 `P_TryMove` reaches its position-finalizing block **the same way whether the `Pickup:` chain
 succeeded or failed.** If a mod's `Pickup:` chain only calls `SetActorPosition` from one branch
 (commonly the failure branch — "reject the pickup and knock the player back/away"), the visible
@@ -68,8 +68,8 @@ alike.
 
 This specific clobbering only applies when the touch happens **as a side effect of the toucher's
 own `P_TryMove` call** — i.e. walking into the item. It does not apply to:
-- **`Use:`** (`ACustomInventory::Use`, called from `AActor::UseInventory`) — reached from ticcmd
-  handling (`d_net.cpp`, `cl_main.cpp`, `sv_main.cpp`), never from inside `P_TryMove`. A
+- **`Use:`** (`ACustomInventory::Use`, called from `AActor::UseInventory`) — reached from ticcmd and
+  network-command handling (`d_net.cpp`, `cl_main.cpp`, `sv_main.cpp`), never from inside `P_TryMove`. A
   `SetActorPosition` call from a `Use:` chain is not subject to this overwrite.
 - **A stationary item given directly** (`A_GiveInventory` spawning and immediately granting an
   item with no intervening `P_TryMove` on the receiver) — same reasoning: no enclosing `P_TryMove`

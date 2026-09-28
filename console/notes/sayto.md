@@ -2,16 +2,20 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-02)
-**Provenance:** Zandronum Wiki `Console commands` (https://wiki.zandronum.com/w/index.php?title=Console_commands&oldid=2437, retrieved 2026-08-02); verified against `src/chat.cpp:1999-2040` (sayto/sayto_idx CCMD implementations).
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** Zandronum Wiki `Console commands` (https://wiki.zandronum.com/w/index.php?title=Console_commands&oldid=2437, retrieved 2026-08-02); verified against `src/chat.cpp:1999-2051` (sayto/sayto_idx CCMD implementations) and `src/chat.cpp:1884-1997` (`chat_PrivateMessage`, optional message and ACS refusal).
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 
 Send a private message to a specific player by name or player index. The server itself can be targeted with a magic constant.
 
 ## Syntax
 
-- `sayto <player_name_or_magic> <message>`
-- `sayto_idx <player_index_or_magic> <message>`
+- `sayto <player_name_or_magic> [<message>]`
+- `sayto_idx <player_index_or_magic> [<message>]`
+
+The message is optional. On a client, giving only the target opens the chat prompt in private-message mode addressed to that target. With no arguments at all, the client picks a valid receiver itself, or prints "There's no valid player to send private messages to." On the server, a target with no message does nothing.
+
+Both commands return silently when run through ACS's `ConsoleCommand()`, so a mod can't send private messages in a player's name.
 
 ## Magic constants for server
 
@@ -31,11 +35,13 @@ Using either form when the issuing client **is** the server produces an error: "
 `sayto`/`sayto_idx` are confirmed absent from UZDoom's source entirely — no `CCMD`/`CVAR`
 declaration and no bare mention of either name anywhere in the tree. This isn't a documentation
 gap; UZDoom's netcode has no private/whisper-message channel for these commands to address.
-Invoking either under UZDoom — from the console, a config file, or ACS's `ConsoleCommand()` — hits
-the console dispatcher's command lookup, then its cvar-name fallback, and when neither matches
-prints `Unknown command "sayto"` (or `"sayto_idx"`) to console/log and does nothing else: a visible
-failure at the console, but easy to miss if triggered from an unattended context like a server
-startup script or `autoexec.cfg` line nobody is watching.
+Invoking either under UZDoom from the console or a config file hits the console dispatcher's
+command lookup, then its cvar-name fallback, and when neither matches prints `Unknown command
+"sayto"` (or `"sayto_idx"`) to console/log and does nothing else: a visible failure at the console,
+but easy to miss if triggered from an unattended context like a server startup script or
+`autoexec.cfg` line nobody is watching. Calling either through ACS's `ConsoleCommand()` never gets
+that far: UZDoom's `ConsoleCommand` p-codes only print a "doesn't support execution of console
+commands from scripts" error and discard their arguments, so nothing reaches the dispatcher.
 
 As a result, UZDoom has no console-driven way to send a private message to a single player by name
 or index, or to address the server itself via the magic `"Server"`/`-1` constants this file

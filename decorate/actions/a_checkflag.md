@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_CheckFlag` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_CheckFlag&oldid=54541) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4752-4769`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_CheckFlag` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_CheckFlag&oldid=54541) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4752-4769`, `src/thingdef/thingdef_properties.cpp:183-208`, `src/thingdef/thingdef_data.cpp:449-486`, `protocolspec/spec.things.txt:167`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:4752` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_CheckFlag)`).
 
@@ -17,7 +17,7 @@ void A_CheckFlag (string flagname, state label [, int check_pointer])
 
 ## Parameters
 
-- **`flagname`** — the name of the flag to check, as a string. Case-insensitive. Supports dot notation for actor-class-specific flags (e.g., `"FRIENDLY"` or `"weapon.nohitscanscan"`), resolved via the same `FindFlag` function as `A_ChangeFlag`. See `A_ChangeFlag` for the full `FindFlag` semantics.
+- **`flagname`** — the name of the flag to check, as a string. Case-insensitive. Supports dot notation for actor-class-specific flags (e.g., `"FRIENDLY"` or `"weapon.noautofire"`), resolved via the same `FindFlag` function as `A_ChangeFlag`. The name is looked up against the class of the actor being checked, not the caller. See `A_ChangeFlag` for the full `FindFlag` semantics.
 - **`label`** — the state to jump to if the flag is set on the target actor. If a state label (e.g., `"Death"`, `"DeathFade"`), the name is resolved in the calling actor's derived class's state table (virtual resolution). If the flag is not set, no jump occurs — execution continues to the next action or frame in the current state.
 - **`check_pointer`** (optional) — the actor on which to perform the flag check, specified as an actor pointer. Default is `AAPTR_DEFAULT`, which refers to the calling actor itself. Other common pointers are `AAPTR_TARGET`, `AAPTR_MASTER`, `AAPTR_TRACER` (see `actorptrselect.h` in the Zandronum source for the full enum of selectors).
 
@@ -31,15 +31,15 @@ void A_CheckFlag (string flagname, state label [, int check_pointer])
 
 **Null pointer path:** If `check_pointer` resolves to `NULL` or an invalid pointer (e.g., `AAPTR_MASTER` on an actor with no master), the function returns immediately **without jumping**. The behavior is indistinguishable from "flag is clear" — no jump occurs, execution continues to the next action in the state.
 
-**Unknown flag name:** If `flagname` does not match any flag in the engine's flag table, `FindFlag()` returns `NULL`, the flag check fails, and no jump occurs. **Additionally, the engine prints an error message `Unknown flag 'X' in 'ClassName'` to the console every tic the state runs**, because the `CheckActorFlag(owner, flagname)` overload defaults `printerror` to `true`. This can lead to console spam if an actor loops in a state that performs the check with a typo'd flag name; use caution when testing.
+**Unknown flag name:** If `flagname` does not match any flag in the engine's flag table, `FindFlag()` returns `NULL`, the flag check fails, and no jump occurs. **Additionally, the engine prints an error message `Unknown flag 'X' in 'ClassName'` to the console every time the action runs**, where `ClassName` is the checked actor's class, because the `CheckActorFlag(owner, flagname)` overload defaults `printerror` to `true`. This can lead to console spam if an actor loops in a state that performs the check with a typo'd flag name; use caution when testing.
 
 **Deprecated flags:** If the flag name refers to a deprecated flag (where `structoffset == -1` in the flag definition), the check routes through `CheckDeprecatedFlags()` instead of a direct bit test, applying any special deprecation handling the engine defines for that flag.
 
-**Dot notation:** Actor-class-specific flags can be checked using dot notation (e.g., `"weapon.nohitscanscan"`), which allows checking flags on actors of different classes without switching the context. This works identically to `A_ChangeFlag`'s dot-notation support.
+**Dot notation:** A flag name can be qualified with the class that defines it (e.g., `"weapon.noautofire"`). This works identically to `A_ChangeFlag`'s dot-notation support. On Zandronum the prefix must name one of the engine's flag-list classes (`Actor`, `Inventory`, `Weapon`, `PlayerPawn`, `PowerSpeed`), and the flag only resolves when the checked actor descends from that class. Otherwise it is treated as an unknown flag (error message, no jump).
 
 ## Zandronum-specific: network handling
 
-Unlike `A_ChangeFlag` (which broadcasts state changes to clients via `SERVERCOMMANDS_SetThingFlags`) or `A_CheckSight` (which branches on `NETWORK_InClientMode()` and broadcasts the jump decision), **`A_CheckFlag` performs no explicit network handling**. The source comment notes that clients already mirror actor flag state; the function checks this state without synchronization overhead. Because it is a read-only check, no client-side inconsistency guard is present. The jump decision is made identically on both server and client (assuming their flag state is synchronized), and no `CLIENTUPDATE_FRAME` flag is passed to the underlying `ACTION_JUMP` macro.
+Unlike `A_ChangeFlag` (which broadcasts state changes to clients via `SERVERCOMMANDS_SetThingFlags`) or `A_CheckSight` (which branches on `NETWORK_InClientMode()` and broadcasts the jump decision), **`A_CheckFlag` performs no explicit network handling**. It has no client-mode branch, and it passes no `CLIENTUPDATE_FRAME` flag to `ACTION_JUMP`, so a server-side jump sends clients no frame update. The source comment only says clients know the flags, so it is "hopefully ok". Each client instead runs the check on its own copy of the actors, and the result matches the server only when that copy matches. Flags are only as synchronized as the server's own flag updates make them. Pointers are a bigger gap: the protocol has no command that sends `master` or `tracer` to clients (`target` is sent, via `SetThingTarget` in `protocolspec/spec.things.txt:167`), so a check through `AAPTR_MASTER` or `AAPTR_TRACER` can resolve differently on a client than on the server.
 
 ## Related functions
 
@@ -49,7 +49,7 @@ Unlike `A_ChangeFlag` (which broadcasts state changes to clients via `SERVERCOMM
 
 ## Examples
 
-This imp will be frightened if its master is frightened, copying the master's `FRIGHTENED` flag state:
+This imp will be frightened if its master is frightened, copying the master's `FRIGHTENED` flag state. On Zandronum, clients do not know the `master` pointer (see network handling above):
 
 ```decorate
 ACTOR CowardImp : DoomImp
@@ -67,11 +67,13 @@ ACTOR CowardImp : DoomImp
 }
 ```
 
-This projectile enters a slow "trailing" state if its tracer (target) is marked as friendlier to the player:
+This projectile enters a "trailing" state if its tracer has the `FRIENDLY` flag:
 
 ```decorate
-ACTOR MyTracingProjectile : Projectile
+ACTOR MyTracingProjectile
 {
+  Projectile
+  Speed 10
   States
   {
   Spawn:

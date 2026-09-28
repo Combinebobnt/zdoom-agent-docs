@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** wiki page `SetGameModeLimit - Zandronum Wiki.html` (`_intake/`, retrieved
 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=SetGameModeLimit&oldid=1329`) + source-verified (`p_acs.cpp:7588-7592`, `gamemode.cpp:1572-1657`,
 `gamemode.h:134-140`, plus the six CVar definitions in `deathmatch.cpp`, `team.cpp`,

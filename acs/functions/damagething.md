@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** wiki page `DamageThing - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
 `https://zdoom.org/w/index.php?title=DamageThing&oldid=49026`) + source-verified (`p_lnspec.cpp:1123-1152`, `p_interaction.cpp:1152-1230,1515-1596,
 1586`, `MODtoDamageType` `p_lnspec.cpp:97-119`) for behavior including TELEFRAG_DAMAGE invulnerability
@@ -15,7 +15,7 @@ index 73 in `zcommon.bcs`'s `special` table), semantics in the Zandronum source'
 `FUNC(LS_DamageThing)` (line 1123), which delegates damage calculation to `P_DamageMobj`.
 
 **Activator-only:** operates on the activator exclusively. **No TID parameter.** If called from a
-script with no activator (e.g., `OPEN`/`ENTER`/`RESPAWN`/`DISCONNECT`), returns `false`/`0` and
+script with no activator (e.g., `OPEN`, or a Zandronum `DISCONNECT` script; `ENTER`/`RESPAWN` scripts have the player as activator), returns `false`/`0` and
 does nothing.
 
 - `amount` — damage amount or healing amount.
@@ -70,7 +70,7 @@ DamageThing(0);
 ```
 
 **Returns:** `int` — `1` (true) if an activator exists and action completed; `0` (false) if
-called from a script with no activator (e.g., `OPEN`/`ENTER`/`RESPAWN`/`DISCONNECT`) or other
+called from a script with no activator (e.g., `OPEN`, or a Zandronum `DISCONNECT` script; `ENTER`/`RESPAWN` scripts have the player as activator) or other
 failure. **Not a success/failure indicator for the damage itself** — a called on an invulnerable
 actor that took no damage still returns `1` if the activator existed.
 

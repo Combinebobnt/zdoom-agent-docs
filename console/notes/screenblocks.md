@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-16); Zandronum 3.2.1 @28f736fb3 (2026-08-02)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-16); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** ZDoom Wiki `CVARs:Display` (retrieved 2026-08-02, https://zdoom.org/w/index.php?title=CVARs%3ADisplay&oldid=54715) + verified against Zandronum source's `src/r_utility.cpp`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
@@ -30,3 +30,11 @@ UZDoom keeps the ZDoom Wiki's default of 10 (a normal status bar). Zandronum's s
 ## Related cvars
 
 - `hud_althud` — changes what HUD is displayed in full-screen mode (screenblocks 11).
+- [`st_scale`](st_scale.md) — decides `ST_Y`, the status bar's top screen row, which is the height
+  this cvar's view window is measured against below screenblocks 11.
+
+## Related concepts
+
+- [The 3D view window's screen rectangle](../concepts/view-window-geometry.md) — the exact
+  `viewwidth`/`viewheight`/`viewwindowx`/`viewwindowy` this cvar produces at each value, where the
+  view's centre row lands, and why a smaller view crops the world rather than squashing it.

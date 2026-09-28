@@ -2,13 +2,21 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-02)
-**Provenance:** Zandronum Wiki `Console commands` (https://wiki.zandronum.com/w/index.php?title=Console_commands&oldid=2437, saved 2026-08-02); verified against `src/sv_ban.cpp`.
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** Zandronum Wiki `Console commands` (https://wiki.zandronum.com/w/index.php?title=Console_commands&oldid=2437, saved 2026-08-02); verified against `src/sv_ban.cpp` (`serverban_ExecuteBanCmd` at 714-747, `SERVERBAN_BanPlayer` at 498-508), `src/c_dispatch.cpp:1017-1045` (`FCommandLine::GetPlayerFromArg`) and `src/sv_main.cpp:5470-5495` (`SERVER_GetPlayerIndexFromName`).
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 
-Bans a player by name with optional comment and duration. Syntax: `ban <player name> <duration> [reason] [file index]`
+Bans a connected player, looked up by name, for a required duration with an optional reason and ban-file index. Syntax: `ban <player name> <duration> [reason] [file index]`. With fewer than two arguments it prints its usage text and does nothing.
 
-The duration argument and all related semantics (time formats, permanent bans, file index selection) are identical to the `addban` command — see `addban.md` for the time-format grammar details. The only difference is that `ban` identifies the target by current player name rather than IP address; the command resolves the player's IP at execution time and bans that address.
+The duration argument and all related semantics (time formats, permanent bans, file index selection) are identical to the `addban` command, since both end in the same ban routine. See `addban.md` for the time-format grammar details. `ban` resolves the player's current IP address at execution time, bans that address, and kicks the player with the given reason.
+
+Where `ban` differs from `addban`:
+
+- The name must match a connected player's name exactly, case-insensitively, with color codes stripped from the player's name before comparing. There is no partial matching. No match prints `There isn't a player named <name>.` and bans nothing.
+- Bots can't be banned. Naming one prints `Player <name> is a bot.` and bans nothing.
+- It only runs on a server (network state `NETSTATE_SERVER`). Anywhere else it silently does nothing, without even printing the usage text.
+
+Like `addban`, it silently does nothing when invoked through ACS `ConsoleCommand`.
 
 Related: `ban_idx` (same command but uses player index from `playerinfo`), `addban` (by IP address directly).
 

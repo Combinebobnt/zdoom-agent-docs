@@ -2,20 +2,25 @@
 
 **Tier:** B
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-17)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** Source-derived (no wiki page consulted) — verified against the Zandronum source's
 `src/p_interaction.cpp` (`P_DamageMobj`, the order-of-operations around its `MF2_INVULNERABLE`
-check and its `DamageFactor`/`DamageFactors` application).
+check and its `DamageFactor`/`DamageFactors` application), plus `src/p_enemy.cpp` (`A_Die`'s
+`DMG_FORCED` call).
 **Bucket:** `DEFINE_PROPERTY(damagefactor, ZF, Actor)` in `src/thingdef/thingdef_properties.cpp`
-(stores into the actor's `DamageFactor` field for the untyped/`"Normal"` case, or into its
-per-type `DamageFactors` table for a named type). See
+(the one-argument form stores into the actor's `DamageFactor` field; a named type, including
+`"Normal"` which is stored under the untyped key, goes into its per-type `DamageFactors` table). See
 [Custom damage types](../concepts/custom-damage-types.md) for the general precedence chain this
 property participates in; this note covers a narrower interaction that chain doesn't mention.
 
 On Zandronum, `P_DamageMobj` (`src/p_interaction.cpp:1337-1343`) applies an actor's
-`DamageFactor`/`DamageFactors` unconditionally, with no floor or magnitude check — this is true
-even when the incoming `damage` value is `TELEFRAG_DAMAGE` (the sentinel used for instant-kill
-effects: telefragging, `A_Die`, forced falling-damage kills, etc.). A `DamageFactor "<type>", 0`
+`DamageFactor`/`DamageFactors` with no floor or magnitude check. The only things that skip it are
+the caller-supplied `DMG_NO_FACTOR` and `DMG_FORCED` flags (the whole modifier block sits inside
+an `if` that `DMG_FORCED` skips, `src/p_interaction.cpp:1259`). This holds even when the incoming
+`damage` value is `TELEFRAG_DAMAGE` (1000000, the sentinel used for instant-kill effects such as
+telefragging, monster falling damage and Hexen-style fatal player falls), since none of those
+callers pass `DMG_FORCED`. `A_Die` is not one of them: it deals the actor's current health with
+`DMG_FORCED` (`src/p_enemy.cpp:3625`), so no `DamageFactor` entry can block it. A `DamageFactor "<type>", 0`
 entry (or a `Factor 0` on the matching global `DamageType` block, if the actor has no more
 specific override) genuinely zeroes out an incoming `TELEFRAG_DAMAGE` hit of that type, the same
 way it zeroes any smaller hit — there is no special case anywhere in Zandronum's `P_DamageMobj`
@@ -29,16 +34,16 @@ divergence section below.
 This is the opposite of how `+INVULNERABLE` behaves in the same function. `P_DamageMobj`'s
 `MF2_INVULNERABLE` check is explicitly gated on `damage < TELEFRAG_DAMAGE` — so a hit that carries
 `TELEFRAG_DAMAGE` (or higher) bypasses `+INVULNERABLE` entirely and always applies, regardless of
-the flag. `DamageFactor 0` has no such carve-out and blocks the damage unconditionally, including
-at telefrag magnitude. A modder reaching for "make this actor immune to telefrag/instakill damage
-of type X" wants `DamageFactor "<type>", 0`, not `+INVULNERABLE` — the flag alone does not achieve
+the flag. `DamageFactor 0` has no such carve-out and blocks the damage regardless of magnitude, including
+at telefrag magnitude (short of a `DMG_FORCED` or `DMG_NO_FACTOR` caller). A modder reaching for
+"make this actor immune to telefrag-magnitude damage of type X" wants `DamageFactor "<type>", 0`, not `+INVULNERABLE` — the flag alone does not achieve
 that for this class of damage, **on Zandronum**. UZDoom does not share this contrast — see below.
 
 Both checks run inside the same function and in this relative order on Zandronum: the
 `+INVULNERABLE` gate runs first (near the top of `P_DamageMobj`, before pointer-based damage
 modifiers), and `DamageFactor`/`DamageFactors` application runs later (after `PowerProtection`-style
 [passive/active inventory damage modifiers](../classes/powerprotection.md), guarded only by the
-caller-supplied `DMG_NO_FACTOR` flag — not by damage magnitude).
+caller-supplied `DMG_NO_FACTOR` and `DMG_FORCED` flags, not by damage magnitude).
 
 ## Engine-family divergence: UZDoom exempts telefrag-magnitude damage from `DamageFactor` too, unless `+LAXTELEFRAGDMG`
 

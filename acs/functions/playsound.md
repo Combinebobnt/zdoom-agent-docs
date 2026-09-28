@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** `PlaySound - ZDoom Wiki` (https://zdoom.org/w/index.php?title=PlaySound&oldid=47607), verified 2026-07-29 against fork source.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
@@ -48,7 +48,7 @@ with `PlayActorSound` in one switch case: the Zandronum source's `src/p_acs.cpp:
   `6534-6546`) not present in vanilla ZDoom — a Zandronum-specific addition the wiki (written for
   upstream ZDoom) doesn't and can't describe. Notably, the engine also treats the `channel`
   argument's `CHAN_LOOP` bit as an alternate way to request looping (`chan & CHAN_LOOP` checks
-  alongside the explicit `looping` bool at `p_acs.cpp:6520`/`6538`) — this is engine-internal
+  alongside the explicit `looping` bool at `p_acs.cpp:6520`/`6527`) — this is engine-internal
   plumbing, not something the ACS caller needs to set, but explains why `channel` is passed
   through raw rather than masked.
 

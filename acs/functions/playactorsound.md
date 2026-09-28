@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** `PlayActorSound - ZDoom Wiki` (https://zdoom.org/w/index.php?title=PlayActorSound&oldid=50241), verified 2026-07-29 against fork source.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
@@ -30,7 +30,7 @@ covers what's specific to `PlayActorSound`.
   `GetActorSound` itself (`p_acs.cpp:5332-5348`) does not guard `actor` either: every case except
   `default` dereferences it directly (`actor->SeeSound`, `actor->AttackSound`, ...,
   `actor->GetClass()->Meta.GetMetaInt(...)` for `SOUND_Howl`). So calling this with `tid=0` from a
-  script that has no activator — `OPEN`/`ENTER`/`RESPAWN`, a `DISCONNECT` script, or any other
+  script that has no activator — `OPEN`, a Zandronum `DISCONNECT` script, or any other
   context where `activator == NULL` — **null-pointer-dereferences and crashes the engine**, for
   *any* real `SOUND_*` constant. (The one case that doesn't crash: an out-of-range/invalid `sound`
   value hits `default: return 0;` without ever touching `actor`, so misusing the `sound` param

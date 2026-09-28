@@ -53,7 +53,7 @@
 | designatedteam | property | Actor | I | yes | yes | C |  |
 | donthurtshooter | property | Actor | 0 | yes | yes | C |  |
 | dropamount | class-property | Ammo | I | yes | yes | C |  |
-| dropitem | property | Actor | S_i_i | yes | yes | C |  |
+| dropitem | property | Actor | S_i_i | yes | yes | B | [notes](../notes/dropitem.md) |
 | duration | class-property | MorphProjectile | I | yes | yes | C |  |
 | explosiondamage | property | Actor | I | yes | yes | C |  |
 | explosionradius | property | Actor | I | yes | yes | C |  |
@@ -71,9 +71,9 @@
 | howlsound | property | Actor | S | yes | yes | C |  |
 | icon | class-property | Inventory | S | yes | yes | C |  |
 | interhubamount | class-property | Inventory | I | yes | yes | C |  |
-| jumpswayspeed | class-property | Weapon | F | yes | — | C |  |
+| jumpswayspeed | class-property | Weapon | F | yes | — | B | [notes](../notes/jumpswayspeed.md) |
 | kickback | class-property | Weapon | I | yes | yes | C |  |
-| limitedtoteam | property | Actor | I | yes | — | C |  |
+| limitedtoteam | property | Actor | I | yes | — | A | [notes](../notes/limitedtoteam.md) |
 | lowmessage | class-property | Health | IT | yes | yes | C |  |
 | mass | property | Actor | I | yes | yes | C |  |
 | maxabsorb | class-property | Armor | I | yes | — | C |  |
@@ -97,7 +97,7 @@
 | morphflash | class-property | PowerMorph | S | yes | yes | C |  |
 | morphstyle | class-property | MorphProjectile | M | yes | yes | C |  |
 | morphstyle | class-property | PowerMorph | M | yes | yes | C |  |
-| motionswayspeed | class-property | Weapon | F | yes | — | C |  |
+| motionswayspeed | class-property | Weapon | F | yes | — | B | [notes](../notes/motionswayspeed.md) |
 | number | class-property | PuzzleItem | I | yes | yes | C |  |
 | number | class-property | WeaponPiece | I | yes | yes | C |  |
 | obituary | property | Actor | S | yes | yes | C |  |
@@ -163,7 +163,7 @@
 | renderstyle | property | Actor | S | yes | yes | C |  |
 | respawntics | class-property | Inventory | I | yes | yes | C |  |
 | restrictedto | class-property | Inventory | Ssssssssssssssssssss | yes | yes | C |  |
-| rune.type | class-property-prefix | RuneGiver | S | yes | — | C |  |
+| rune.type | class-property-prefix | RuneGiver | S | yes | — | B | [notes](../notes/rune.type.md) |
 | saveamount | class-property | Armor | I | yes | — | C |  |
 | savepercent | class-property | Armor | F | yes | — | C |  |
 | scale | property | Actor | F | yes | yes | C |  |
@@ -178,20 +178,20 @@
 | speed | property | Actor | F | yes | yes | C |  |
 | stamina | property | Actor | I | yes | yes | C |  |
 | stencilcolor | property | Actor | C | yes | yes | C |  |
-| stillbobrange | class-property | Weapon | F | yes | — | C |  |
-| stillbobspeed | class-property | Weapon | F | yes | — | C |  |
-| swaystyle | class-property | Weapon | S | yes | — | C |  |
+| stillbobrange | class-property | Weapon | F | yes | — | B | [notes](../notes/stillbobrange.md) |
+| stillbobspeed | class-property | Weapon | F | yes | — | B | [notes](../notes/stillbobspeed.md) |
+| swaystyle | class-property | Weapon | S | yes | — | B | [notes](../notes/swaystyle.md) |
 | tag | property | Actor | S | yes | yes | C |  |
 | translation | property | Actor | L | yes | yes | C |  |
 | unmorphflash | class-property | MorphProjectile | S | yes | yes | C |  |
 | unmorphflash | class-property | PowerMorph | S | yes | yes | C |  |
 | upsound | class-property | Weapon | S | yes | yes | C |  |
 | usesound | class-property | Inventory | S | yes | yes | C |  |
-| viewpitchoffset | class-property | Weapon | F | yes | — | C |  |
-| viewpitchstyle | class-property | Weapon | S | yes | — | C |  |
-| viewswayspeed | class-property | Weapon | F | yes | — | C |  |
-| visibletoplayerclass | property | Actor | Ssssssssssssssssssss | yes | yes | C |  |
-| visibletoteam | property | Actor | I | yes | yes | C |  |
+| viewpitchoffset | class-property | Weapon | F | yes | — | B | [notes](../notes/viewpitchoffset.md) |
+| viewpitchstyle | class-property | Weapon | S | yes | — | B | [notes](../notes/viewpitchstyle.md) |
+| viewswayspeed | class-property | Weapon | F | yes | — | B | [notes](../notes/viewswayspeed.md) |
+| visibletoplayerclass | property | Actor | Ssssssssssssssssssss | yes | yes | A | [notes](../notes/visibletoplayerclass.md) |
+| visibletoteam | property | Actor | I | yes | yes | A | [notes](../notes/visibletoteam.md) |
 | vspeed | property | Actor | F | yes | yes | C |  |
 | wallbouncefactor | property | Actor | F | yes | yes | C |  |
 | wallbouncesound | property | Actor | S | yes | yes | C |  |

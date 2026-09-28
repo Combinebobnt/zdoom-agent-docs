@@ -2,11 +2,11 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-17)
-**Provenance:** Zandronum source `src/am_map.cpp:84` (CVAR declaration) and consuming code throughout the file; comparison with ZDoom Wiki `CVARs:Automap` (https://zdoom.org/w/index.php?title=CVARs%3AAutomap&oldid=54516).
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** Zandronum source `src/am_map.cpp:84` (CVAR declaration) and consuming code throughout the file, including the pan-clamp check at `src/am_map.cpp:1094`; comparison with ZDoom Wiki `CVARs:Automap` (https://zdoom.org/w/index.php?title=CVARs%3AAutomap&oldid=54516).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
-Controls whether the automap rotates to match the player's view direction. Takes integer values 0–2 (not a boolean, despite the wiki's boolean description). It's a plain `CVAR`, not a `CUSTOM_CVAR`, in both engines, so this range isn't enforced — an out-of-range value simply falls through to mode-0 (non-rotated) behavior at every `am_rotate == 1 || (am_rotate == 2 && viewactive)` check site.
+Controls whether the automap rotates to match the player's view direction. Takes integer values 0–2 (not a boolean, despite the wiki's boolean description). It's a plain `CVAR`, not a `CUSTOM_CVAR`, in both engines, so this range isn't enforced. An out-of-range value draws and pans the map non-rotated, since those sites all test `am_rotate == 1 || (am_rotate == 2 && viewactive)`. The pan-clamp check is the exception: it tests `am_rotate == 0 || (am_rotate == 2 && !viewactive)` (Zandronum's `AM_ClipRotatedExtents`, `src/am_map.cpp:1094`; UZDoom's `DAutomap::ClipRotatedExtents`), so an out-of-range value also skips clamping the view to the map's bounds, like the rotated modes do.
 
 UZDoom declares the identical `Int`/`0`/`CVAR_ARCHIVE` cvar (`src/am_map.cpp:143`) and gates rotation on the same `am_rotate == 1 || (am_rotate == 2 && viewactive)` condition throughout `src/am_map.cpp` — clean agreement with the Zandronum behavior described below (line numbers differ between the two checkouts; Provenance above cites Zandronum's `:84`, not UZDoom's `:143`).
 

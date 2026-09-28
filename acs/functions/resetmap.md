@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-07)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** Zandronum Wiki `ResetMap` (retrieved 2026-08-07, https://wiki.zandronum.com/w/index.php?title=ResetMap&oldid=2479); verified against Zandronum engine source's `src/p_acs.cpp:7136-7146` (extension function `ACSF_ResetMap`), `src/g_game.cpp:4299-4302` (`GAME_RequestMapReset`), and `src/g_game.cpp:3346-4247` (`GAME_ResetMap` and actor-reset logic). Introducing commit `20fa4539f` (2012-04-04) confirmed as ancestor of the 3.2.1 version-bump commit (`28f736fb3`).
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 

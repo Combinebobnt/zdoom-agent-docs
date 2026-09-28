@@ -7,7 +7,6 @@
 | acsgc | yes | yes | C |  |
 | acsprofile | yes | yes | C |  |
 | acstime | yes | — | C |  |
-| actorsnear | yes | — | C |  |
 | addban | yes | — | A | [notes](../notes/addban.md) |
 | addbanexemption | yes | — | C |  |
 | addbot | yes | yes | C |  |
@@ -59,7 +58,7 @@
 | clearmaplist | yes | — | C |  |
 | clearplayerclasses | yes | yes | C |  |
 | clearscancycles | yes | — | C |  |
-| cleartrafficmeasure | yes | — | C |  |
+| cleartrafficmeasure | yes | — | A | [notes](../notes/cleartrafficmeasure.md) |
 | clearwallcycles | yes | — | C |  |
 | closemenu | yes | yes | C |  |
 | cmdlist | yes | yes | C |  |
@@ -90,25 +89,18 @@
 | doublebind | yes | yes | C |  |
 | drop | yes | yes | C |  |
 | dumpacsnetids | yes | — | C |  |
-| dumpacsvars | yes | — | C |  |
-| dumpactor | yes | — | C |  |
 | dumpactors | yes | yes | C |  |
 | dumpclasses | yes | yes | C |  |
 | dumpcurrentactors | yes | — | C |  |
 | dumpdb | yes | — | C |  |
-| dumpfunctions | yes | — | C |  |
 | dumpgeometry | yes | yes | C |  |
-| dumphud | yes | — | C |  |
 | dumpmapthings | yes | yes | C |  |
-| dumpmodules | yes | — | C |  |
 | dumpnetclassids | yes | — | C |  |
 | dumpportals | yes | yes | C |  |
-| dumprenderer | yes | — | C |  |
-| dumpscripts | yes | — | C |  |
 | dumpserverlist | yes | — | C |  |
 | dumpspawnables | yes | yes | C |  |
 | dumpstates | yes | yes | C |  |
-| dumptrafficmeasure | yes | — | B | [notes](../notes/dumptrafficmeasure.md) |
+| dumptrafficmeasure | yes | — | A | [notes](../notes/dumptrafficmeasure.md) |
 | echo | yes | yes | C |  |
 | endgame | yes | yes | C |  |
 | error | yes | yes | C |  |
@@ -126,11 +118,8 @@
 | gameversion | yes | yes | C |  |
 | gc | yes | yes | C |  |
 | get | yes | yes | C |  |
-| getacsvar | yes | — | C |  |
 | getIP | yes | — | C |  |
 | getIP_idx | yes | — | C |  |
-| getmaparray | yes | — | C |  |
-| getmapvar | yes | — | C |  |
 | give | yes | yes | C |  |
 | gl_flush | yes | — | C |  |
 | gl_portalinfo | yes | yes | C |  |
@@ -168,7 +157,7 @@
 | kick_ip | yes | — | C |  |
 | kickfromgame | yes | — | B | [notes](../notes/kickfromgame.md) |
 | kickfromgame_idx | yes | — | C |  |
-| kill | yes | yes | C |  |
+| kill | yes | yes | B | [notes](../notes/kill.md) |
 | land | yes | yes | C |  |
 | lineloc | yes | — | C |  |
 | linetarget | yes | yes | C |  |
@@ -304,9 +293,6 @@
 | select | yes | yes | C |  |
 | send_password | yes | — | C |  |
 | set | yes | yes | C |  |
-| setacsvar | yes | — | C |  |
-| setmaparray | yes | — | C |  |
-| setmapvar | yes | — | C |  |
 | setslot | yes | yes | C |  |
 | showpop | yes | yes | C |  |
 | showrngs | yes | yes | C |  |

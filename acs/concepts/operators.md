@@ -2,7 +2,7 @@
 
 **Tier:** A (all three claims traced to the actual codegen/semantic/interpreter source, not inferred from the wiki or from signatures).
 **Applies to:** UZDoom=yes, Zandronum=yes — the short-circuit, fixed-point `++`/`--` and `str + str` findings are `zt-bcc` toolchain behavior rather than engine behavior, and hold whichever engine ends up running the emitted bytecode. The Zandronum entry below reads a `master` HEAD checkout whose own `version.h` reports `3.3-alpha`, a development snapshot ahead of the 3.2.1 target; this is core interpreter-loop behavior, stable across that gap.
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-16)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** `zt-bcc/src/codegen/expr.c` (`write_logical` short-circuit codegen and its own comment, line ~658; `inc_var`/`inc_fixed`/`inc_indexed`, line ~1168-1235), `zt-bcc/src/semantic/expr.c` (`perform_primitive_inc`, line ~1465), and the Zandronum source's `src/p_acs.cpp` (`PCD_DIVIDE` line 9589, `PCD_MODULUS` line ~9601-9604, `PCD_ANDLOGICAL`/`PCD_ORLOGICAL` line ~10594-10602, the divide/modulus-by-zero console-print-and-`SCRIPT_PleaseRemove` handling around line 13018-13027), verified against the ZDoom wiki's `Operators - ZDoom Wiki.html` (https://zdoom.org/w/index.php?title=Operators&oldid=51290) intake page.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 

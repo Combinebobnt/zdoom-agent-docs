@@ -141,6 +141,40 @@ SECTIONS = {
             "sprites/concepts": CONCEPT,
         },
     },
+    "bots": {
+        "index": "bots/INDEX.md",
+        "agents": "bots/AGENTS.md",
+        "dirs": {
+            "bots/inventory": TABLE_INVENTORY,
+            "bots/notes": TABLE_NOTES,
+            "bots/concepts": CONCEPT,
+        },
+    },
+    "zandronum-lumps": {
+        "index": "zandronum-lumps/INDEX.md",
+        "agents": "zandronum-lumps/AGENTS.md",
+        "dirs": {
+            "zandronum-lumps/concepts": CONCEPT,
+            "zandronum-lumps/inventory": TABLE_INVENTORY,
+            "zandronum-lumps/notes": TABLE_NOTES,
+        },
+    },
+    "menudef": {
+        "index": "menudef/INDEX.md",
+        "agents": "menudef/AGENTS.md",
+        "dirs": {
+            "menudef/inventory": TABLE_INVENTORY,
+            "menudef/notes": TABLE_NOTES,
+            "menudef/concepts": CONCEPT,
+        },
+    },
+    "netcode": {
+        "index": "netcode/INDEX.md",
+        "agents": "netcode/AGENTS.md",
+        "dirs": {
+            "netcode/concepts": CONCEPT,
+        },
+    },
 }
 
 # Cross-section concepts live here, outside any one section's own directory.

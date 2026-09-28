@@ -3,7 +3,7 @@
 **Tier:** A (original content); B (the `searchparents=true`/parent-class-visibility clause in
 Parameters below, added from direct source reading — not on this file's wiki page)
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-30)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** `GetUserVariable - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=GetUserVariable&oldid=44988`), verified 2026-07-30 against the Zandronum source's `src/p_acs.cpp:5623-5652` (static helper) and `p_acs.cpp:6148-6157` (engine case handler); the `bUserVar`-gate finding below re-verified 2026-08-01 against the same helper's exact guard at `p_acs.cpp:5629-5633`. The `searchparents=true` clause is a further source-only reading of the same `p_acs.cpp:5623-5652` helper, with no wiki counterpart.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Extension function.

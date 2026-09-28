@@ -2,9 +2,9 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `GetPlayerInput - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28,
-`https://zdoom.org/w/index.php?title=GetPlayerInput&oldid=54772`) + source-verified (`p_acs.cpp:5174-5234,12375-12378`, `zt-bcc/src/builtin.c:164`,
+`https://zdoom.org/w/index.php?title=GetPlayerInput&oldid=54772`) + source-verified (`p_acs.cpp:5174-5234,12375-12378`, `network.cpp:1552-1555`, `zt-bcc/src/builtin.c:164`,
 `zt-bcc/lib/zcommon.bcs:143-189`). The `INPUT_*`/`MODINPUT_*` constant mapping and general button
 semantics hold as described; the `player < 0`-with-no-activator branching and the complete absence
 of `BT_RUN` in Zandronum are this doc's source-verified additions/corrections, not wiki-sourced.
@@ -20,15 +20,14 @@ in `p_acs.cpp:5174-5234` (helper `DLevelScript::GetPlayerInput`, called from the
   wiki says "Use -1 to specify the script activator instead," implying `-1` always means "the
   activator." The actual fork logic (`p_acs.cpp:5178-5198`) for any negative `player`:
   - If the script has a real activator (`activator != NULL`), it uses `activator->player` — this
-    part matches the wiki.
+    part matches the wiki. An activator that isn't a player (e.g. a monster) has no `player`, so
+    the call returns `0` (the `p == NULL` check at `p_acs.cpp:5207-5210`).
   - If there's **no** activator (e.g. a world-activated script) and the engine is *not* in
-    Zandronum's client-prediction mode (`NETWORK_InClientMode()` false — i.e. normal
-    single-player/listen-server execution), the function returns `0` rather than falling back to
-    any player. **This has no equivalent in the ZDoom wiki page at all** — it's a Zandronum
-    multiplayer-specific branch, since ZDoom has no separate client/server input replication to
-    disambiguate.
-  - If there's no activator **and** `NETWORK_InClientMode()` is true (Zandronum's clientside
-    prediction path), it substitutes `consoleplayer`'s input instead of returning 0 — and for a
+    client mode (`NETWORK_InClientMode()` false, i.e. offline or on the server), the function
+    returns `0` rather than falling back to any player. The wiki doesn't mention this case. It is
+    not Zandronum-specific: UZDoom does the same (see "Engine-family divergence" below).
+  - If there's no activator **and** `NETWORK_InClientMode()` is true (running on a client, or
+    during client demo playback; `network.cpp:1552-1555`), it substitutes `consoleplayer`'s input instead of returning 0 — and for a
     spectating console player, it additionally forces `inputnum` up into the `MODINPUT_*` range
     (`inputnum += MODINPUT_OLDBUTTONS`) even if an `INPUT_*` constant was requested, because raw
     (pre-processing) input isn't tracked for spectators. A world-activated `CLIENTSIDE` script
@@ -71,7 +70,7 @@ field lookup to a shared helper, `P_Thing_CheckInputNum` (`src/playsim/p_things.
 the surrounding logic differs from Zandronum in two ways:
 
 - **No client-prediction fallback for a no-activator negative `player`.** UZDoom's `player < 0`
-  branch is just `if (activator == NULL) return 0;` — there is no `NETWORK_InClientMode()` check,
+  branch just returns `0` when there is no activator. There is no `NETWORK_InClientMode()` check,
   no `consoleplayer` substitution, and no forcing a raw `INPUT_*` request up into the `MODINPUT_*`
   range for a spectator. A world-activated script calling `GetPlayerInput(-1, ...)` always gets `0`
   in UZDoom, regardless of client/server execution context — the Zandronum-specific branching
@@ -80,8 +79,8 @@ the surrounding logic differs from Zandronum in two ways:
   `INPUT_*`/`MODINPUT_*` case list (`p_things.cpp:543-561`) match 1:1 with what this doc already
   describes for Zandronum, including `INPUT_ROLL`/`MODINPUT_ROLL` being present and wired.
 - **`BT_RUN` exists in UZDoom, unlike Zandronum.** `wadsrc/static/zscript/constants.zs:882` defines
-  `BT_RUN = 1<<25`, distinct from `BT_SPEED`, and it's a real tracked bit — `src/g_game.cpp:684`
-  sets it from actual running state (`if (speed) cmd->buttons |= BT_RUN;`), and
+  `BT_RUN` as bit 25, distinct from `BT_SPEED`, and it's a real tracked bit — `src/g_game.cpp:684`
+  sets it in the ticcmd whenever the player is actually running, and
   `wadsrc/static/zscript/actors/player/player.zs:1808-1810` reads it back to pick footstep timing.
   So for UZDoom, this doc's Zandronum-specific "`BT_RUN` does not exist in Zandronum at all" bullet
   above does not apply — UZDoom instead matches the original ZDoom wiki's description of `BT_RUN`

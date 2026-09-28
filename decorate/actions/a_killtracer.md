@@ -3,7 +3,7 @@
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=no
 **Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15)
-**Provenance:** ZDoom Wiki `A_KillTracer` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_KillTracer&oldid=46807) + verified against the UZDoom source's `src/playsim/p_actionfunctions.cpp:4193-4209`.
+**Provenance:** ZDoom Wiki `A_KillTracer` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_KillTracer&oldid=46807) + verified against the UZDoom source's `src/playsim/p_actionfunctions.cpp:4193-4209`; Zandronum extra-argument parse-error correction from `src/thingdef/thingdef_states.cpp:430` and `src/thingdef/thingdef_parse.cpp:91-97`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_KillTracer)` in the UZDoom source's `src/playsim/p_actionfunctions.cpp`.
 
@@ -11,7 +11,7 @@ Kills the calling actor's tracer with optional filters, damage type customizatio
 
 ## Engine-family divergence
 
-Zandronum's simplified kill functions take only a `damagetype` parameter and use `DMG_NO_ARMOR | DMG_NO_FACTOR` unconditionally. UZDoom/GZDoom-family engines extend all kill-family functions with configurable flags, actor/species filters, and source/inflictor pointer control. **Code written for the wiki's GZDoom/UZDoom version will not compile in Zandronum** — attempting to pass flags, filter, or species parameters to `A_KillMaster`, `A_KillChildren`, or `A_KillSiblings` in Zandronum will fail with "too many arguments" parse errors.
+Zandronum's simplified kill functions take only a `damagetype` parameter and use `DMG_NO_ARMOR | DMG_NO_FACTOR` unconditionally. UZDoom/GZDoom-family engines extend all kill-family functions with configurable flags, actor/species filters, and source/inflictor pointer control. **Code written for the wiki's GZDoom/UZDoom version will not compile in Zandronum** — attempting to pass flags, filter, or species parameters to `A_KillMaster`, `A_KillChildren`, or `A_KillSiblings` in Zandronum aborts DECORATE parsing with a fatal script error `Expected ')', got ','.` at the comma before the extra argument (`src/thingdef/thingdef_states.cpp:430` in the Zandronum source). A bare `KILS_*` word passed as the only argument does not error: the name parameter accepts any bare token, so it silently becomes a damage type of that name.
 
 ## Parameters (UZDoom/GZDoom-family)
 

@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** wiki page `GetPlayerStatus - Zandronum Wiki.html` (`_intake/`, retrieved
 2026-07-28, `https://wiki.zandronum.com/w/index.php?title=GetPlayerStatus&oldid=2251`) + source-verified (`p_acs.cpp:8713-8716`, `d_player.h:271-280`,
 `p_interaction.cpp:3006-3014`, `zcommon.bcs:1346-1352`, `sv_main.cpp:5066-5077`,

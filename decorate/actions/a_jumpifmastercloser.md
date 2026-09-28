@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_JumpIfMasterCloser` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_JumpIfMasterCloser&oldid=44215) + verified against Zandronum source's `src/thingdef/thingdef_codeptr.cpp:903-906` and `src/thingdef/thingdef_codeptr.cpp:856-873` (`DoJumpIfCloser` helper).
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_JumpIfMasterCloser` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_JumpIfMasterCloser&oldid=44215) + verified against Zandronum source's `src/thingdef/thingdef_codeptr.cpp:903-906` and `src/thingdef/thingdef_codeptr.cpp:856-873` (`DoJumpIfCloser` helper); also `src/p_maputl.cpp:59-64` (`P_AproxDistance`), `src/thingdef/thingdef_codeptr.cpp:695-753` (`DoJump`) and `protocolspec/spec.things.txt:167-170` (`SetThingTarget`, no master counterpart).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** AActor — callable from any actor's state table. Shared implementation via the `DoJumpIfCloser()` helper, which also backs `A_JumpIfCloser` and `A_JumpIfTracerCloser`.
 
@@ -16,7 +16,7 @@ Jumps to a target state (or forward by an offset) if the calling actor's master 
 
 ## Wiki/engine divergence
 
-The source ZDoom wiki describes an optional third parameter, `noz` (boolean), to disable vertical distance checking. **This parameter does not exist in Zandronum 3.2.1** — attempting to pass it causes a parse error. Vertical distance is always checked in Zandronum's implementation.
+The source ZDoom wiki describes an optional third parameter, `noz` (boolean), to disable vertical distance checking. **This parameter does not exist in Zandronum 3.2.1 or 3.3-alpha.** Passing it causes a parse error, since the state parser expects `)` after the second argument. Vertical distance is always checked in Zandronum's implementation.
 
 ## Engine-family divergence: `noz` parameter exists on UZDoom
 
@@ -30,13 +30,13 @@ UZDoom's `CheckIfCloser` tests horizontal distance via `Distance2D(targ) < dist`
 
 - **NULL master — no jump.** If the calling actor has no master, the condition is never true and the jump does not occur. There is no way to distinguish "master is far away" from "no master set" using only this function; combining with inventory checks or ACS lookups is necessary for master-presence detection.
 
-- **Distance calculation does not account for actor radius.** Both the calling actor and its master are treated as points. If either or both actors are very wide (large radius), it's possible the jump condition can never be met. Workaround: increase the distance threshold to account for radii, e.g. `A_JumpIfMasterCloser(radius + desired_dist, "label")`.
+- **Distance calculation does not account for actor radius.** Horizontally, both the calling actor and its master are treated as points. If either or both actors are very wide (large radius), it's possible the jump condition can never be met. Workaround: increase the distance threshold to account for radii, e.g. `A_JumpIfMasterCloser(radius + desired_dist, "label")`.
 
-- **Vertical distance is always checked, independent of horizontal distance.** The implementation compares the vertical gap between the actors' Z extents: if the calling actor is above the master, it measures the gap from the caller's Z to the top of the master's bounding box; if at or below, it measures from the top of the caller's bounding box to the master's Z. The applicable gap (one or the other) must be less than the specified distance threshold for the jump to occur. This means the test is strictly more permissive than a true spherical radius check (overlapping actors always pass the vertical component).
+- **Vertical distance is always checked, independent of horizontal distance.** The implementation compares the vertical gap between the actors' Z extents: if the calling actor is above the master, it measures the gap from the caller's Z to the top of the master's bounding box; if at or below, it measures from the top of the caller's bounding box to the master's Z. The applicable gap (one or the other) must be less than the specified distance threshold for the jump to occur. The vertical test is independent of the horizontal one and measures the gap between bounding boxes, not centres, so vertically it is more permissive than a spherical radius check (overlapping actors always pass the vertical component). On Zandronum the whole test is not strictly more permissive than a sphere: `P_AproxDistance` overestimates off-axis distances, so near a diagonal the horizontal test can fail where a true spherical check of the same distance would pass.
 
-- **Network synchronization: client-side execution with no server gate.** Unlike `A_JumpIfCloser`, this function has **no early-return guard** preventing execution in client mode. Clients evaluate the jump condition locally using their own `self->master` pointer, which Zandronum does not reliably replicate across the network. This creates a server/client behavioral divergence: if the calling actor's master is known to the server but not to a client, the server and client may reach different jump decisions in the same tic. Effects of a server-side jump (e.g., state changes, subsequent action side effects) are broadcast to clients, but the divergence itself may cause out-of-sync windows on non-CLIENTSIDEONLY actors (where the client's local evaluation is not the intended behavior).
+- **Network synchronization: client-side execution with no server gate.** Unlike `A_JumpIfCloser`, this function has **no early-return guard** preventing execution in client mode. Clients evaluate the jump condition locally using their own `self->master` pointer. Zandronum's protocol has no command that sends an actor's master to clients (`protocolspec/spec.things.txt` has `SetThingTarget` but no master equivalent), so a client's pointer is only set if code running on that client set it. This creates a server/client behavioral divergence: if the calling actor's master is known to the server but not to a client, the server and client may reach different jump decisions in the same tic. Effects of a server-side jump (e.g., state changes, subsequent action side effects) are broadcast to clients, but the divergence itself may cause out-of-sync windows on non-CLIENTSIDEONLY actors (where the client's local evaluation is not the intended behavior).
 
-- **Client update on jump.** When the jump occurs, `ACTION_JUMP(..., CLIENTUPDATE_FRAME|CLIENTUPDATE_POSITION)` sends a frame and position update to keep clients synchronized.
+- **Client update on jump.** When the jump occurs on the server from the actor's own state, `ACTION_JUMP(..., CLIENTUPDATE_FRAME|CLIENTUPDATE_POSITION)` sends a frame and position update to keep clients synchronized. A jump from an inventory state chain sends nothing, and one from a weapon psprite sends only the weapon state jump.
 
 ## Engine-family divergence: no client/server authority split
 

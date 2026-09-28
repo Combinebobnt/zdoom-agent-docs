@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-06)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** ZDoom Wiki (https://zdoom.org/w/index.php?title=MorphActor&oldid=53654), verified against Zandronum source (src/p_acs.cpp PCD_MORPHACTOR, src/g_shared/a_morph.cpp, src/g_shared/a_morph.h), 2026-08-06
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin (`PCD_MORPHACTOR` in `src/p_acs.cpp`).

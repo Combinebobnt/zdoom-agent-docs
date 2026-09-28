@@ -1,9 +1,9 @@
-# `void A_SetUserVar(string name, int value)`
+# `void A_SetUserVar(name varname, int value)`
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
-**Provenance:** ZDoom Wiki `A_SetUserVar` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_SetUserVar&oldid=46793) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:5149-5168` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_SetUserVar)`).
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** ZDoom Wiki `A_SetUserVar` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_SetUserVar&oldid=46793) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:5149-5168` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_SetUserVar)`); signature from `wadsrc/static/actors/actor.txt:301`; weapon/CustomInventory `self` binding from `src/p_pspr.cpp:257`, `src/thingdef/thingdef_codeptr.cpp:135-146` (`ACustomInventory::CallStateChain`) and `src/g_shared/a_pickups.cpp:1818,1829,1841`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:5149` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_SetUserVar)`).
 
@@ -11,12 +11,12 @@ Sets a user variable on the calling actor to an integer value. User variables ar
 
 ## Parameters
 
-- **`name`** — the name of the user variable to set. The variable must have been declared with `var int <name>` in the actor definition and its name must begin with the `user_` prefix. Required.
+- **`varname`** — the name of the user variable to set, passed as a quoted string. The variable must have been declared with `var int <name>` in the actor definition and its name must begin with the `user_` prefix. Required.
 - **`value`** — the integer value to set the variable to. Required.
 
 ## Behavior and validation
 
-When called, `A_SetUserVar` looks up the named variable in the calling actor's class symbol table. If the variable is not found, is not marked as a user variable, or is not of type `int` (e.g., a float or array user variable), the function prints an error message to the console and returns without making any change:
+When called, `A_SetUserVar` looks up the named variable in the calling actor's class symbol table. If the variable is not found, is not marked as a user variable, or is not of type `int` (e.g., an array user variable; a `float` one behaves differently on UZDoom, see below), the function prints an error message to the console and returns without making any change:
 
 ```text
 <name> is not a user variable in class <classname>
@@ -34,8 +34,8 @@ Separately, on UZDoom `A_SetUserVar` is also declared as a `native` function usa
 
 ## Weapon and CustomInventory caveats
 
-- **Weapons with user variables** must have those variables defined on the player actor itself (e.g., `PlayerPawn` or a player class inheriting from it), not on the weapon actor. User variables defined only on the weapon will not be accessible or modifiable from weapon state code.
-- **CustomInventory items modifying monster variables** can update a monster actor's user variables, but only after the CustomInventory item has legitimately entered its `Use` state (via the engine's internal triggering, not via `Goto` or other state jumps). Before that point, modifications only affect the CustomInventory actor's own variables. If an inventory item needs to modify itself once picked up, do so in the `Pickup` state rather than waiting for `Use`.
+- **Weapons with user variables** must have those variables defined on the player class (a DECORATE class inheriting from `PlayerPawn`), not on the weapon actor. Weapon state code runs with the player's pawn as `self`, so the lookup searches the player class and fails for a variable declared only on the weapon.
+- **CustomInventory state chains** run with a different actor as `self`. The `Pickup` chain runs on the toucher, the `Use` chain on the owner (a player or a monster), and the `Drop` chain on the dropper, so `A_SetUserVar` there writes that actor's variable and fails if its class lacks it. This only applies when the engine triggers the chain; reaching `Use` by `Goto` from the item's own `Spawn` states keeps the item itself as `self`. Once picked up, the item's own user variables are not reachable from any of these chains.
 
 ## See also
 

@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_RemoveMaster` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RemoveMaster&oldid=46797) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4777-4783` and actor declaration (`wadsrc/static/actors/actor.txt:239`).
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_RemoveMaster` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RemoveMaster&oldid=46797) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4777-4783` and actor declaration (`wadsrc/static/actors/actor.txt:239`); removal path `src/p_things.cpp:504-519` (`P_RemoveThing`) and `src/p_mobj.cpp:619-648` (`HideOrDestroyIfSafe`).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_RemoveMaster)` in `src/thingdef/thingdef_codeptr.cpp` — callable from any actor's state table.
 
@@ -22,17 +22,18 @@ When called, this action:
 2. If true, removes the master actor by calling `P_RemoveThing`
 
 Removal is performed via `P_RemoveThing`, which handles:
+- Skipping live players: if the master is a player's current body, nothing happens (UZDoom has the same guard)
 - Clearing actor-specific counters (kill/item/secret statistics)
 - Network broadcasting to clients in multiplayer (server-side only)
 - Safe hiding or destruction depending on map-reset requirements
 
 ## Zandronum-specific behavior
 
-**No parameters exist.** The ZDoom wiki describes an advanced version with optional `flags` (bitfield), `filter` (class name), and `species` parameters that **do not exist in Zandronum**. The Zandronum implementation is a simple no-argument function that unconditionally removes the master actor if it exists.
+**No parameters exist.** The ZDoom wiki describes an advanced version with optional `flags` (bitfield), `filter` (class name), and `species` parameters that **do not exist in Zandronum**. The Zandronum implementation is a simple no-argument function that removes the master actor if it exists, with no filtering beyond `P_RemoveThing`'s live-player guard.
 
 - **No flag constants.** Constants like `RMVF_MISSILES`, `RMVF_NOMONSTERS`, `RMVF_MISC`, `RMVF_EVERYTHING`, `RMVF_EXFILTER`, `RMVF_EXSPECIES`, and `RMVF_EITHER` are not defined in Zandronum and cannot be used.
-- **No type discrimination.** Unlike the wiki's description, Zandronum's version removes the master actor unconditionally, regardless of type — missiles, monsters, and other actors are removed equally. There is no filter mechanism.
-- **No class or species filtering.** The master actor is always removed if it exists; there is no way to selectively spare certain classes or species.
+- **No type discrimination.** Unlike the wiki's description, Zandronum's version removes the master actor regardless of type — missiles, monsters, and other actors are removed equally. There is no filter mechanism. The one exception is a live player, which `P_RemoveThing` never removes.
+- **No class or species filtering.** A non-player master is always removed if it exists; there is no way to selectively spare certain classes or species.
 
 ## Engine-family divergence: parameters, flags, and removal mechanics
 
@@ -57,14 +58,14 @@ early return if the target isn't a genuine map actor (e.g. an owned inventory it
 **no** network broadcasting and has **no** "safe hide vs. destroy for map-reset" branch. UZDoom
 has no client/server network-authority split anywhere in its source tree (no
 `NETWORK_InClientMode`/`SERVERCOMMANDS_*` equivalent), so the "Network behavior" section below,
-including "server-authoritative" removal and "no effect on clients," is Zandronum-only and does
+including "server-authoritative" removal and the client-side note, is Zandronum-only and does
 not carry over.
 
 ## Network behavior
 
 In Zandronum multiplayer, `P_RemoveThing` broadcasts actor destruction to clients via `SERVERCOMMANDS_DestroyThing` when called on the server. The removal is **server-authoritative** — the server decides which master actors to remove, and clients receive the destruction command.
 
-On clients, the action executes but has no effect since `P_RemoveThing` checks the network state internally.
+`P_RemoveThing`'s only network check gates that broadcast. It does not skip clients: run on a client, it still clears counters and destroys the actor locally. In practice a server-spawned actor's `master` pointer is not sent to clients, so on a client it is NULL and the action does nothing.
 
 ## NULL master check
 
@@ -74,8 +75,8 @@ The function safely checks whether `master != NULL` before attempting removal. C
 
 - **`A_KillMaster`** — Kills the calling actor's master (forces it into the Death state) without removing it from the game world.
 - **`A_DamageMaster`** — Damages the calling actor's master by a specified amount.
-- **`A_RemoveChildren`** — Removes actors spawned by the calling actor (its children).
-- **`A_RemoveSiblings`** — Removes all actors that share the calling actor's master (siblings, not including the caller itself).
+- **`A_RemoveChildren`** — Removes actors whose `master` is the calling actor (its children). By default only dead ones (health <= 0) are removed; pass `removeall = true` to remove all.
+- **`A_RemoveSiblings`** — Removes actors that share the calling actor's master (siblings, not including the caller itself). Same default: only dead ones unless `removeall = true`.
 
 ## Example (Zandronum DECORATE)
 
@@ -84,6 +85,8 @@ A spawned imp that removes its spawner when killed:
 ```text
 ACTOR SpawnedImp : DoomImp
 {
+    States
+    {
     Death:
         TROO I 8 A_RemoveMaster    // Remove the spawner
         TROO J 8 A_Scream
@@ -91,13 +94,17 @@ ACTOR SpawnedImp : DoomImp
         TROO L 6
         TROO M -1
         Stop
+    }
 }
 
 ACTOR SpawnerDemon : BaronOfHell
 {
+    States
+    {
     Missile:
         BOSS G 6 A_SpawnItemEx("SpawnedImp", 50, 50, 60, 0, 0, 0, 0, SXF_SETMASTER)
         Goto See
+    }
 }
 ```
 

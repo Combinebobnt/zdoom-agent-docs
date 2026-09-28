@@ -2,15 +2,25 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** `SetHudSize - ZDoom Wiki.html`
 (`https://zdoom.org/w/index.php?title=SetHudSize&oldid=35982`), verified against
 the Zandronum source's `src/p_acs.cpp` (`PCD_SETHUDSIZE` case, line 12506; `DLevelScript` constructor,
 line 13120; savegame serialization, line 3769), the Zandronum source's `src/p_acs.h` (line 1074,
 `hudwidth`/`hudheight` field declarations), the Zandronum source's `src/g_shared/hudmessages.cpp`
-(`DHUDMessage` constructor lines 78-156, `DHUDMessage::Draw` lines 400-460), and
+(`DHUDMessage` constructor lines 78-156, `DHUDMessage::Draw` lines 338-468), and
 the Zandronum source's `src/sv_commands.cpp` (`SERVERCOMMANDS_PrintACSHUDMessage`, lines 2416-2437) on
-2026-07-29.
+2026-07-29. Extended 2026-08-23 (status-bar squash section) from the Zandronum source's
+`src/g_shared/shared_sbar.cpp` (`DBaseStatusBar::DrawMessages` lines 1252-1271,
+`DrawBottomStuff`/`DrawTopStuff` lines 1595-1621), `src/d_main.cpp` (`D_Display`'s HUD-state
+selection, lines 1054-1074) and `src/v_draw.cpp` (`DCanvas::VirtualToRealCoords`, lines 758-799).
+Extended 2026-08-26 (multi-line line-spacing section) from the same `hudmessages.cpp` `Draw`/
+`DoDraw` pair, plus `src/basicinlines.h` (`Scale`, line 18). Re-read 2026-09-25 at the
+`bdd0f7beb` checkout (the revision this file's Zandronum claims were actually verified against all
+along; the SHA above only ever named a target-version label): corrected the
+`DHUDMessage::Draw`/`VirtualToRealCoords` line ranges above (both were already off even at the
+originally-cited `28f736fb3` checkout, not new drift), and see the "Engine-family divergence"
+section below for a real behavior correction found in the same pass.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin — `zt-bcc/src/builtin.c:117`: `{ "sethudsize", ";iib" }` (void return,
 params `int, int, bool`), compiles to `PCD_SETHUDSIZE` (`zt-bcc/src/semantic/asm.c:365`,
@@ -64,6 +74,141 @@ Two things here are undocumented by the wiki:
 - The value **is** preserved across a `Delay`/blocking call within the same script instance
   (nothing resets it mid-run) and is saved/restored across a savegame (`arc << hudwidth <<
   hudheight;`, `p_acs.cpp:3769`), so it survives a save/load but not a fresh script re-entry.
+
+## What the `statusbar` argument actually costs you: the status-bar squash (verified 2026-08-23)
+
+The sign-encoding above is an implementation detail. Its *effect* is not, and it silently changes
+where every coordinate in the virtual canvas lands. Passing `0` for `statusbar` does not merely
+"avoid drawing over the status bar": it squashes the entire canvas, glyph heights included, into
+the rows above the status bar.
+
+**When this can happen at all.** The squash only applies while the engine is drawing HUD messages
+in the `HUD_StatusBar` state. `DBaseStatusBar::DrawBottomStuff`/`DrawTopStuff`
+(`shared_sbar.cpp:1595-1597`, `:1606-1621`) pass `DrawMessages` a `bottom` of `::ST_Y` in that
+state and `SCREENHEIGHT` in every other one, and `DrawMessages` (`shared_sbar.cpp:1252-1271`) hands
+that straight to each message's `Draw(bottom, visibility)`. The state is picked in `D_Display`
+(`d_main.cpp:1054-1074`): the two full-screen branches both require `screenblocks > 10` **and**
+`viewheight == SCREENHEIGHT`, and `viewheight` only equals `SCREENHEIGHT` at `screenblocks >= 11`
+anyway, so `HUD_StatusBar` is selected when `screenblocks <= 10`, or when `screenblocks >= 11` but
+neither `hud_althud` nor `viewactive` is set (a rare fall-through, e.g. a non-overlay automap with
+no alternate HUD). Note the practical consequence on Zandronum specifically: its `screenblocks`
+default is **11**, not 10 (see [`console/notes/screenblocks.md`](../../console/notes/screenblocks.md)),
+so a stock install is in a full-screen state where `bottom == SCREENHEIGHT` and the third argument
+makes no positional difference at all. Everything below applies to a player who has set
+`screenblocks` to 10 or lower.
+
+**What the engine does with `bottom`.** `DHUDMessage::Draw` (`hudmessages.cpp:443-450`) picks the
+virtual canvas height it will actually draw with:
+
+```cpp
+if (HUDHeight < 0)
+{ // A negative height means the HUD size covers the status bar
+    hudheight = -HUDHeight;
+}
+else
+{ // A positive height means the HUD size does not cover the status bar
+    hudheight = Scale (HUDHeight, screen_height, bottom);
+}
+```
+
+`screen_height` is `SCREENHEIGHT` here whenever the canvas is active, because the one branch that
+would replace it with `con_virtualheight` (`hudmessages.cpp:364-381`) is gated on `HUDWidth == 0`.
+That local `hudheight` is what reaches `DTA_VirtualHeight` in `DoDraw`
+(`hudmessages.cpp:503-512`), and `DCanvas::VirtualToRealCoords` then applies
+`y = y * Height / vheight` (`v_draw.cpp:798`, the non-5:4 branch).
+
+**Net effect.** Substituting a canvas fraction `f = y / height` (the natural way to place something
+in a canvas of a known size) collapses the whole chain:
+
+```text
+statusbar = 1:  vheight = height
+                y_screen = f * height * SCREENHEIGHT / height       = f * SCREENHEIGHT
+
+statusbar = 0:  vheight = height * SCREENHEIGHT / ST_Y
+                y_screen = f * height * SCREENHEIGHT * ST_Y / (height * SCREENHEIGHT)
+                         = f * ST_Y
+```
+
+So with the flag set, the canvas spans the full screen height at every `screenblocks`. With the
+flag clear, the canvas is scaled into `ST_Y` rows: the entire canvas is compressed vertically by
+`ST_Y / SCREENHEIGHT`, which is `0.84` for the stock Doom status bar in its scaled state
+(`168/200`; see [`console/notes/st_scale.md`](../../console/notes/st_scale.md) for the other
+`ST_Y` cases, including an `SBARINFO` bar, where the factor is different).
+
+Three consequences worth separating, because only the first is intuitive:
+
+- **The canvas centre does not move.** At `f = 0.5` the flag-clear form gives `ST_Y/2`, which is
+  exactly the 3D view's own unpitched centre screen row across the whole `screenblocks <= 10`
+  range (see
+  [`console/concepts/view-window-geometry.md`](../../console/concepts/view-window-geometry.md)).
+  Anything drawn at the middle of the canvas therefore looks correct under either flag value, which
+  is precisely why the bug this causes is easy to miss.
+- **Every offset from that centre is wrong by the same `ST_Y / SCREENHEIGHT` factor.** A point
+  placed a fixed canvas distance above or below centre lands proportionally closer to centre than
+  intended. The error grows linearly with distance from the canvas centre and is zero at it.
+- **Glyphs are squashed vertically only, not scaled uniformly.** `VirtualToRealCoords` receives the
+  destination width and height together with the position (`v_draw.cpp:715-719`), but width goes
+  through the X branch (driven by `vwidth`, which the flag does not touch) while height goes
+  through the Y branch. The result is anamorphic: text keeps its width and loses `ST_Y/SCREENHEIGHT`
+  of its height.
+
+Two smaller facts that follow from the same code and are easy to assume wrongly:
+
+- **This is per script instance, not a global mode.** `hudwidth`/`hudheight` are `DLevelScript`
+  members reset to `0` in the constructor (`p_acs.cpp:13120`), as covered in the previous section,
+  so one script's choice of `statusbar` flag never leaks into another script's messages. There is
+  no engine-wide "HUD covers the status bar" state to read back or restore.
+- **A non-zero `width` makes the `con_scaletext` scaling branch dead.** Both the
+  `con_virtualwidth`/`con_virtualheight` substitution (`hudmessages.cpp:364-381`) and the
+  `HUDWidth == 0` positioning block that consumes it (`hudmessages.cpp:385-403`) are gated on
+  `HUDWidth == 0`. Once a canvas is active, the `g_bScale`/`con_scaletext` path documented further
+  down this file is simply not on the code path, in either `statusbar` state.
+
+## Multi-line HudMessage line spacing under the status-bar squash (verified 2026-08-26)
+
+The squash above is derived for a single message's position. It reaches a multi-line message's
+*inter-line spacing* too, but uniformly — worth stating explicitly because it rules out the squash
+as an explanation for a disproportionate multi-line spacing bug (some lines merging while others
+in the same message stay clean), which needs a different cause.
+
+`DHUDMessage::Draw` computes the per-line vertical step once, outside the line loop:
+
+```cpp
+ystep = Font->GetHeight();// * yscale;
+
+if (HUDHeight < 0)
+{ // A negative height means the HUD size covers the status bar
+	hudheight = -HUDHeight;
+}
+else
+{ // A positive height means the HUD size does not cover the status bar
+	hudheight = Scale (HUDHeight, screen_height, bottom);
+}
+CalcClipCoords(hudheight);
+
+for (i = 0; i < NumLines; i++)
+{
+	int drawx;
+
+	drawx = CenterX ? x - Lines[i].Width*xscale/2 : x;
+	DoDraw (i, drawx, y, clean, hudheight);
+	y += ystep;
+}
+```
+
+(`hudmessages.cpp:441-460`.) `ystep` is a raw canvas-space quantity (the font's own pixel height,
+computed before any squash is applied), and `hudheight` — the value that sets the squash ratio,
+per the section above — is computed once before the loop starts, then passed unchanged to every
+line's `DoDraw` call. `DoDraw`'s `DTA_VirtualHeight` tag (`hudmessages.cpp:501-512`, see "What
+drawing path each state actually takes" below) is what `VirtualToRealCoords` divides every
+y-coordinate by to reach a real screen pixel, so every line's accumulated `y` — including the
+`ystep` gaps between them — goes through the identical `screen_height/hudheight` ratio. Line
+pitch and glyph height therefore compress by the same factor in lockstep for every line of one
+message: this mechanism cannot by itself widen or narrow the gap between some lines relative to
+others, or turn a positive gap into an overlap, at a fixed `orcslay_cl_hud_scale`-equivalent
+setting and resolution. A per-line disproportionate spacing bug needs a different root cause —
+worth checking `Scale`'s truncating integer division (`(a*b)/c`, `src/basicinlines.h:18`) for a
+per-resolution rounding remainder before assuming this squash is responsible.
 
 ## Reset behavior (`width` or `height` == `0`)
 
@@ -163,7 +308,7 @@ equivalent, `g_statusbar/hudmessages.cpp:481-482`, is structurally identical) dr
 `DTA_VirtualWidth, HUDWidth, DTA_VirtualHeight, hudheight` and no `DTA_KeepRatio` tag, so
 `parms->keepratio` stays at its default `false` (`v_draw.cpp:384`) and the tag parser's fallthrough
 (`v_draw.cpp:715-718`) calls `VirtualToRealCoords(..., vwidth, vheight, vbottom,
-handleaspect=true)`. Zandronum's `VirtualToRealCoords` (`v_draw.cpp:760-798`) branches on `myratio
+handleaspect=true)`. Zandronum's `VirtualToRealCoords` (`v_draw.cpp:758-799`) branches on `myratio
 = CheckRatio(Width, Height)` — the REAL screen's aspect-ratio bucket (4:3/16:9/16:10/17:10/5:4/21:9,
 computed from the actual framebuffer dimensions, with no input from `vwidth`/`vheight` at all) — and
 for any bucket other than 4:3/5:4 (i.e. every common modern widescreen ratio) takes this branch:
@@ -179,7 +324,7 @@ if (myratio != 0 && myratio != 4)
 }
 ```
 
-This exact fence is Zandronum-only source (`v_draw.cpp:760-798`) — see "Engine-family divergence"
+This exact fence is Zandronum-only source (`v_draw.cpp:758-799`) — see "Engine-family divergence"
 below for how the pinned UZDoom checkout computes the same effect differently; the two are no
 longer the same code, despite an earlier pass through this doc having claimed otherwise.
 
@@ -196,7 +341,7 @@ cancellation happens in UZDoom's differently-shaped version of this formula too 
 divergence" below) — the width-independence conclusion holds on both engines even though the code
 computing it no longer matches.
 
-Concretely, at 16:10 (`BaseRatioSizes[2][0] = 1152`, `v_video.cpp:1770`): `x_real` at the
+Concretely, at 16:10 (`BaseRatioSizes[2][0] = 1152`, `v_video.cpp:1768`): `x_real` at the
 virtual-canvas edges (`frac=0`/`frac=1`) lands at `Width * (0.5 - 0.5*960/1152)` ≈ `0.0833 * Width`
 from each true screen edge — an ~8.3% pillarbox margin on each side, symmetric, present at
 16:9/16:10/17:10 alike (with per-ratio `BaseRatioSizes` constants), and **unavoidable via any
@@ -209,33 +354,53 @@ own source comment frames the 4:3/5:4-only fill as deliberate, not a bug: `SetHu
 virtual-canvas mode is architecturally scoped to a 4:3-equivalent centered region on non-4:3 real
 screens, and there is no `width`/`height` combination that makes it fill the real screen instead.
 
-## Engine-family divergence: aspect-correction implementation on UZDoom (verified 2026-08-15)
+## Engine-family divergence: aspect-correction implementation on UZDoom (verified 2026-08-15; 21:9 handling corrected 2026-09-25)
 
 On the pinned UZDoom checkout, `VirtualToRealCoords` (`common/2d/v_draw.cpp:1441-1487`) reaches the
 same pillarboxed-canvas effect as the fence above through different code, not the same code. Where
-Zandronum looks up a discrete `myratio` bucket (0-5, covering 4:3/16:9/16:10/17:10/5:4/21:9) in a
-`BaseRatioSizes` table, UZDoom computes `myratio` as a continuous float via `ActiveRatio` and derives
-the equivalent base-width value with a formula (`AspectBaseWidth`, `round(240 * aspect * 3)`) instead
-of a table lookup, and branches on `myratio > 1.334f` rather than an explicit bucket-index check. For
-the standard buckets the two approaches land on the same numbers — `AspectBaseWidth` for 16:10
-evaluates to 1152, matching Zandronum's `BaseRatioSizes[2][0]` cited above — so at 4:3, 16:9, 16:10,
-17:10, and 5:4 the resulting pillarbox math is equivalent between engines even though the
-implementing code isn't.
+Zandronum looks up a discrete `myratio` bucket in a `BaseRatioSizes` table, UZDoom computes `myratio`
+as a continuous float via `ActiveRatio` and derives the equivalent base-width value with a formula
+(`AspectBaseWidth`, `round(240 * aspect * 3)`) instead of a table lookup, and branches on `myratio >
+1.334f` rather than an explicit bucket-index check. For the standard buckets the two approaches land
+on the same numbers. `AspectBaseWidth` for 16:10 evaluates to 1152, matching Zandronum's
+`BaseRatioSizes[2][0]` cited above. So at 4:3, 16:9, 16:10, 17:10, and 5:4 the resulting pillarbox
+math is equivalent between engines even though the implementing code isn't.
 
-Genuinely ultrawide real screens are where the two diverge in outcome, not just implementation.
-Before computing `myratio`, UZDoom clamps it through an `Int` cvar, `vid_allowtrueultrawide`
-(default `1`, `CVAR_ARCHIVE`): at its default, a real screen ratio wider than 16:9 is allowed through
-up to 64:27 (~21:9) rather than being folded into one fixed "21:9" bucket the way Zandronum's table
-does it, so the exact pillarbox width UZDoom computes for a genuinely ultrawide monitor tracks that
-monitor's actual measured ratio instead of a single constant. Setting `vid_allowtrueultrawide` to `0`
+`CheckRatio` (`v_video.cpp:1719-1753`) returns 0 (4:3), 1 (16:9), 2 (16:10), 3 (17:10), 4 (5:4), or 6
+(21:9). Index 5 is a duplicate 17:10 row in `BaseRatioSizes` (`v_video.cpp:1771`) that `CheckRatio`
+never actually returns; it is dead weight left over from the table's own history, not a live bucket.
+`VirtualToRealCoords` itself then immediately remaps a 21:9 result back to 16:10
+(`if (myratio == 6) { myratio = 2; }`, `v_draw.cpp:763-767`) before doing anything else with it, so
+`SetHudSize`'s own pillarbox math never actually indexes `BaseRatioSizes[6]`: on a genuine 21:9
+screen it silently reuses the 16:10 numbers instead. This corrects an earlier pass through this doc,
+which described a dedicated 21:9 bucket here; there isn't one for this function.
+
+**Version gate.** None of this 21:9 handling exists in Zandronum 3.2.1. `CheckRatio`'s
+nearest-ratio rewrite (`10221d769`, "Improve CheckRatio to always return the closest ratio") and the
+21:9 row's addition to `BaseRatioSizes` (`41947975f`/`04a98bbf8`/`b318501b3`, "21:9 aspect ratio
+support" and its two follow-up fixes) all postdate the 3.2.1 version-bump commit `28f736fb3`, as does
+the `VirtualToRealCoords` remap itself (`b43f7a490`, "fix: 21:9 AR stretching in intermission, end
+level screens"). At 3.2.1, `CheckRatio` only ever returns 0-4 (a threshold-based check, not a
+nearest-ratio search), and its final fallback treats anything it doesn't recognize as 4:3
+(`ratio = 0`). A 21:9 real screen there lands in that fallback, so `VirtualToRealCoords` takes the
+`myratio == 0` branch: the plain proportional `else` case with no pillarbox at all, not the
+16:10-equivalent pillarbox HEAD applies. A script targeting 3.2.1 specifically should not assume an
+ultrawide player sees the same centered canvas a 3.3-alpha client shows them.
+
+Genuinely ultrawide real screens are where the two engines diverge in outcome on the current
+checkouts, not just implementation. Before computing `myratio`, UZDoom clamps it through an `Int`
+cvar, `vid_allowtrueultrawide` (default `1`, `CVAR_ARCHIVE`): at its default, a real screen ratio
+wider than 16:9 is allowed through up to 64:27 (~21:9), tracking that monitor's actual measured ratio
+instead of a single constant, whereas Zandronum's remap above collapses any 21:9-classified screen to
+the same 16:10 constant regardless of exactly how wide it is. Setting `vid_allowtrueultrawide` to `0`
 instead clamps the ratio down to 16:9 before it reaches the formula, which is closer in spirit to
 (though not verified identical to) Zandronum's fixed-bucket treatment of anything wider than 16:10.
-Zandronum has no cvar or code path equivalent to `vid_allowtrueultrawide` at all — this is
+Zandronum has no cvar or code path equivalent to `vid_allowtrueultrawide` at all; this is
 UZDoom-specific behavior with no Zandronum counterpart to compare against. The `vwidth`-cancellation
 property described above (the real X position, and therefore the pillarbox inset, never depends on
 the `width` a script passes to `SetHudSize`) holds under this formula exactly as it does under
 Zandronum's, since the cancellation only relies on `vwidth` appearing once in the numerator and once
-in the denominator — that part of the derivation is unaffected by which value computes
+in the denominator; that part of the derivation is unaffected by which value computes
 `AspectBaseWidth(myratio)`/`BaseRatioSizes[myratio][0]` upstream of it.
 
 ## The glyph-size invariant, and the `width`/`height` you pass is genuinely free to rescale (verified 2026-08-12)
@@ -246,7 +411,7 @@ render. It doesn't, and the invariant is exact, not approximate:
 
 Once `hudwidth`/`hudheight` are nonzero, `DoDraw` always takes the `DTA_VirtualWidth,
 HUDWidth`/`DTA_VirtualHeight, hudheight` tag path (`hudmessages.cpp:503-512`), which bottoms out in
-`VirtualToRealCoords` (`v_draw.cpp:717`, formula at `v_draw.cpp:785`,`799` for the non-16:9/16:10
+`VirtualToRealCoords` (`v_draw.cpp:715`, formula at `v_draw.cpp:782`,`796` for the non-16:9/16:10
 branch — see "The wiki's '4:3 area...' claim" above for the other branch): `real_px =
 virtual_units * (RealScreenWidth / virtWidth)`. This holds for BOTH a coordinate's position AND a
 glyph's own rendered width (the glyph's destination width is itself in virtual units, scaled by the

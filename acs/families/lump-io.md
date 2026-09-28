@@ -6,7 +6,7 @@
 **Applies to:** UZDoom=no, Zandronum=yes — for the five real, callable members; `LumpReadArray`
 is a compiler-toolchain-level dead end unreachable from `zt-bcc` source on *either* engine (see
 its own section below), not part of this engine-family claim
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-06)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** six Zandronum Wiki pages, all retrieved 2026-08-06 — `LumpOpen` (https://wiki.zandronum.com/w/index.php?title=LumpOpen&oldid=2255),
 `LumpRead` (https://wiki.zandronum.com/w/index.php?title=LumpRead&oldid=2256), `LumpReadArray` (https://wiki.zandronum.com/w/index.php?title=LumpReadArray&oldid=2257), `LumpReadString` (https://wiki.zandronum.com/w/index.php?title=LumpReadString&oldid=2258), `LumpClose`
 (https://wiki.zandronum.com/w/index.php?title=LumpClose&oldid=2260), `LumpGetInfo` (https://wiki.zandronum.com/w/index.php?title=LumpGetInfo&oldid=2515) — each re-verified against the Zandronum source `master`
@@ -55,10 +55,12 @@ Opens a lump by name and returns a **handle** for use with the other `Lump*` fun
 
 **Gotcha (observed in source, not documented on the wiki):** the handle **is** the lump number —
 `LumpGetInfo`/`LumpRead`/etc. all key a map by this same integer. The "already open, don't
-re-open" guard in the C++ (`p_acs.cpp:8288`) checks `ACSLumpHandles.CheckKey(args[0])`, but
+re-open" guard in the C++ (`p_acs.cpp:8284`) checks `ACSLumpHandles.CheckKey(args[0])`, but
 `args[0]` at that point is the **name argument's string index**, not the resolved lump number —
-so the guard can never match in practice, and the reference-count increment on line
-`ACSLumpHandles[lumpNum].refCount++` runs on every call. Practical effect: calling `LumpOpen` on
+so the guard only matches by coincidence, and the reference-count increment on line
+`ACSLumpHandles[lumpNum].refCount++` runs on every normal call. When it does match (the string
+index happens to equal an already-open lump number), `LumpOpen` returns the resolved lump number
+without opening it or bumping its count, so that handle may not be open at all. Practical effect: calling `LumpOpen` on
 the same lump twice bumps refCount to 2 (each `LumpClose` only decrements by 1), so **every
 `LumpOpen` call must be paired with exactly one `LumpClose` call** — don't assume the engine
 dedups repeated opens of the same name for you.
@@ -89,7 +91,7 @@ constants.
 
 **⚠ Wiki example bug:** the wiki's example script calls `LumpRead(startIndex, LUMP_READ_INT, 0)`
 — that's `(handle, type, pos)` order. Both the declared signature *and* the actual
-`p_acs.cpp:8314-8315` implementation (`lump.Seek(args[1], ...)` then `readType = args[2]`) are
+`p_acs.cpp:8314-8318` implementation (`lump.Seek(args[1], ...)` then `readType = args[2]`) are
 `(handle, pos, type)`. **Do not copy the wiki example's argument order** — use
 `LumpRead(handle, pos, type)`.
 
@@ -98,7 +100,8 @@ a fixed-point." The implementation at `p_acs.cpp:8351-8363` reads raw bytes into
 then returns `FLOAT2FIXED((float)buf)` — which casts the integer *value* to float, not
 reinterpreting the bytes as a float. Reading IEEE 754 bytes (e.g. `0x3F 0x80 0x00 0x00` for 1.0)
 will produce an incorrect result: the bytes are read as `int32 = 1065353216` (on little-endian),
-then cast to `float` which becomes ~1 billion, then fixed-point multiplied by 65536. This is a
+then cast to `float` which becomes ~1 billion, and converting that to fixed point overflows
+32 bits, so the result is garbage. This is a
 genuine engine bug, not a documentation gap.
 
 **Provenance:** wiki page `LumpRead - Zandronum Wiki.html` (`https://wiki.zandronum.com/w/index.php?title=LumpRead&oldid=2256`, 2026-08-06) + source-verified.
@@ -117,7 +120,7 @@ whichever is shorter.
   pos)`.
 
 **Returns:** the string read (null-terminated internally). Empty string `""` if `handle` is
-invalid, or if `pos` is at/past the end of the lump (`p_acs.cpp:8367-8377`).
+invalid, or if `pos` is at/past the end of the lump (`p_acs.cpp:8368-8378`).
 
 **Wiki says** "stops upon encountering a null terminator or the end of the lump" — true of the
 *result*, not the read itself: the engine always reads exactly `len` raw bytes (capped by
@@ -150,6 +153,10 @@ Queries metadata about an opened (or even un-opened — see below) lump.
     pairing this with `GetWadInfo`, but that function is **not reachable from this toolchain
     either** — it's a real engine ACSF (`p_acs.cpp:8945`, `ACSF_GetWadInfo`) but, like
     `LumpReadArray` below, has no entry in `zcommon.bcs`, so `bcc` has no name to call it by.
+    `GetWadInfo` itself, and both the `LUMP_INFO_NAMESPACE`/`LUMP_INFO_WAD` constants above, were
+    all added together by the same commit (`ba928315f`, 2025-11-19), which postdates the 3.2.1
+    version-bump commit (`28f736fb3`, 2025-08-04) — so `GetWadInfo` does not exist on a real 3.2.1
+    client either, moot as that already is given its unreachability from this toolchain.
 
 **Returns:** varies by `infoType` (see above). Prints `"LumpGetInfo: unknown info type %u\n"` and
 returns 0 for anything else.
@@ -157,12 +164,30 @@ returns 0 for anything else.
 **Note:** unlike `LumpRead`/`LumpReadString`, this does **not** check `ACSLumpHandles` at all —
 it operates directly on the raw lump number for `SIZE`/`NAMESPACE`/`WAD`, and only bounds-checks
 for `NAME`. In practice this means you can call `LumpGetInfo` with a lump number you never passed
-through `LumpOpen`. **The wiki's "an index higher than the total number of lumps can crash the
-game" warning is corroborated by source**, not just repeated: `SIZE`/`NAMESPACE`/`WAD` all pass
-`lumpNum` straight into `Wads.LumpLength`/`GetLumpNamespace`/`GetWadnumFromLumpnum` with no range
-check (`p_acs.cpp:8504-8519`) — only the `NAME` branch bounds-checks first.
+through `LumpOpen`. The ACS side passes `lumpNum` (an `unsigned int`) straight into
+`Wads.LumpLength`/`GetLumpNamespace`/`GetWadnumFromLumpnum` (`p_acs.cpp:8504-8519`), but those
+`w_wad.cpp` functions range-check it themselves. An out-of-range `lumpNum`, including
+`LumpOpen`'s `-1` failure return, gives:
+- `SIZE`: `I_Error("W_LumpLength: %i >= NumLumps")`, which aborts the running game with that
+  message (`w_wad.cpp:615-620`). This is the case the wiki's "an index higher than the total number of
+  lumps can crash the game" warning describes.
+- `NAME`: `""` (checked in `p_acs.cpp:8509` itself).
+- `NAMESPACE`: `0` (`ns_global`, `w_wad.cpp:1086-1092`).
+- `WAD`: `-1` (`w_wad.cpp:1315-1321`).
+
+These `w_wad.cpp` checks are unchanged since 3.2.1.
+
+**Version gate: the `NAME` bounds check is itself newer than 3.2.1.** Commit `1fb043a9a`
+(2025-11-19, also after the 3.2.1 version-bump `28f736fb3`) added the `lumpNum <
+Wads.GetNumLumps()` guard to the `NAME` case; before that commit it called
+`GlobalACSStrings.AddString(Wads.GetLumpFullName(lumpNum))` unconditionally. `GetLumpFullName`
+returns NULL for an out-of-range lump (`w_wad.cpp:1051-1054`) and `AddString` runs `strlen` on
+it (`p_acs.cpp:474-476`), so on a real 3.2.1 client an out-of-range `NAME` query is a null
+dereference crash. `SIZE` gives the `I_Error` above on both versions. `NAMESPACE`/`WAD` didn't
+exist at all yet on 3.2.1 (see above).
 
 **Provenance:** wiki page `LumpGetInfo - Zandronum Wiki.html` (`https://wiki.zandronum.com/w/index.php?title=LumpGetInfo&oldid=2515`, 2026-08-06) + source-verified.
+Out-of-range handling: `w_wad.cpp:615-620`, `1051-1054`, `1086-1092`, `1315-1321`; `p_acs.cpp:474-476`.
 **Tier:** A.
 
 ---
@@ -190,7 +215,8 @@ matching `LumpClose` — don't assume repeated opens of the same lump share one 
 **original ACC compiler**, not `zt-bcc`. The four backing functions are real and fully
 implemented on the engine side — `ACSF_LumpReadLocal` / `ACSF_LumpReadModule` /
 `ACSF_LumpReadHub` / `ACSF_LumpReadGlobal` (`p_acs.cpp:8402-8487`), one case per array storage
-class (local/map array, module/library array, hub-scope world array, global array) — and
+class (script/function-local array, module-level map/library array, hub-scope world array, global
+array) — and
 `zcommon.bcs` reserves their indices (`-162` to `-165`, between `LumpReadString` at `-161` and
 `LumpGetInfo` at `-166`) but **does not name any of them**, and no dispatch logic exists anywhere
 in `zt-bcc/src` to pick one based on the array argument's scope.
@@ -212,15 +238,17 @@ Engine-side semantics (`p_acs.cpp:8402-8487`), recorded for completeness / in ca
   start writing at.
 - **Local/Module arrays additionally clip** `len` to `arraySize - arrayOffset` (can't overrun the
   fixed-size array). **Hub/Global arrays do not get this clip** — the source comment explicitly
-  says they "have the entire range of an integer available to them," meaning an oversized
-  `length`/`pos` combination against a hub or global array is an out-of-bounds write footgun in
-  the engine itself, not just a theoretical one. (Moot while the function stays unreachable from
-  `bcc`, but worth knowing if `zt-bcc` ever exposes it.)
+  says they "have the entire range of an integer available to them." They are sparse hash maps
+  (`FWorldGlobalArray` is a `TMap`, `p_acs.h:69`), so an oversized `length`/`pos` just creates
+  entries past whatever range the script expected, not a memory overrun. An out-of-range hub or
+  global array *number* hits the `BoundsCheckingArray` check instead (`p_acs.h:73-83`), an
+  `I_Error("Out of bounds memory access in ACS VM")`. (Moot while the function stays unreachable
+  from `bcc`, but worth knowing if `zt-bcc` ever exposes it.)
 - **Returns** the number of bytes actually written (`len` after clipping) — matches the wiki's
   "returns the number of bytes read."
 
 **Provenance:** wiki page `LumpReadArray - Zandronum Wiki.html` (`https://wiki.zandronum.com/w/index.php?title=LumpReadArray&oldid=2257`, 2026-08-06) + source-verified +
-compile-tested against `bcc`. **Tier:** A (verified-unreachable is still a
+compile-tested against `bcc`. Hub/global array storage: `p_acs.h:69`, `73-83`. **Tier:** A (verified-unreachable is still a
 verified fact).
 
 ---

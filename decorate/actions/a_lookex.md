@@ -2,12 +2,12 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
-**Provenance:** ZDoom Wiki `A_LookEx` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_LookEx&oldid=53757) + verified against the Zandronum source's `src/p_enemy.cpp:2068-2277` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_LookEx)`).
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** ZDoom Wiki `A_LookEx` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_LookEx&oldid=53757) + verified against the Zandronum source's `src/p_enemy.cpp:2068-2277` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_LookEx)`), `src/p_enemy.cpp:1317-1323` (`P_IsVisible` FOV/close-range override), `src/p_enemy.cpp:1463,1537,1713,1895-1899` (`LOF_DONTCHASEGOAL` handling), `src/p_enemy.cpp:1951` (`A_Look`'s `Thing_SetGoal` handling), `wadsrc/static/actors/actor.txt:274` (declaration).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/p_enemy.cpp:2068` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_LookEx)`).
 
-Customizable target-acquisition action for monsters, similar to `A_Look` but allowing parameterized conditions for sight/sound detection, minimum/maximum ranges, and a custom state to jump to. If a friendly monster (one that passes `IsFriend()` checks against candidates) calls this without having a `SeeState`, it falls back to `A_Wander` instead of staying idle — use the `+STANDSTILL` flag to suppress this behavior.
+Customizable target-acquisition action for monsters, similar to `A_Look` but allowing parameterized conditions for sight/sound detection, minimum/maximum ranges, and a custom state to jump to. If the target the monster heard is one it counts as a friend (`IsFriend()`, typically a friendly monster hearing its allied player), it does not stay idle. Failing a sight search for an enemy, it jumps to `label`, else its `SeeState`, and calls `A_Wander` only if it has neither. The `+STANDSTILL` flag suppresses this whole branch.
 
 ## Zandronum-specific: server-authoritative, same netcode gate as A_Look
 
@@ -19,31 +19,31 @@ The one line that *does* run on both server and client is the stealth-monster `v
 
 - **`int flags`** — Combination of zero or more `LOF_*` flags (combined with `|`). **All six flags defined in Zandronum** are available:
   - `LOF_NOSIGHTCHECK` (1) — Skip sight-based target detection; makes the monster blind to line-of-sight targets (sound-based targets still work unless `LOF_NOSOUNDCHECK` is also set).
-  - `LOF_NOSOUNDCHECK` (2) — Skip sound-based target detection; makes the monster deaf to player noise. **Note:** This is different from the `AMBUSH` flag — `AMBUSH` allows detection by line-of-sight regardless of facing direction, while this flag disables sound checks entirely.
-  - `LOF_DONTCHASEGOAL` (4) — Do not break idle animation to chase a patrol goal set by `Thing_SetGoal`. The monster can still acquire a target and transition to the see state.
+  - `LOF_NOSOUNDCHECK` (2) — Skip sound-based target detection; makes the monster deaf to player noise. **Note:** This is different from the `AMBUSH` flag. An `AMBUSH` monster still hears, but a heard target only wakes it if it has a clear line of sight to that target (facing is not checked; `minseedist`/`maxseedist` apply). This flag disables sound checks entirely.
+  - `LOF_DONTCHASEGOAL` (4) — Do not break idle animation to chase a patrol goal set by `Thing_SetGoal`. The monster can still acquire a target and transition to the see state. On Zandronum the flag only takes effect for an actor with a hate target set by `Thing_Hate` (the `P_LookForTID` path). Zandronum's rewritten `P_LookForPlayers` reads the flag but still falls back to the goal unconditionally. UZDoom honors it in both paths.
   - `LOF_NOSEESOUND` (8) — Do not play the actor's `SeeSound` when acquiring a target from this call.
   - `LOF_FULLVOLSEESOUND` (16) — Play the see sound at full volume globally (like a boss alert), instead of at normal distance-attenuated volume.
   - `LOF_NOJUMP` (32) — Acquire a target but do not transition to the see state; allows checking for a valid target and manually jumping based on conditions without automatically entering the see animation.
 
-- **`fixed minseedist`** — Minimum sight distance in map units. If greater than 0, the monster will not see a player who is closer than this distance. Additionally, if set, the monster will not wake up if touched by the player (so it can be set smaller than the actor's radius to create a "blind spot" behind the monster). Default: 0 (no minimum).
+- **`fixed minseedist`** — Minimum sight distance in map units. If greater than 0, the monster will not see a player who is closer than this distance. Additionally, a nonzero value disables the close-range override that otherwise lets a monster notice a target outside its `fov` cone (see the distance divergence section below for that range per engine). So a value smaller than the actor's radius leaves a "blind spot" behind the monster. Default: 0 (no minimum).
 
 - **`fixed maxseedist`** — Maximum sight distance in map units. The monster will not see any players farther away than this. Default: 0 (interpreted as unlimited, same as vanilla Doom). **Friendly monsters have a hard-coded cap of 1280 map units for performance reasons.**
 
 - **`fixed maxheardist`** — Maximum hearing range in map units. The monster will not react to sounds from players farther away than this. Default: 0 (interpreted as unlimited).
 
-- **`double fov`** — Field of view angle in degrees. Controls how wide an angle the monster must see the player within. Default: 0 (interpreted as 180°, straight forward to straight back). Smaller values create a narrower cone (player must be more centered). 360 produces all-around vision (equivalent to the `MF4_LOOKALLAROUND` flag with a 180° FOV). Internally stored and converted to angle units; fractional degrees are allowed.
+- **`double fov`** — Field of view angle in degrees. Controls how wide an angle the monster must see the player within. Default: 0 (interpreted as 180°, the front half-circle, 90° to either side of facing). Smaller values create a narrower cone (player must be more centered). 360 produces all-around vision. An actor with `MF4_LOOKALLAROUND` skips the FOV test entirely, whatever value is passed. Internally stored and converted to angle units; fractional degrees are allowed.
 
-- **`state label`** — The state to jump to when a valid target is acquired. If null or 0 (the default), falls back to the actor's `SeeState`. On friendly monsters with `+STANDSTILL`, this parameter can be used to trigger custom behavior instead of the default wander fallback.
+- **`state label`** — The state to jump to when a valid target is acquired. If null or 0 (the default), falls back to the actor's `SeeState`. In the friendly wander branch (only without `+STANDSTILL`), a non-null label is jumped to in preference to `SeeState` and the `A_Wander` fallback.
 
 ## Behavior notes
 
-- **`CF_NOTARGET` early-out.** If the candidate target is a player with the `CF_NOTARGET` cheat flag set, the function returns without acquiring the target or changing state.
-- **`Thing_SetGoal` special case.** If the actor's map `special` field is `Thing_SetGoal` with `args[0] == 0`, the function consumes the special on its first call (`self->special = 0`) and sets up a patrol goal — the mapper-facing linedef-special convention that only triggers from this one action function. The `LOF_DONTCHASEGOAL` flag can suppress the transition away from the current state.
-- **Friendly-monster path.** When `IsFriend()` returns true for a candidate (a fellow monster), the function may call `P_LookForPlayers` with all-around logic (if `MF4_LOOKALLAROUND` is set) before transitioning to the see state or falling back to `A_Wander`.
+- **`CF_NOTARGET` early-out.** If the heard sound target is a player with the `CF_NOTARGET` cheat flag set, the function returns without acquiring the target or changing state. That return also skips the sight search for that call. Players with `CF_NOTARGET` are separately skipped by the sight search itself.
+- **`Thing_SetGoal` special case.** If the actor's map `special` field is `Thing_SetGoal` with `args[0] == 0`, the function consumes the special on its first call (`self->special = 0`) and sets up a patrol goal. `A_Look` does the same. The `LOF_DONTCHASEGOAL` flag can suppress the transition away from the current state (on Zandronum only for a `Thing_Hate` actor; see the flag above).
+- **Friendly-monster path.** When the heard sound target passes `IsFriend()` and the actor lacks `+STANDSTILL`, the function first runs a `P_LookForPlayers` sight search. Zandronum always runs it all-around, ignoring facing. UZDoom runs it all-around only if `MF4_LOOKALLAROUND` is set. If that finds nothing, it jumps to `label`/`SeeState` or falls back to `A_Wander`. This branch ignores `LOF_NOJUMP`.
 
 ## Zandronum vs. ZDoom-wiki differences
 
-The ZDoom wiki page uses modern GZDoom/UZDoom syntax (`double` parameters, named arguments like `label: "WakeUp"`, `class X : Parent` syntax, and ZScript-level structs) that is not valid in Zandronum DECORATE. Zandronum uses fixed-point arithmetic for distances (`fixed` keyword, representing 16.16 fixed-point values in terms of the compiler) and does not support named arguments in action calls. The wiki's example actors (`ImpairedZombie : ZombieMan`, `SecuritySoul : LostSoul`) would require rewriting with Zandronum DECORATE's `actor classname : parent {}` syntax and positional parameters to compile on this engine. The "See also" section referencing `Structs:LookExParams` and `LookForEnemies` describes ZScript-only constructs not available in Zandronum DECORATE.
+The ZDoom wiki page uses modern GZDoom/UZDoom syntax (`double` parameters, named arguments like `label: "WakeUp"`, `class X : Parent` syntax, and ZScript-level structs) that is not valid in Zandronum DECORATE. Zandronum declares the four numeric parameters as `float` in `actor.txt` (DECORATE has no `fixed` type keyword); the engine reads the three distances as 16.16 fixed-point and `fov` as a double. Callers just pass numbers. Zandronum does not support named arguments in action calls. The wiki's example actors (`ImpairedZombie : ZombieMan`, `SecuritySoul : LostSoul`) would require rewriting with Zandronum DECORATE's `actor classname : parent {}` syntax and positional parameters to compile on this engine. The "See also" section referencing `Structs:LookExParams` and `LookForEnemies` describes ZScript-only constructs not available in Zandronum DECORATE.
 
 ## Engine-family divergence: no client/server authority split in UZDoom
 

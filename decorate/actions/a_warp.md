@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** ZDoom Wiki `A_Warp` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_Warp&oldid=54969) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:5539-5703`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_Warp)` in `src/thingdef/thingdef_codeptr.cpp`.
@@ -69,7 +69,7 @@ Bitfield controlling warp behavior. Flags are combined using `|`. Only the follo
 
 - `WARPF_ABSOLUTEPOSITION` — **Does not exist in Zandronum** (GZDoom/UZDoom only). The wiki lists this, but Zandronum has no equivalent for treating x/y/z offsets as absolute world coordinates while still respecting `WARPF_TOFLOOR`.
 
-- `WARPF_TOFLOOR` (0x100) — Makes the `zofs` parameter relative to the target's floor height rather than its z-position. The warp is first positioned at the target's x/y with z at the ceiling, then adjusted to the floor and offset by `zofs`.
+- `WARPF_TOFLOOR` (0x100) — Makes the `zofs` parameter relative to the target's floor height rather than its z-position. The warp first repositions the actor at the target's x/y with z left at the target's own z-position, purely to force a floor-height recalculation for the new x/y. It is then dropped to that recalculated floor height, offset by `zofs`.
 
 #### Angle/rotation flags
 

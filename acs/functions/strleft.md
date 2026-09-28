@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** `StrLeft - ZDoom Wiki.html`
 (`https://zdoom.org/w/index.php?title=StrLeft&oldid=37592`), verified against
 the Zandronum source's `src/p_acs.cpp:6640-6659` (`case ACSF_StrLeft: case ACSF_StrRight:`) on
@@ -34,7 +34,7 @@ mechanically true of the other's:
   "If string is shorter than length characters, the entire string is returned." (Implemented as
   `oldlen < newlen` clamping `newlen` down to `oldlen`.)
 - **`length` negative — undocumented on the wiki, and not a safe no-op or error.** The engine reads
-  `length` into a `size_t` (`size_t newlen = args[1];`) with no sign check first. `args[]` is a
+  `length` into an unsigned `size_t` with no sign check first. `args[]` is a
   signed 32-bit `SDWORD`, so a negative `length` sign-extends and then gets reinterpreted as a huge
   unsigned value on the assignment to `size_t`. That huge value immediately trips the
   "`oldlen < newlen`" shorter-than-requested clamp, so `newlen` collapses back down to `oldlen` —
@@ -49,6 +49,4 @@ mechanically true of the other's:
 [`StrRight`](strright.md) — the literal same `case` block as `StrLeft`, with the substring
 anchored at the other end (`oldstr + oldlen - newlen` instead of `oldstr`) and the identical
 negative-`length` quirk above. [`StrMid`](strmid.md) is a related but separate extension
-function. A future `families/*.md` consolidating `StrLeft`/`StrRight`/`StrMid`/`StrCpy`/
-`StrParam` would be reasonable, but per this batch's instructions no family file was created
-here — see the final report for that recommendation.
+function.

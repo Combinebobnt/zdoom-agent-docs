@@ -4,7 +4,7 @@
 **Applies to:** UZDoom=yes, Zandronum=yes — DECORATE `const`/`enum` parsing is shared engine
 behavior; the ACS/BCS half of this note is a zt-bcc/compiler-side preprocessor artifact, not an
 engine feature.
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** `Constants - ZDoom Wiki.html`
 (https://zdoom.org/w/index.php?title=Constants&oldid=54415), verified 2026-07-29/2026-08-01
 against the `zt-bcc` source and the Zandronum source's `src/thingdef/thingdef_parse.cpp`.
@@ -25,8 +25,10 @@ mechanisms depending which language you're in**, not one concept with two syntax
 - **DECORATE constants are a real, engine-parsed language construct**, unrelated to any
   preprocessor — DECORATE has no `#define` at all. `const`/`enum` are keywords `ParseConstant`/
   `ParseEnum` parse directly while loading a WAD/PK3, valid at global scope or inside an `actor { }`
-  block. Both Zandronum (`src/thingdef/thingdef_parse.cpp`) and UZDoom
-  (`src/scripting/decorate/thingdef_parse.cpp`) implement this identically. See
+  block. Zandronum (`src/thingdef/thingdef_parse.cpp:175-256`) and UZDoom
+  (`src/scripting/decorate/thingdef_parse.cpp`) apply the same author-facing rules: `int`/`float`
+  only for `const`, `int` for `enum`, global or actor-body placement. The internals differ (for
+  example, which symbol table a global constant lands in). See
   [`../../decorate/concepts/constants.md`](../../decorate/concepts/constants.md) for the full
   detail.
 
@@ -36,9 +38,9 @@ ACS-side file) and a DECORATE actor's `const int MYVALUE = 5;` declaration look 
 similar but are handled by entirely different code paths (external compiler preprocessing in one
 case, the engine's own WAD-loading parser in the other) with different rules about what's legal
 (BCS's richer typed/named `enum` vs. DECORATE's `const` being restricted to `int`/`float` only).
-The two mechanisms have no engine-level divergence between UZDoom and Zandronum — DECORATE
-parsing is architecturally identical on both engines (only source file paths differ), and
-ACS/BCS preprocessing is entirely compiler-side (zt-bcc), independent of which engine runs the
+Neither mechanism diverges between UZDoom and Zandronum in what an author may write. DECORATE
+`const`/`enum` follow the same rules on both engines, though the implementations are not
+identical. ACS/BCS preprocessing is entirely compiler-side (zt-bcc), independent of which engine runs the
 compiled output. For specifics on DECORATE constant scope and symbol registration, see the
 `decorate/concepts/constants.md` Engine-family divergence section.
 

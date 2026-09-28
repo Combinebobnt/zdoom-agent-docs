@@ -2,12 +2,18 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** `SetLineTexture - ZDoom Wiki.html`
 (`https://zdoom.org/w/index.php?title=SetLineTexture&oldid=35840`), verified against
 the Zandronum source's `src/p_acs.cpp` (`PCD_SETLINETEXTURE` at lines 11431-11433,
 `DLevelScript::SetLineTexture` at lines 4027-4093, declaration at `p_acs.h:1095`),
-the Zandronum source's `src/sv_commands.cpp` (`SERVERCOMMANDS_SetLineTextureByID` at lines 5041-5070),
+the Zandronum source's `src/sv_commands.cpp` (`SERVERCOMMANDS_SetLineTextureByID` at lines 3468-3479),
+the Zandronum source's `src/textures/texturemanager.cpp` (`FTextureManager::GetTexture` at lines
+308-328, its empty-string check at lines 312-315; `FTextureManager::CheckForTexture` at lines
+151-230, its `"-"` special case at lines 164-167; `DefaultTexture`'s `"-NOFLAT-"` assignment at
+line 988) for the `"-"`/empty-string/unrecognized-name resolution paths, the Zandronum source's
+`src/cl_main.cpp` (`ServerCommands::SetLineTextureByID::Execute` at lines 7096-7108) for the
+client-side re-execution behavior (2026-09-25),
 and the zt-bcc source's `lib/zcommon.bcs` (constant definitions at lines 67-69 for `SIDE_*`, lines 74-76
 for `TEXTURE_*`) on 2026-07-29.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
@@ -57,7 +63,7 @@ TEXTURE_BOTTOM = 2   // lower texture of sidedef
 ```
 
 The position parameter is used directly as a switch index; values outside 0–2 are silently ignored
-(the switch has no default case, so an invalid position does nothing to the texture).
+(the switch has an empty `default:` case, so an invalid position does nothing to the texture).
 
 ## Special behavior: string resolution and the empty-string "-" case
 
@@ -74,44 +80,52 @@ if (texname == NULL)
 The function returns early without raising an error, console message, or return value to indicate
 the failure.
 
-**Exception:** the special string `"-"` (resolved to a valid empty string in the string table) is
-*not* `NULL`, so it passes the guard above and is handed to the texture manager as the name to
-look up. The texture manager treats empty strings as a request for the no-texture dummy (texture
-ID 0), which is then set on the matched sidedef segments. This is the documented way to remove a
+**Exception:** the special string `"-"` is a literal one-character string, not an empty one. It
+resolves from the string table as itself, so it is *not* `NULL` and passes the guard above the
+same as any other name; it is then handed to `TexMan.GetTexture` (see below) exactly like any
+other texture name. The special-casing happens inside the texture manager, not the ACS string
+table: `FTextureManager::CheckForTexture` explicitly checks for the literal name `"-"` (a
+Doom-era convention predating ACS) and returns the no-texture dummy (texture ID 0) for it
+directly, without ever attempting a real texture lookup. This is the documented way to remove a
 texture; it is not a silent failure, just a special-case name.
 
-A resolved-but-empty string that is not `"-"` (e.g., a string-table entry that happens to be
-`""`) behaves the same way: it sets the segment to no texture.
+A resolved string that is genuinely empty (`""`, not `"-"`) also ends up at texture ID 0, but via
+a separate check: `FTextureManager::GetTexture` tests for a zero-length name itself and returns
+texture ID 0 immediately, before `CheckForTexture` (and its `"-"` special case) is ever reached.
 
 An unresolved string (one that compiles fine but the string index is out of range at runtime) is
 distinct from a resolved empty string and is truly silent.
 
-## Texture name validation — `texname` must be a valid, loaded texture name or "-"
+## Texture name validation — `texname` must be a valid, loaded texture name, "-", or ""
 
-If `texname` is neither `NULL` nor `"-"`, it is looked up in the texture manager via
-`TexMan.GetTexture(texname, FTexture::TEX_Wall, ...)`. An unrecognized texture name does not
-cause an error; the texture manager prints `Unknown texture: "<name>"` to the console and returns
-the engine's default/missing-texture placeholder (the `-NOFLAT-` checkered graphic). The matched
-sidedef segment's texture is then set to this placeholder. This differs from other string-lookup
-failures on this function (NULL pointer case) and from `ReplaceTextures`' behavior — a typo in
+Once `texname` is non-`NULL`, it is always looked up via `TexMan.GetTexture(texname,
+FTexture::TEX_Wall, FTextureManager::TEXMAN_Overridable)`, including for `"-"` and `""` (handled
+as above). For any other, unrecognized texture name, the lookup fails to find a match; the
+texture manager prints `Unknown texture: "<name>"` to the console and returns the engine's
+default/missing-texture placeholder (the `-NOFLAT-` checkered graphic). The matched sidedef
+segment's texture is then set to this placeholder. This differs from other string-lookup failures
+on this function (NULL pointer case) and from `ReplaceTextures`' behavior — a typo in
 `texturename` is *visible* as a console message and a visible broken-texture appearance, not
 silent.
 
 ## Zandronum-specific: netcode replication (not on the ZDoom wiki)
 
-The implementation checks `NETWORK_GetState()` before textures are changed:
+The implementation checks `NETWORK_GetState()` after the local texture change loop, not before it:
 
 ```cpp
 if ( NETWORK_GetState( ) == NETSTATE_SERVER )
     SERVERCOMMANDS_SetLineTextureByID( lineid, side, position, texname );
 ```
 
-On a server, the function broadcasts the texture change to all connected clients via the
-`SetLineTextureByID` server command. Each client re-runs the same texture-lookup and texture-set
-logic independently. This keeps network traffic constant regardless of how many linedefs match the
-ID, but means any lookup failures (NULL string resolution, unrecognized texture name) happen
-identically on server and clients. In single-player or as a client-side script, the network call
-is skipped.
+On a server, the local sidedef textures are updated first, then the change is broadcast to all
+connected clients via the `SetLineTextureByID` server command. Each client re-runs the same
+texture-lookup and texture-set logic independently against the string the server sends. This keeps
+network traffic constant regardless of how many linedefs match the ID. A `NULL` string resolution
+returns early before this broadcast is ever reached, so it stays server-local; clients never see a
+command for it. An unrecognized texture name does reach clients (the server still sends the
+resolved string), and each client's own `TexMan.GetTexture` call prints its own `Unknown texture`
+warning and falls back to the same placeholder independently. In single-player or as a client-side
+script, the network call is skipped.
 
 UZDoom's version of this function has no equivalent check or broadcast step — it always runs the
 lookup-and-set logic directly, with no server/client branch. This is consistent with that engine's
@@ -124,7 +138,8 @@ Each affected linedef has a `TexChangeFlags` bitmask updated to track which of i
 segments (three per side) were modified:
 
 ```cpp
-ulShift = position;
+ulShift = 0;
+ulShift += position;
 if ( side )
     ulShift += 3;
 lines[linenum].TexChangeFlags |= 1 << ulShift;

@@ -2,9 +2,9 @@
 
 **Tier:** B
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-17)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** Source-derived (no wiki page consulted) — verified against the Zandronum source's
-`src/thingdef/thingdef_properties.cpp:2131-2149` (`DEFINE_CLASS_PROPERTY_PREFIX(powerup, duration,
+`src/thingdef/thingdef_properties.cpp:2131-2151` (`DEFINE_CLASS_PROPERTY_PREFIX(powerup, duration,
 I, Inventory)`).
 **Bucket:** the same `DEFINE_CLASS_PROPERTY_PREFIX(powerup, duration, I, Inventory)` macro on both
 engines, requiring the actor descend from `Powerup` or `PowerupGiver` — Zandronum:
@@ -20,9 +20,10 @@ changes its unit, not just its magnitude:
 - **Negative**: the value is treated as a count of seconds and converted with `-i * TICRATE`
   (i.e. `Powerup.Duration -15` means "15 seconds", stored internally as `15 * TICRATE` tics).
 
-This mirrors the same `i >= 0 ? i : -i*TICRATE` idiom used by several other DECORATE integer-tic
-properties (e.g. `MorphProjectile`'s `duration` property, `thingdef_properties.cpp:2764-2768`) —
-if a property's doc/prose doesn't explicitly say which convention it uses, check its definition
+This mirrors the `i >= 0 ? i : -i*TICRATE` idiom of `MorphProjectile`'s `duration` property
+(`thingdef_properties.cpp:2764-2768`). On both engines that is the only other property in
+`thingdef_properties.cpp` using it, so most integer-tic properties take a plain tic count. If a
+property's doc/prose doesn't explicitly say which convention it uses, check its definition
 for this pattern before assuming a plain tic count.
 
 **Clean agreement on UZDoom.** UZDoom's native property-parsing layer carries the identical

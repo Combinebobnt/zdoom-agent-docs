@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `Classes:TeleportFog` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=Classes%3ATeleportFog&oldid=48907) + verified against Zandronum source (`src/g_shared/a_sharedglobal.h:85`, `src/p_teleport.cpp:49`, `wadsrc/static/actors/shared/teleport.txt`).
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `Classes:TeleportFog` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=Classes%3ATeleportFog&oldid=48907) + verified against Zandronum source (`src/g_shared/a_sharedglobal.h:85`, `src/p_teleport.cpp:49`, `wadsrc/static/actors/shared/teleport.txt`, `src/cl_main.cpp:3624-3932,5840-5864`).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** native C++ class in Zandronum (`class ATeleportFog : public AActor` in `src/g_shared/a_sharedglobal.h:85`; also declared in DECORATE as `ACTOR TeleportFog native` in `wadsrc/static/actors/shared/teleport.txt`); ordinary ZScript class in UZDoom (`class TeleportFog : Actor` in `wadsrc/static/zscript/actors/shared/teleport.zs:20`, no native backing beyond what `Actor` itself provides — though the fog-spawning *mechanism* used throughout the engine is native, see "Engine-family divergence: customizable teleport fog is live on UZDoom" below).
 
@@ -75,7 +75,7 @@ Teleports an actor to a random spot of a specified type. Accepts optional `FogTy
 - Fog spawned as "exit flash" when a player unmorphs back to human form.
 - Defaults to the class stored in `player->MorphExitFlash` (usually `TeleportFog`).
 - Target pointer not set.
-- Spawned at offset angle from unmorphed actor position (20 map units perpendicular to facing angle).
+- Spawned 20 map units from the unmorphed actor's position, offset in the direction the actor faces (not perpendicular to it).
 
 ### Monster morphing and unmorphing
 
@@ -87,7 +87,7 @@ When Invasion mode spawns monsters, items, or weapons at designated spots, tempo
 
 ### Client-side teleport replication — Zandronum-only (cl_main.cpp)
 
-Clients replicate incoming teleport events (receiving state updates from server) by spawning local fog visuals. Two sites handle player vs. missile-type actors.
+Clients replicate incoming teleport events by spawning local fog visuals. `ServerCommands::TeleportThing::Execute()` spawns a source fog (if `sourcefog`) and, separately, a destination fog (if `destfog`) for the teleported actor; each of the two spawns independently uses a zero height offset instead of `TELEFOGHEIGHT` when the actor is a missile, rather than the two sites being split by actor type. `ServerCommands::SpawnPlayer::Execute()` separately spawns a similar respawn fog for a (re)spawning player, skipped while receiving a snapshot, while `ZADF_NO_SPAWN_TELEFOG` is set, or while the player is or was morphed.
 
 ## Replaceability
 

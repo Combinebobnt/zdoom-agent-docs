@@ -1,15 +1,15 @@
-# `A_SetPitch(float pitch = 0, int flags = 0)`
+# `A_SetPitch(float pitch, int flags = 0)`
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
 **Provenance:** ZDoom Wiki `A_SetPitch` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_SetPitch&oldid=55322) + verified against
 the Zandronum source's native declaration `wadsrc/static/actors/actor.txt:297` and implementation
 `src/thingdef/thingdef_codeptr.cpp:4988-5011`, plus `src/p_mobj.cpp:3929-3940` and `src/d_player.h:675-676`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_SetPitch)` — actor action on AActor.
 
-Sets the actor's pitch (vertical angle/viewing angle) to a specified value in degrees, with optional interpolation and clamping. In DECORATE, this is the only way to change an actor's pitch; ZScript allows direct assignment to the `pitch` field but this function enables sub-tic interpolation for smoother visual updates.
+Sets the actor's pitch (vertical angle/viewing angle) to a specified value in degrees, with optional interpolation and clamping. In DECORATE, this is the direct way to set an actor's pitch. `A_FaceTarget`/`A_FaceTracer`/`A_FaceMaster` also change pitch, but only as a side effect of aiming at another actor. ZScript allows direct assignment to the `pitch` field but this function enables sub-tic interpolation for smoother visual updates.
 
 ## Parameters
 
@@ -29,13 +29,13 @@ Sets the actor's pitch (vertical angle/viewing angle) to a specified value in de
 
 **UZDoom adds a third flag value, `SPF_SCALEDNOLERP` (4), that doesn't exist in Zandronum.** When set on a player actor, the pitch change is not written to the actor's pitch directly; instead the delta is stored as a target for the engine's scaled-interpolation system (and a corresponding player cheat flag is set), deferring the actual angle update rather than applying it immediately. Non-player actors, and calls that don't set this flag, behave as described elsewhere in this file on both engines.
 
-**The non-player `SPF_FORCECLAMP` clamp range is not identical between engines.** Zandronum clamps to just under ±90° (90° minus one fixed-point fine-angle unit, roughly ±89.9945°) to avoid the exact boundary value; UZDoom clamps to a flat ±89°. Both match the "approximately ±90°" description below, but the exact boundary differs by about a degree.
+**The non-player `SPF_FORCECLAMP` clamp range is not identical between engines.** Zandronum clamps to just under ±90° (90° minus one fine-angle unit of 360/8192°, roughly ±89.956°) to avoid the exact boundary value; UZDoom clamps to a flat ±89°. Both match the "approximately ±90°" description below, but the exact boundary differs by about a degree.
 
 ## Clamping behavior
 
 Pitch values are clamped as follows when applicable:
 
-- **For actors with a `player` field** (player-controlled actors): pitch is clamped to `player->MinPitch` and `player->MaxPitch`, which are typically −32° (looking up) to +56° (looking down) on the server, but may vary based on renderer settings or configuration on clients.
+- **For actors with a `player` field** (player-controlled actors): pitch is clamped to `player->MinPitch` and `player->MaxPitch`, which on a Zandronum server are fixed at −32° (looking up) to +56° (looking down). Offline and on clients they come from the renderer's maximum view pitch, so they vary with renderer settings.
 
 - **For non-player actors with `SPF_FORCECLAMP` set**: pitch is clamped to approximately ±90° (with a fine-angle unit adjustment to avoid exact boundaries).
 
@@ -49,7 +49,7 @@ For actors with a `player` field and `SPF_INTERPOLATE` set, if the pitch value a
 
 ## Example
 
-A weapon that kicks the player's view vertically when fired:
+A weapon that kicks the player's view 2 degrees upward when fired (plain DECORATE: one action per frame, so the kick sits in its own 0-tic frame):
 
 ```text
 ACTOR KickingRifle : DoomWeapon
@@ -62,11 +62,8 @@ ACTOR KickingRifle : DoomWeapon
   {
     Fire:
       RIFG A 4;
-      RIFG A 4
-      {
-        A_FireBullets(5.6, 0, 1, 5);
-        A_SetPitch(pitch + 2, SPF_INTERPOLATE | SPF_FORCECLAMP);
-      }
+      RIFG A 4 A_FireBullets(5.6, 0, 1, 5)
+      RIFG A 0 A_SetPitch(pitch - 2, SPF_INTERPOLATE)
       RIFG A 0 A_ReFire;
       Goto Ready;
 

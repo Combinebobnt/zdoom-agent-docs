@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-18)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** wiki page `GetPlayerChasecam - Zandronum Wiki.html` (retrieved `https://wiki.zandronum.com/w/index.php?title=GetPlayerChasecam&oldid=1331`) + source-verified (`p_acs.cpp:7697-7705`, `p_interaction.cpp` `PLAYER_IsValidPlayer`; `zt-bcc/lib/zcommon.bcs:1770`).
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function (index -137; dispatched as `ACSF_GetPlayerChasecam`).

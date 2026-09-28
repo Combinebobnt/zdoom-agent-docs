@@ -3,7 +3,7 @@
 **Tier:** A (wiki-sourced sections below); B (the "Named constants are not accepted as plain
 property values" section, added from direct source reading with no wiki starting point)
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** ZDoom Wiki "Constants" (retrieved 2026-07-29, https://zdoom.org/w/index.php?title=Constants&oldid=54415)'s "DECORATE usage"
 section, verified against the Zandronum source's `src/thingdef/thingdef_parse.cpp`
 (`ParseConstant`/`ParseEnum`). The property-value section below adds source-only verification of
@@ -27,9 +27,11 @@ wiki's claim that DECORATE constants "cannot be strings."
 
 ## `enum`
 
-`enum { NAME1, NAME2 = 5, NAME3, ... }` auto-increments from 0 by default, the same as the wiki
+`enum { NAME1, NAME2 = 5, NAME3, ... };` auto-increments from 0 by default, the same as the wiki
 describes, with an explicit `= value` overriding the running counter for that member and
 subsequent members continuing to increment from there. Also valid at global or per-actor scope.
+The `;` after the closing `}` is required on both engines (`ParseEnum` ends by demanding it, so
+leaving it out is a parse error). A trailing comma after the last member is tolerated.
 
 ## Named constants are not accepted as plain property values (verified)
 
@@ -41,10 +43,12 @@ property parser. DECORATE property parameters declared `'I'` (int) or `'F'` (fix
 engine's property-parsing tables are parsed by `ParsePropertyParams` via `sc.MustGetNumber()` (the
 `'I'` case, Zandronum `src/thingdef/thingdef_parse.cpp:649-651`; UZDoom
 `src/scripting/decorate/thingdef_parse.cpp:688-691`) or the equivalent `sc.MustGetFloat()` for
-`'F'`. Both bottom out in `FScanner`'s own `GetNumber()`/`CheckNumber()` (Zandronum `src/sc_man.cpp`;
-UZDoom `src/common/engine/sc_man.cpp`), which special-case only the literal `MAXINT` token and
-otherwise call `strtol()`/`strtod()` directly on the token text — there is no symbol-table lookup
-anywhere in that path on either engine.
+`'F'`. These bottom out in `FScanner`'s own `GetNumber()` and `GetFloat()` respectively (Zandronum
+`src/sc_man.cpp:590-616,715-738`; UZDoom `src/common/engine/sc_man.cpp`). The integer path
+special-cases only the literal `MAXINT` token, the float path has no special case, and both
+otherwise run a `strtol`/`strtod`-style conversion on the token text and raise a
+"Bad numeric constant" script error if any characters are left over. There is no symbol-table
+lookup anywhere in that path on either engine.
 
 Meanwhile, a `const int`/`enum` declared per this page is registered into Zandronum's `GlobalSymbols`
 (Zandronum `src/thingdef/thingdef_parse.cpp:1261-1265`; UZDoom `src/scripting/decorate/thingdef_parse.cpp:1285-1291`),

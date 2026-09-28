@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** `ReplaceTextures - ZDoom Wiki.html`
 (`https://zdoom.org/w/index.php?title=ReplaceTextures&oldid=35847`), verified against
 the Zandronum source's `src/p_acs.cpp` (`PCD_REPLACETEXTURES` at lines 11436-11439,
@@ -12,7 +12,11 @@ the Zandronum source's `src/textures/texturemanager.cpp` (`FTextureManager::GetT
 308-328, texture index 0 reserved as the "no texture" dummy at lines 973-974, `DefaultTexture`
 init at line 988), the Zandronum source's `src/sv_commands.cpp` (`SERVERCOMMANDS_ReplaceTextures` at
 lines 5114-5120), the Zandronum source's `src/cl_main.cpp` (`ServerCommands::ReplaceTextures::Execute`
-at lines 9622-9625), and the zt-bcc source's `lib/zcommon.bcs` (`NOT_*` flag values at lines 371-375)
+at lines 9623-9626), the Zandronum source's `protocolspec/spec.misc.txt` (`textureFlags` sent as a
+`Byte` at line 58), the Zandronum source's `src/g_game.cpp` (`GAME_ResetMap` restoring flagged line
+textures at lines 3541-3563 and flagged flats at lines 3665-3669), the Zandronum source's
+`src/sv_main.cpp` (`SERVER_UpdateSectors`/`SERVER_UpdateLines` sending flagged flats and line
+textures to a connecting client at lines 3494-3495 and 3692-3693), and the zt-bcc source's `lib/zcommon.bcs` (`NOT_*` flag values at lines 371-375)
 on 2026-07-29.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin — `zt-bcc/src/builtin.c:148`: `{ "replacetextures", ";ss;i" }`
@@ -28,8 +32,7 @@ void ReplaceTextures(str oldtexturename, str newtexturename, int flags = 0);
 
 Replaces every wall-side texture/sector flat in the currently loaded map that exactly matches
 `oldtexturename` with `newtexturename`, restricted by `flags`. This matches the wiki's basic
-description — no divergence found there, this is a real, fully-implemented Zandronum function, not
-one of the ZDoom-ahead-of-fork traps this bucket is usually checked for.
+description. It is fully implemented on Zandronum.
 
 ## Flags — matches the wiki's list, verified against the fork's bit values
 
@@ -42,9 +45,10 @@ NOT_CEILING = 0x10  // don't touch sector ceiling flats
 ```
 
 Combine with `|` as the wiki says. Internally the wall pass and the flat pass are each skipped
-entirely only when *all* of that pass's bits are set (e.g. `flags == NOT_BOTTOM|NOT_MIDDLE|NOT_TOP`
-skips the wall loop outright); any other combination still walks every sidedef/sector and checks
-bits individually, so passing all five flags at once is a documented no-op, not an error.
+outright only when `flags` equals exactly that pass's group and nothing else (an XOR test, e.g.
+`flags == NOT_BOTTOM|NOT_MIDDLE|NOT_TOP` skips the wall loop). Any other value still walks every
+sidedef/sector and checks bits individually. So passing all five flags at once skips neither loop,
+but both loops change nothing: an effective no-op, not an error.
 
 ## Silent no-op on an unresolved `oldtexturename` string index — not on the wiki
 
@@ -77,9 +81,11 @@ dummy texture, unconditionally registered first at texture-manager init
 (`texturemanager.cpp:973-974`, `// Texture 0 is a dummy texture used to indicate "no texture"`).
 Every sidedef segment that has no upper/lower texture assigned, and by extension a lot of ordinary
 two-sided linedefs, already carries texture ID `0` on those unused segments. So
-`ReplaceTextures("", "SOMETEX")` does not fail or no-op — it matches and overwrites **every
-currently-blank wall segment (and, via the flat pass, no equivalent blank case for
-floors/ceilings since sectors always have a real flat) in the map** with `SOMETEX`. This is
+`ReplaceTextures("", "SOMETEX")` does not fail or no-op. It matches and overwrites **every
+currently-blank wall segment in the map** with `SOMETEX`. The flat pass matches the same way, but
+only a sector whose floor or ceiling is itself blank, which ordinary maps rarely have. The name
+`"-"` resolves to the same index 0 (the texture manager's "-" means "no texture" check,
+`texturemanager.cpp:164-167`), so `ReplaceTextures("-", "SOMETEX")` behaves identically. This is
 silent and easy to trigger by accident (e.g. an empty string literal, or a string-returning
 expression that can evaluate to `""`), and is functionally very different from the NULL-pointer
 no-op case above despite both stemming from "the old texture name didn't really name a texture."
@@ -102,23 +108,31 @@ if ((NETWORK_GetState() == NETSTATE_SERVER))
     SERVERCOMMANDS_ReplaceTextures(fromname, toname, flags);
 ```
 
-The server sends the raw `(fromname, toname, flags)` triple to clients rather than a diff of which
-sidedefs/sectors actually changed — each client's `ServerCommands::ReplaceTextures::Execute`
-(`cl_main.cpp:9622-9625`) re-runs the identical `DLevelScript::ReplaceTextures` logic locally
+Offline, and on a client (e.g. from a `CLIENTSIDE` script), the call just runs locally with no
+broadcast; a client-side call changes only that client's map. On the server it also sends the raw
+`(fromname, toname, flags)` triple to clients rather than a diff of which sidedefs/sectors
+actually changed. Each client's `ServerCommands::ReplaceTextures::Execute`
+(`cl_main.cpp:9623-9626`) re-runs the identical `DLevelScript::ReplaceTextures` logic locally
 against its own copy of the map. This keeps network traffic constant regardless of map size, but
 means the replacement logic (including both silent-failure modes above) runs independently on the
-server and on every client — a script that fires `ReplaceTextures` only from a server-exclusive
-code path can still leave clients out of sync if the client's local texture set ever differs from
-the server's (e.g. mid-game texture packs), which the wiki has no reason to mention since it
-predates any of Zandronum's multiplayer split.
+server and on every client. Clients resolve the names against their own loaded textures, so a
+client missing `newtexturename` gets the default texture while the server does not. `flags`
+travels as a `Byte` (`protocolspec/spec.misc.txt:58`); all five flags fit, so the truncation has
+no visible effect.
+
+A client that connects later never receives this command. Instead the server sends it the current
+textures of every line and flats of every sector flagged by the bookkeeping below
+(`sv_main.cpp:3692-3693`, `3494-3495`).
 
 ## Zandronum-specific: map-reset/change-tracking bookkeeping
 
 Every wall-side change sets a bit in that linedef's `TexChangeFlags`, and every flat change sets
-`sector_t::bFlatChange = true` (`p_acs.cpp:4137-4138, 4157, 4163-4164`) — bookkeeping so the engine
-can restore original textures when the map resets (e.g. a hub return or `ResetMap`-style reload).
-Not user-facing behavior to code around, just documents why those fields exist if you see them
-elsewhere.
+`sector_t::bFlatChange = true` (`p_acs.cpp:4137-4138, 4157, 4163-4164`). `GAME_ResetMap` reads
+these to restore the map's original line textures and both flats of each flagged sector
+(`g_game.cpp:3541-3563`, `3665-3669`). That reset runs on round resets in modes such as survival,
+last man standing, duel and invasion, and on a map reset requested through ACS `ResetMap`. So a
+`ReplaceTextures` change is reverted by a map reset, not by a hub return. The same flags drive
+the late-join updates described above.
 
 ## Engine-family divergence: no change-tracking bookkeeping on UZDoom
 
@@ -137,8 +151,7 @@ role. On Zandronum those fields turn out to feed the same client/server-sync mac
 netcode section above (relaying accumulated state to a late-joining client, and per-reset texture
 restoration), which tracks with UZDoom having no equivalent: without a dedicated server process
 distinct from the players, there is no "what changed since a client last saw this map" question for
-a `ReplaceTextures` call to answer. This stays "not user-facing behavior to code around" from an
-ACS scripter's point of view, same as above, but a tool or script that inspected Zandronum's
+a `ReplaceTextures` call to answer. A tool or script that inspected Zandronum's
 `TexChangeFlags`/`bFlatChange` bits to detect an ACS-driven texture change has no equivalent hook
 on UZDoom.
 

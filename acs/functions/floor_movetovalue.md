@@ -2,10 +2,10 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `Floor_MoveToValue - ZDoom Wiki.html` (`_intake/`, retrieved
 2026-07-28, `https://zdoom.org/w/index.php?title=Floor_MoveToValue&oldid=31421`) + source-verified (`p_lnspec.cpp:384-389`, `p_floor.cpp:519-538`,
-`p_lnspec.cpp:73-76`) + cross-checked against
+`p_lnspec.cpp:73-76`, `actionspecials.h:38`, `p_lnspec.cpp:3598`) + cross-checked against
 `UltimateDoomBuilder/Assets/Common/Scripting/ZDoom_ACS.cfg:156`. The wiki page covers `tag`/
 `speed`/`height`/`neg` and the `tag == 0` convention accurately but says nothing about the dead
 5th argument, the `SPEED()` `/8` scaling, or the hardcoded-off crush/change/reset — those are
@@ -39,20 +39,24 @@ into `EV_DoFloor` (`p_floor.cpp:519`).
   convention (`p_lnspec.cpp:73-74`, the shared `FUNC` macro always receives `arg0..arg4`) but
   `LS_Floor_MoveToValue`'s body never references `arg4` at all** — it's silently ignored. Passing
   a 5th argument compiles and has **zero effect** on behavior. This isn't documented as
-  deprecated anywhere; it's simply dead on the receiving end in the Zandronum engine fork. Confirmed independently
+  deprecated anywhere; it's simply dead on the receiving end in the Zandronum engine fork, whose
+  own special table also declares at most 4 args for it (`actionspecials.h:38`). Confirmed independently
   by `UltimateDoomBuilder`'s own arg-name list (`Assets/Common/Scripting/ZDoom_ACS.cfg:156`:
   `"Floor_MoveToValue(tag, speed, height, neg)"`) which also only names 4 params.
 - **Crush/change/reset are hardcoded off**, not caller-controllable: `LS_Floor_MoveToValue` calls
-  `EV_DoFloor(..., 0 /*crush*/, 0 /*change*/, false /*hexencrush*/, false)` — there is no way to
-  make this specific special crush or change the floor texture/type; use
-  `Floor_MoveToValueAndCrush` (index 279) if crushing is needed.
+  `EV_DoFloor(..., 0 /*crush*/, 0 /*change*/, false /*hexencrush*/)`, leaving `hereticlower` at
+  its default `false`. The `floorMoveToValue` case never copies `crush` into the mover anyway, so
+  it keeps its `m_Crush = -1` (no crushing) default (`p_floor.cpp:563`, `616-620`). There is no
+  way to make this specific special crush or change the floor texture/type. On UZDoom, use
+  `Floor_MoveToValueAndCrush` (index 279) if crushing is needed. Zandronum has no such special:
+  its special table stops at 255 (`actionspecials.h`, `LineSpecials[256]` at `p_lnspec.cpp:3598`).
 
 ## Engine-family divergence: 5th argument
 
 The "dead 5th argument" claim above, source-verified against the Zandronum engine fork only, does
 not hold on UZDoom. UZDoom's `LS_Floor_MoveToValue` (UZDoom source's `src/playsim/p_lnspec.cpp`,
-`FUNC(LS_Floor_MoveToValue)`) reads `arg4` through a `CHANGE(a)` macro
-(`((a) >= 0 && (a)<=7) ? ChangeMap[a] : 0`) and passes the result straight into `EV_DoFloor`'s
+`FUNC(LS_Floor_MoveToValue)`) reads `arg4` through a `CHANGE()` macro (values 0-7 are mapped
+through a `ChangeMap` lookup table, anything else becomes 0) and passes the result straight into `EV_DoFloor`'s
 `change` parameter — the same generic "copy the new sector's texture and/or type" mechanism other
 ZDoom-family floor/ceiling specials expose via their own `change` argument. On UZDoom, passing a
 5th argument to `Floor_MoveToValue` therefore has a real, observable effect, unlike the "zero
@@ -67,4 +71,5 @@ Floor_MoveToValue(5, 8, 128);
 ```
 
 **Returns:** `int`, per the declared signature (`EV_DoFloor`'s `bool` result, `1`/`0`) — whether
-at least one sector matching `tag` was found and started moving.
+at least one sector matching `tag` was found and started moving. On Zandronum a sector whose
+floor is already moving is skipped and does not count (`p_floor.cpp:548-555`).

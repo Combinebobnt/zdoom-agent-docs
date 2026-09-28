@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** wiki pages `GetActorX - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=GetActorX&oldid=38555`),
 `GetActorY - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=GetActorY&oldid=35874`), `GetActorZ - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=GetActorZ&oldid=35809`)
 (all `_intake/`, retrieved 2026-07-29) + source-verified against `p_acs.cpp:11998-12016`
@@ -32,6 +32,12 @@ to all three identically, and `GetActorZ`'s one real behavioral divergence (bob 
 makes sense stated as a contrast against its two siblings, so one file avoids maintaining three
 near-duplicate `functions/*.md` pages (same precedent as the [plane-trigger family](plane-trigger.md)).
 
+**Reading any of these to position a world-anchored HUD overlay? See
+[rendered-view-tic-offset](../concepts/rendered-view-tic-offset.md) first.** ACS runs after actors
+move within a tic, while the view the renderer draws from was resolved before they moved, so what
+these functions return is one tic newer than the frame it will be composited onto — an overlay
+placed from them visibly leads the world during fast motion. The same applies to velocity getters.
+
 ---
 
 ## `fixed GetActorX(int tid)`
@@ -44,12 +50,12 @@ return of [GetActorAngle](../functions/getactorangle.md), position coordinates c
 zero, or any positive value depending on where the actor sits on the map.
 
 - `tid` — **`0` means "the activator"** (`SingleActorFromTID`'s `tid == 0` fallback,
-  `p_acs.cpp:4448`); guarded against a NULL activator (e.g. called from a script with no
+  `p_acs.cpp:4449`); guarded against a NULL activator (e.g. called from a script with no
   activator), which returns `0` silently rather than crashing — the safe pattern that
   [PlayActorSound](../functions/playactorsound.md) violates (see
   [crash-and-bug-checklist.md](../concepts/crash-and-bug-checklist.md)).
 - **`tid != 0`: reads only the first actor matching that TID**, via `FActorIterator` wrapped in a
-  single `Next()` call (`p_acs.cpp:4449`). In projects where a TID is deliberately shared across
+  single `Next()` call (`p_acs.cpp:4453-4454`). In projects where a TID is deliberately shared across
   many actors, reading position on a shared TID yields only one actor's coordinates, never a sum
   or average across all matches.
 - **Symmetric with `SetActorPosition`, unlike the angle functions.**

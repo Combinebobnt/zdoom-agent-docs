@@ -2,15 +2,15 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
-**Provenance:** wiki page `Timer - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=Timer&oldid=38125`) + source-verified against `p_acs.cpp:11321-11323` (`PCD_TIMER`), `p_tick.cpp:437-439` (per-tic increment of `time`/`maptime`/`totaltime`), `g_level.cpp:585` (`G_InitNew` reset), `g_level.cpp:1036` (`G_DoCompleted` non-hub reset), `g_level.cpp:1483` (per-load `maptime` reset), `g_level.cpp:2210-2243` (`G_SerializeLevel`, confirming `level.time` is excluded from hub snapshots), and the Zandronum-only `sv_commands.cpp:3892-3897` / `cl_main.cpp:7469-7487` client sync path. This is a ZDoom wiki page, so per the intake process it was checked for existence-first divergence — `PCD_TIMER` exists and behaves as described; the hub-vs-non-hub claim, which is easy to hand-wave past, was traced to the actual reset sites rather than trusted at face value. No feature-gap divergence found (a case where the ZDoom description holds), beyond the added Zandronum server→client sync behavior noted above.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** wiki page `Timer - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=Timer&oldid=38125`) + source-verified against `p_acs.cpp:11323-11325` (`PCD_TIMER`), `p_tick.cpp:437-439` (per-tic increment of `time`/`maptime`/`totaltime`), `g_level.cpp:585` (`G_InitNew` reset), `g_level.cpp:1036` (`G_DoCompleted` non-hub reset), `g_level.cpp:1484` (per-load `maptime` reset), `g_level.cpp:2210-2243` (`G_SerializeLevel`, confirming `level.time` is excluded from hub snapshots), and the Zandronum-only `sv_commands.cpp:3892-3897` / `cl_main.cpp:7485-7488` client sync path. This is a ZDoom wiki page, so per the intake process it was checked for existence-first divergence — `PCD_TIMER` exists and behaves as described; the hub-vs-non-hub claim, which is easy to hand-wave past, was traced to the actual reset sites rather than trusted at face value. No feature-gap divergence found (a case where the ZDoom description holds), beyond the added Zandronum server→client sync behavior noted above.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
 Returns the number of tics elapsed since a fork-defined epoch, as a plain ACS `int`. Compiler
 builtin (`{ "timer", "i" }` in the zt-bcc source's `src/builtin.c:49`, opcode `PCD_TIMER`),
-implementation in `p_acs.cpp:11321-11323`:
+implementation in `p_acs.cpp:11323-11325`:
 
 ```cpp
 case PCD_TIMER:
@@ -40,7 +40,7 @@ case PCD_TIMER:
     **`level.time` is never written to or read from a level snapshot at all.** So within a hub,
     `Timer()` isn't merely "preserved by save/restore" — it's a plain running counter that hub
     travel (`G_DoLoadLevel`) never touches, while `level.maptime` *is* explicitly reset to `0` on
-    every load (`g_level.cpp:1483`) and then gets overwritten back to its saved value if
+    every load (`g_level.cpp:1484`) and then gets overwritten back to its saved value if
     `G_UnSnapshotLevel` restores a snapshot for that specific level (i.e. `maptime` is
     per-level-visit, `time` is whole-hub-session).
   - Net effect matches the wiki's framing exactly for Zandronum: on a map that isn't part of a
@@ -49,7 +49,7 @@ case PCD_TIMER:
     revisiting an earlier hub map).
 - **Zandronum netcode addition absent from the ZDoom wiki:** the server treats `level.time` as
   authoritative and explicitly replicates it to clients via a dedicated command,
-  `ServerCommands::SetMapTime` (`sv_commands.cpp:3892-3897`, `cl_main.cpp:7484-7487`:
+  `ServerCommands::SetMapTime` (`sv_commands.cpp:3892-3897`, `cl_main.cpp:7485-7488`:
   `SERVERCOMMANDS_SetMapTime` sends `command.SetTime(level.time)`; the client's
   `SetMapTime::Execute()` does a plain `level.time = time;`). A client does not free-run its own
   independent tic count that could drift from the server — it's overwritten with the server's

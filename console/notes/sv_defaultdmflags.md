@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes — no UZDoom/GZDoom-family equivalent found; see "Zandronum-specific" section below.
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-17)
-**Provenance:** Zandronum source `src/sv_main.cpp` (CUSTOM_CVAR declaration) and game-mode initialization logic in `src/*.cpp` (mode-specific dmflags preset).
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** Zandronum source `src/sv_main.cpp` (CUSTOM_CVAR declaration) and game-mode initialization logic in `src/*.cpp` (mode-specific dmflags preset); `src/g_game.cpp:2815-2846`, gametype cvar callbacks in `src/team.cpp`/`src/deathmatch.cpp`, skirmish call at `src/menu/multiplayermenu.cpp:314`, `src/campaign.cpp:180-192`.
 
 When enabled, automatically sets certain dmflags appropriate to the current game mode, without requiring manual cvar configuration.
 
@@ -13,9 +13,11 @@ When enabled, automatically sets certain dmflags appropriate to the current game
 
 ## Automatic dmflags per game mode
 
-When `sv_defaultdmflags` is true, `GAME_CheckMode()` calls `GAME_SetDefaultDMFlags()` (`src/g_game.cpp:2815-2846`) once per map load — skipped entirely while `CAMPAIGN_InCampaign()` is true (`g_game.cpp:3022`):
+When `sv_defaultdmflags` is true, `GAME_CheckMode()` calls `GAME_SetDefaultDMFlags()` (`src/g_game.cpp:2815-2846`) once per map load. It is skipped while `CAMPAIGN_InCampaign()` is true (`g_game.cpp:3022`), which can only happen offline: `CAMPAIGN_AllowCampaign()` returns false on a server (`src/campaign.cpp:180-192`). `GAME_CheckMode()` also returns early on clients. The function only ever ORs bits in (or tries to clear them, for coop); other `dmflags`/`dmflags2` bits are left as they were.
 
-- **Deathmatch, non-duel** — plain deathmatch, CTF, Skulltag, one-flag CTF, and other team games (anything with `deathmatch` or `teamgame` true and `duel` false):
+The branches key on the `deathmatch`, `duel` and `teamgame` cvars. Setting a mode cvar forces these: `teamplay`, `duel`, `terminator`, `lastmanstanding`, `teamlms`, `possession` and `teampossession` all set `deathmatch` true (`src/deathmatch.cpp`), while `ctf`, `oneflagctf`, `skulltag` and `domination` set `teamgame` true, and `teamgame` in turn forces `deathmatch` false (`src/team.cpp`).
+
+- **Deathmatch-family, non-duel** (`deathmatch` true, `duel` false: plain deathmatch, team deathmatch, terminator, (team) LMS, (team) possession):
   - Weapons stay enabled (`DF_WEAPONS_STAY`)
   - Items respawn (`DF_ITEMS_RESPAWN`)
   - Monsters disabled (`DF_NO_MONSTERS`)
@@ -23,20 +25,21 @@ When `sv_defaultdmflags` is true, `GAME_CheckMode()` calls `GAME_SetDefaultDMFla
   - Players spawn farthest from other players (`DF_SPAWN_FARTHEST`)
   - Double ammo (`DF2_YES_DOUBLEAMMO`)
 
-- **Duel mode** (`deathmatch` and `duel` both true):
-  - Same as above **except** `DF_SPAWN_FARTHEST` is deliberately left unset. The source comment at `g_game.cpp:2822` reads "Don't do 'spawn farthest' for duels." **Correction:** an earlier version of this note had this backwards, claiming duel adds spawn-farthest on top of plain deathmatch. It's the reverse: only non-duel deathmatch/team games get `DF_SPAWN_FARTHEST`; duel specifically excludes it.
+- **Duel** (`deathmatch` and `duel` both true):
+  - Same as above **except** `DF_SPAWN_FARTHEST` is not set. The source comment at `g_game.cpp:2822` reads "Don't do 'spawn farthest' for duels."
+
+- **Team games** (`teamgame` true, so `deathmatch` false: CTF, one-flag CTF, Skulltag, domination):
+  - Same set as duel: weapons stay, items respawn, no monsters, no crouch, double ammo. `DF_SPAWN_FARTHEST` is not set (`g_game.cpp:2830-2834`).
 
 - **Cooperative modes** (neither `deathmatch` nor `teamgame`):
   - The evident intent is to clear `DF_WEAPONS_STAY`, `DF_ITEMS_RESPAWN`, `DF_NO_MONSTERS`, `DF_NO_CROUCH` from `dmflags`, and `DF2_YES_DOUBLEAMMO` from `dmflags2`. The `dmflags2` clear works as written (`flags2 &= ~DF2_YES_DOUBLEAMMO;`, `g_game.cpp:2838`).
   - **The `dmflags` clear is a no-op due to an operator-precedence bug in the source.** The line is `flags &= ~DF_WEAPONS_STAY | ~DF_ITEMS_RESPAWN | ~DF_NO_MONSTERS | ~DF_NO_CROUCH;` (`g_game.cpp:2837`). Unary `~` binds tighter than binary `|`, so this parses as `flags &= ((~A) | (~B) | (~C) | (~D))`, which by De Morgan's law equals `flags &= ~(A & B & C & D)`. `DF_WEAPONS_STAY`, `DF_ITEMS_RESPAWN`, `DF_NO_MONSTERS`, and `DF_NO_CROUCH` are distinct, non-overlapping single bits (`1<<2`, `1<<14`, `1<<12`, `1<<22` respectively, per `src/doomdef.h`), so `A & B & C & D` is always `0`, making the mask always `0xFFFFFFFF` — the `&=` changes nothing. In practice, switching to cooperative through this mechanism leaves whatever `DF_WEAPONS_STAY`/`DF_ITEMS_RESPAWN`/`DF_NO_MONSTERS`/`DF_NO_CROUCH` bits `dmflags` already had (e.g. carried over from a prior deathmatch map, or set explicitly by the server operator) untouched, rather than clearing them as the surrounding code's own intent implies. This is a plain bug in Zandronum's own source, not a cross-engine or wiki-vs-engine divergence.
 
-When false, dmflags are not automatically adjusted; the server uses whatever values are explicitly set via `dmflags`/`dmflags2` or map-specific MAPINFO settings.
+When false, map loads leave `dmflags`/`dmflags2` alone; they keep whatever was set explicitly (offline, a CMPGNINF campaign entry for the map can also set them). Exception: starting an offline skirmish game from the menu calls `GAME_SetDefaultDMFlags()` unconditionally, whatever this cvar says (`src/menu/multiplayermenu.cpp:314`).
 
 ## Rationale and convenience
 
-This cvar simplifies game-mode setup: a server operator can enable deathmatch by setting a gametype cvar (e.g., `sv_gametype deathmatch`) and let `sv_defaultdmflags` automatically configure standard weapons-stay, respawn-items, and no-monsters behavior, rather than manually setting dmflags each time.
-
-Map-specific MAPINFO flags still take precedence where they exist (depending on other cvar settings like `sv_usemapsettingswavelimit`).
+This cvar simplifies game-mode setup: a server operator can pick a mode by setting its gametype cvar (e.g. `deathmatch 1` or `ctf 1`) and let `sv_defaultdmflags` add the standard weapons-stay, respawn-items and no-monsters bits, rather than setting dmflags by hand each time.
 
 ## Storage and replication
 
@@ -44,8 +47,8 @@ Map-specific MAPINFO flags still take precedence where they exist (depending on 
 
 ## Related cvars and flags
 
-- **`dmflags`** / **`dmflags2`** / **`zadmflags`** — the actual gameplay-rule bitfields that this cvar may populate automatically.
-- **`sv_usemapsettingswavelimit`** — similar "use map settings" control for wave limits in invasion/survival modes.
-- **`sv_usemapsettingspossessionholdtime`** — similar "use map settings" control for possession-mode hold time.
+- **`dmflags`** / **`dmflags2`**: the gameplay-rule bitfields this cvar may populate automatically. It never touches **`zadmflags`**.
+- **`sv_usemapsettingswavelimit`**: server-side "use map settings" control that takes the invasion wave limit from the map's CMPGNINF entry (`src/g_level.cpp:1617-1626`). Unrelated to dmflags.
+- **`sv_usemapsettingspossessionholdtime`**: the same for (team) possession hold time (`src/g_level.cpp:1628-1637`).
 
 See `console/concepts/dmflags.md` for detailed explanation of individual dmflags, 2-bit fields, and engine-family divergence.

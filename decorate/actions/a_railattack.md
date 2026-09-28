@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_RailAttack` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RailAttack&oldid=53912) + verified against Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1926-1983` and `wadsrc/static/actors/shared/inventory.txt:14`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_RailAttack` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_RailAttack&oldid=53912) + verified against Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1926-1983`, `src/p_map.cpp:5074-5103`, and `wadsrc/static/actors/shared/inventory.txt:14`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_RailAttack)` in `src/thingdef/thingdef_codeptr.cpp`.
 
@@ -31,17 +31,19 @@ Whether to deplete weapon ammo on firing. If true (nonzero) and the weapon runs 
 
 ### `color1` (color, optional, default "")
 
-Color of the spiral particle trail surrounding the beam. Empty string `""` makes the spiral invisible; `0` draws it in a random shade of gray (selected at beam-fire time, not per particle). Accepts RRGGBB hex, named colors from `X11R6RGB` lump, or any ZScript color constant. Default is `""` (invisible).
+Color of the spiral particle trail surrounding the beam. The DECORATE parser stores the empty string `""` as 0, which draws the spiral in random shades of blue (picked separately for each particle). `"none"` is stored as -1 and makes the spiral invisible. Accepts RRGGBB hex, named colors from `X11R6RGB` lump, or any ZScript color constant. Default is `""` (random blue).
 
 ### `color2` (color, optional, default "")
 
-Color of the core/center beam. Empty string `""` makes the core invisible; `0` draws it in a random shade of gray. Same color formats as `color1`. Default is `""` (invisible).
+Color of the core/center beam. `""` (stored as 0) draws the core in random shades of gray, picked per particle; `"none"` makes it invisible. Same color formats as `color1`. Default is `""` (random gray).
+
+**Zandronum player-color override:** when both colors are left at `""` (0), Zandronum substitutes the player's railgun color settings (`src/p_map.cpp:5084-5103`). In team game modes, for a player on a team, the spiral takes the team's railgun color and the core the player's own; otherwise the spiral takes the player's railgun color and the core is white.
 
 ### `flags` (int, optional, default 0)
 
 Bitfield controlling rail behavior. Flags are combined with `|`. Zandronum defines five flags:
 
-#### Zandronum flags (Zandronum 3.2.1)
+#### Zandronum flags
 
 - `RGF_SILENT` (1) — Suppresses the weapon's attack sound. Without this flag, the weapon fires with its `AttackSound` property.
 
@@ -55,7 +57,7 @@ Bitfield controlling rail behavior. Flags are combined with `|`. Zandronum defin
 
 #### Flags in ZDoom wiki not present in Zandronum
 
-- `RGF_NORANDOMPUFFZ` — Listed in upstream ZDoom/GZDoom docs but **not exported in Zandronum 3.2.1**. Treating it as a raw integer will have no effect.
+- `RGF_NORANDOMPUFFZ` — Listed in upstream ZDoom/GZDoom docs but **not exported in Zandronum**. Treating it as a raw integer will have no effect.
 
 ### `maxdiff` (float, optional, default 0.0)
 
@@ -129,7 +131,7 @@ Spread is applied *per call* (when the state executes the action), not per parti
 
 ### Differences from ZDoom/GZDoom
 
-The ZDoom Wiki page documents upstream ZDoom/GZDoom features not present in Zandronum 3.2.1:
+The ZDoom Wiki page documents upstream ZDoom/GZDoom features not present in Zandronum:
 
 - **`RGF_NORANDOMPUFFZ` flag:** Does not exist in Zandronum. The puff Z-offset is always randomized (within reason).
 - **`spiraloffset` parameter:** Not in Zandronum — spiral always starts at a fixed angle.
@@ -167,13 +169,15 @@ resolves `color1 == 0 ? -1 : ParticleColor(color1)` for the outer spiral and
 code path.
 
 This is a real behavioral divergence, not just a default-syntax one. Zandronum's rail-attack helper
-(`P_RailAttackWithPossibleSpread` in `src/p_map.cpp`, which `A_RailAttack` calls before reaching
-`P_RailAttack` proper) contains an additional player-sourced special case that UZDoom has no
-equivalent of: when the calling actor is a player and both colors evaluate to `0` — which is
-exactly what Zandronum's `""` default evaluates to — it substitutes the firing player's own
-client-configured railgun color for the outer/spiral color (or, if the player is on a team in a
-team-based gamemode, the *team's* configured railgun color for the outer color and the player's own
-color for the inner/core color) instead of leaving the beam colorless. UZDoom's `TEAMINFO` parser
+(`P_RailAttackWithPossibleSpread` in `src/p_map.cpp:5074-5103`, which `A_RailAttack` calls before
+reaching `P_RailAttack` proper) contains an additional player-sourced special case that UZDoom has
+no equivalent of: when the calling actor is a player and both colors evaluate to `0` — which is
+exactly what Zandronum's `""` default evaluates to — the outer/spiral color is substituted with the
+firing player's own client-configured railgun color. If the player is on a team in a team-based
+gamemode, the *team's* configured railgun color is used for the outer color instead, and the
+player's own configured color is used for the inner/core color; otherwise (no team, or team-based
+play is off) the inner/core color is hardcoded to white rather than any player-configured value.
+Either way the beam is never left colorless. UZDoom's `TEAMINFO` parser
 (`src/gamedata/teaminfo.cpp`) does accept a `RailColor` key, but it's grouped with several others
 that are scanned and discarded — the value is never stored on the team struct, and nothing in
 UZDoom's rail-attack code path, native or ZScript, ever reads a per-team or per-player rail color

@@ -2,14 +2,14 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
-**Provenance:** wiki page `GetActorAngle - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=GetActorAngle&oldid=40295`) + source-verified against `p_acs.cpp:12032-12037, 4445-4453`, `doomtype.h` for `angle_t` signedness, and `zt-bcc/src/builtin.c:133`. The fixed-point angle encoding, `fixed` return type, and nonzero-TID read-only-first-match asymmetry with `SetActorAngle` all verified; no wiki/fork divergence found (the `GetActorAngle`/`SetActorAngle` asymmetry is unmentioned on the wiki but is real in the fork and documented in `SetActorAngle`'s own entry).
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
+**Provenance:** wiki page `GetActorAngle - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=GetActorAngle&oldid=40295`) + source-verified against `p_acs.cpp:12032-12037, 4445-4456`, `tables.h:94` for `angle_t` signedness, and `zt-bcc/src/builtin.c:133`. The fixed-point angle encoding, `fixed` return type, and nonzero-TID read-only-first-match asymmetry with `SetActorAngle` all verified; no wiki/fork divergence found (the `GetActorAngle`/`SetActorAngle` asymmetry is unmentioned on the wiki but is real in the fork and documented in `SetActorAngle`'s own entry). Interpolation-flag correction verified against Zandronum `p_acs.cpp:5839-5867, 6855-6858, 12594-12597` and `p_mobj.cpp:3941-3951`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 
 Gets the facing angle of an actor by TID. Compiler builtin (`PCD_GETACTORANGLE`,
 the Zandronum source's `src/p_acs.cpp:12032-12037`), implementation via the file-local
-`SingleActorFromTID(int, AActor*)` helper (`p_acs.cpp:4445-4453`), which the ACS case calls to
+`SingleActorFromTID(int, AActor*)` helper (`p_acs.cpp:4445-4456`), which the ACS case calls to
 resolve the actor and then extracts its angle member.
 
 - `angle` (return value) — a **fixed-point fraction of a full turn** (`[0.0, 1.0)`), the same
@@ -22,14 +22,14 @@ resolve the actor and then extracts its angle member.
   angles are always in the normalized `[0.0, 1.0)` range, never negative. No divergence from the
   wiki here — the wiki already declares `fixed` return, and `zt-bcc/src/builtin.c:133`
   (`{ "getactorangle", "f;i" }`, fixed return, one int param) agrees.
-- `tid` — **`0` means "the activator"** (`SingleActorFromTID`'s `tid == 0` fallback, line 4448);
+- `tid` — **`0` means "the activator"** (`SingleActorFromTID`'s `tid == 0` fallback, line 4447);
   guarded against NULL activator (e.g. called from a script with no activator), which returns `0`
   silently rather than crashing.
 - **`tid == 0` (activator): symmetric with `SetActorAngle`**. Both functions read/write the
   activator alone when `tid == 0`.
 - **`tid != 0` (by TID): asymmetric read behavior vs `SetActorAngle`.** This getter reads only the
   *first* actor matching that TID (`SingleActorFromTID` wraps the iterator in a single
-  `Next()` call, line 4449), while `SetActorAngle` with the same nonzero TID mutates *every*
+  `Next()` call, line 4454), while `SetActorAngle` with the same nonzero TID mutates *every*
   actor sharing that TID in one call (wraps the iterator in a `while` loop). This is a real
   asymmetry to keep in mind in projects where a TID is deliberately shared across many actors —
   a Get on a shared TID doesn't see every actor, but a Set touches every one.
@@ -38,11 +38,14 @@ resolve the actor and then extracts its angle member.
   `tid == 0` with no activator), and also returns `0` when an actor legitimately faces East.
   This is the same pattern already documented for `ActivatorTID`/`GetSectorFloorZ` — all three
   have the same NULL/zero-value conflation at their root.
-- **No angle interpolation.** Unlike `SetActorAngle` (which supports smooth player-view panning
-  via a per-actor `interpolate` flag), the getter is straightforward: read the current angle,
-  no smoothing or filtering involved. Get→Set round-trips are also **lossy below 1/65536 turn**
-  (the internal `angle_t >> 16` operation truncates the low 16 BAM bits), so an angle set with
-  fixed-point precision finer than that will drift on read-back.
+- **No angle interpolation.** The getter just reads the current angle, with no smoothing or
+  filtering. (The optional view-interpolation flag belongs to `ChangeActorAngle`'s third argument,
+  which only affects players. `SetActorAngle` itself always passes it as false.) On Zandronum the
+  read truncates the low 16 BAM bits (`angle >> 16`), so an angle the engine produced with finer
+  precision (e.g. from turning or movement) reads back rounded down to a multiple of 1/65536 turn.
+  A value written there by `SetActorAngle` (`angle << 16`) has no such low bits and reads back
+  exactly, once normalized to `[0.0, 1.0)` (the shift drops the integer part, so `1.25` reads
+  back as `0.25`).
 
 ## Example (adapted from the wiki)
 

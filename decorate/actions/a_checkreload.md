@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_CheckReload` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_CheckReload&oldid=47254) + verified against the Zandronum source's `src/p_pspr.cpp:1104-1112` and `src/g_shared/a_weapons.cpp:630-699`. Neither file is touched by the applied ZandronumMCP patch.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_CheckReload` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_CheckReload&oldid=47254) + verified against the Zandronum source's `src/p_pspr.cpp:1104-1112` and `src/g_shared/a_weapons.cpp:630-699`; weapon flag names confirmed against `src/g_shared/a_pickups.h:360-372`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AInventory, A_CheckReload)` in `src/p_pspr.cpp:1104`.
 
@@ -33,7 +33,7 @@ The weapon remains equipped and unchanged if:
 
 - Infinite ammo is active (either via `DF_INFINITE_AMMO` dmflag or the player's `CF_INFINITEAMMO` cheat flag).
 - The weapon has the `+WEAPON.AMMO_OPTIONAL` flag set on the active fire mode (primary or alternate), overriding the ammo requirement.
-- The weapon has sufficient ammunition: for primary fire, `Ammo1->Amount >= AmmoUse1`; for alternate fire, `Ammo2->Amount >= AmmoUse2` (or both, if the weapon uses both ammo types for one fire mode via `WIF_PRIMARY_USES_BOTH` or `WIF_ALTWEAPON_USES_BOTH`).
+- The weapon has sufficient ammunition: for primary fire, `Ammo1->Amount >= AmmoUse1`; for alternate fire, `Ammo2->Amount >= AmmoUse2` (or both, if the weapon uses both ammo types for one fire mode via `WIF_PRIMARY_USES_BOTH` or `WIF_ALT_USES_BOTH`).
 
 If ammo is insufficient and none of the above exceptions apply, `CheckAmmo()` calls `PickNewWeapon(NULL)`, which cycles to the next weapon in selection-order priority (`Weapon.SelectionOrder` property, lower values first).
 
@@ -51,7 +51,7 @@ In multiplayer with non-`+CLIENTSIDEONLY` actors, the check executes on both ser
 
 ## Open questions
 
-**Unguarded `ReadyWeapon` dereference in non-weapon contexts:** `A_CheckReload` is defined on the `AInventory` class, which means it compiles in any inventory item's state table, including a `CustomInventory`, not just a `Weapon`. The implementation unconditionally dereferences `self->player->ReadyWeapon` without checking for NULL. The surrounding context (weapon sprites/layers) suggests this action is intended for weapons only, but reachability from a non-weapon inventory item while `ReadyWeapon` is NULL (e.g., during a weapon switch window, or in a player class with no starting weapon) is not fully traced. A crash-causing path via a `CustomInventory` state calling `A_CheckReload` is plausible but unverified.
+**Unguarded `ReadyWeapon` dereference in non-weapon contexts:** `A_CheckReload` is defined on the `AInventory` class, which means it compiles in any inventory item's state table, including a `CustomInventory`, not just a `Weapon`. The implementation guards `self->player` with a NULL check, but then dereferences `self->player->ReadyWeapon` without checking whether `ReadyWeapon` itself is NULL. The surrounding context (weapon sprites/layers) suggests this action is intended for weapons only, but reachability from a non-weapon inventory item held by an actual player (so the `self->player` guard passes) while `ReadyWeapon` is NULL (e.g., during a weapon switch window, or in a player class with no starting weapon) is not fully traced. A crash-causing path via a `CustomInventory` state calling `A_CheckReload` is plausible but unverified.
 
 ## See also
 

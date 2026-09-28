@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
-**Provenance:** ZDoom Wiki `A_Weave` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_Weave&oldid=34283) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:5325-5376` and cross-checked against UZDoom.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** ZDoom Wiki `A_Weave` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_Weave&oldid=34283) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:5325-5376` (client-side state advance: `src/p_mobj.cpp:4540-4555`) and cross-checked against UZDoom.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_Weave)` in `src/thingdef/thingdef_codeptr.cpp`.
 
@@ -57,11 +57,11 @@ Actors with the `MF5_NOINTERACTION` flag set (non-interactive decorations, etc.)
 
 ### Network/clientside behavior
 
-**No client-mode guard.** Unlike many state-altering actions (e.g. `A_BishopDecide`), `A_Weave` runs its full logic on both server and client — it advances the phase counters and calls `P_TryMove` on both sides. If the server and client disagree about whether a horizontal move was blocked, their `WeaveIndexXY` counters diverge and stay diverged on subsequent calls. The practical impact of this desync beyond the phase-counter divergence was not traced.
+**No client-mode guard.** Unlike many state-altering actions (e.g. `A_BishopDecide`), `A_Weave` runs its full logic on both server and client — it advances the phase counters and calls `P_TryMove` on both sides. Clients advance actor states and run their actions locally (`AActor::Tick` in `src/p_mobj.cpp`). Because `WeaveIndexXY` advances whether or not the move was blocked, the phase counters stay in step on both sides. If the server and client disagree about whether a horizontal move was blocked, it is the actor's XY position that diverges. Whether a later server position update corrects that was not traced.
 
 ### Phase aliasing
 
-The `WeaveIndexXY` and `WeaveIndexZ` fields are 6-bit counters (range [0, 63]). Initial phase can be set via the `weaveindexXY` and `weaveindexZ` DECORATE properties; values are stored as-is and masked modulo 64 on first use inside `A_Weave`.
+The `WeaveIndexXY` and `WeaveIndexZ` fields are bytes that `A_Weave` uses as 6-bit counters: it reads them masked to 6 bits and writes back values in [0, 63]. Initial phase can be set via the `weaveindexXY` and `weaveindexZ` DECORATE properties; values are stored truncated to a byte and masked modulo 64 on first use inside `A_Weave`.
 
 ## Equivalent actions
 
@@ -72,6 +72,6 @@ Both of these actions are deprecated but still callable in DECORATE.
 
 ## Notes
 
-- **Call frequency matters**: A_Weave's effect depends on how frequently it is called. Called from a 1-tic state produces finer motion; from a 4-tic state produces larger jumps. The displacement per call is a function of the phase increment and the sine curve, not a fixed distance per tic.
+- **Call frequency matters**: A_Weave's effect depends on how frequently it is called. Each call advances the phase by the same step regardless of state duration, so a 4-tic state gives the same per-call jump as a 1-tic state but weaves 4 times slower and holds still between calls. The displacement per call is a function of the phase increment and the sine curve, not a fixed distance per tic.
 - **Weave axis orientation**: The horizontal plane is perpendicular to the actor's facing angle. A projectile spinning mid-flight will see its weave axis rotate with it.
 - **No collision checking on Z adjustment**: The Z branch writes `self->z` directly with no `P_TryMove` and no floor/ceiling clamp. A_Weave itself will not prevent the actor from being displaced into a floor or ceiling; whether anything else corrects that per tic was not traced.

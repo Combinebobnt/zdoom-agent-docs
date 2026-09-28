@@ -2,21 +2,21 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-17)
-**Provenance:** Zandronum source `src/am_map.cpp:94` (CVAR declaration) and `src/am_map.cpp:1654–1660` (consuming code); comparison with ZDoom Wiki `CVARs:Automap` (https://zdoom.org/w/index.php?title=CVARs%3AAutomap&oldid=54516).
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** Zandronum source `src/am_map.cpp:94` (CVAR declaration) and `src/am_map.cpp:1654–1660` (consuming code), `src/am_map.cpp:1345–1346` (background graphic lookup), `src/am_map.cpp:2932–2943` (per-frame draw call), `src/g_mapinfo.cpp:1985–1990` (MAPINFO `automap` block); comparison with ZDoom Wiki `CVARs:Automap` (https://zdoom.org/w/index.php?title=CVARs%3AAutomap&oldid=54516).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
-Controls how the AUTOPAGE map background graphic is drawn in fullscreen automap. Takes integer values 0–2 (not a boolean, despite the wiki's boolean description). The cvar itself, its default value, and its `CVAR_ARCHIVE` persistence are identical on UZDoom (`src/am_map.cpp:162`) and Zandronum (`src/am_map.cpp:94`); mode 2's exact gate differs between the two engines — see the divergence section below.
+Controls how the automap background graphic (`AUTOPAGE`, or the level's MAPINFO `mapbackground` when set) is drawn in fullscreen automap. Takes integer values 0–2 (not a boolean, despite the wiki's boolean description). The cvar itself, its default value, and its `CVAR_ARCHIVE` persistence are identical on UZDoom (`src/am_map.cpp:162`) and Zandronum (`src/am_map.cpp:94`); mode 2's exact gate differs between the two engines — see the divergence section below.
 
 ## Mode behavior
 
 - **0**: Do not draw the background.
 - **1**: Always draw the background (default). This is the standard mode when using the built-in color sets.
-- **2**: Draw the background only when using mod-defined custom colors (set via `am_customcolors = true` and MAPINFO/CVARINFO color definitions) or the Raven color set (`am_colorset = 3`). This mode prevents the background from appearing when using Doom or Strife stock color sets. On UZDoom, this also fires when `am_colorset` is left at its auto-detect default rather than explicitly set to 3 — see below.
+- **2**: Draw the background only when using mod-defined custom colors (a MAPINFO `automap` block, honored while `am_customcolors` is true, its default) or the Raven color set (`am_colorset = 3`). This mode prevents the background from appearing when using the Doom or Strife stock color sets or the `am_*` cvar colors. On UZDoom, this also fires when `am_colorset` is left at its auto-detect default rather than explicitly set to 3 — see below.
 
 ## Persistence
 
-Marked `CVAR_ARCHIVE`, so this setting persists to the config file on both engines. Changes take effect the next time the automap is activated.
+Marked `CVAR_ARCHIVE`, so this setting persists to the config file on both engines. The value is read each time the fullscreen automap frame is drawn, so changes take effect immediately.
 
 ## Related cvars
 

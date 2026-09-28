@@ -1,11 +1,11 @@
 # Shared authoring rules
 
 **This file is the one copy of every rule that applies across all sections** (`acs/`,
-`decorate/`, `zscript/`, `mapinfo/`, `gldefs/`, `sbarinfo/`, `cvarinfo/`, `console/`, `sprites/`,
-and any lump-format section added later). Every section's own `AGENTS.md` points here instead of
+`decorate/`, `zscript/`, `mapinfo/`, `gldefs/`, `sbarinfo/`, `cvarinfo/`, `menudef/`, `console/`,
+`sprites/`, `bots/`, `zandronum-lumps/`, `netcode/`, and any lump-format section added later). Every section's own `AGENTS.md` points here instead of
 restating these rules — the original repo split `maintainer/PROCESS_INTAKE_FILE.md` out of
 `maintainer/CLAUDE.md` for the same reason ("so there's only one copy to keep in sync"); the same
-logic applies with more force across nine sections than it did across one. A section's `AGENTS.md`
+logic applies with more force across thirteen sections than it did across one. A section's `AGENTS.md`
 only covers what's specific to that section: its own layout, its own engine-source buckets or
 inventory extractor, its own worked examples.
 
@@ -58,14 +58,20 @@ not grandfathered — the consuming projects still ship on it.
 
 ```markdown
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @fbad53bff5 (2026-08-08); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** UZDoom 5.0.0-pre @fbad53bff5 (2026-08-08); Zandronum 3.3-alpha @bdd0f7beb (2026-07-28)
 ```
 
 `Applies to:` says where the feature exists; `Verified against:` says whose source was actually
 read and at what revision, and — the stamp-what-you-read rule — names only engines whose source
 you personally read for this entry, at the version/SHA/date of the checkout you read it from,
 never retro-updated when that checkout later advances. `shared/ARCHETYPES.md` has the exact
-grammar; `tools/lint_docs.py` hard-errors on a file carrying only half the pair.
+grammar; `tools/lint_docs.py` hard-errors on a file carrying only half the pair. One exception to
+never retro-updating: a fork-only SHA nobody else can resolve is restamped to its fork point when
+the cited code is identical there (see the clean-checkout caveat below). A second exception: a stamp whose
+SHA never named the revision actually read (a target-version label written in the SHA slot) is
+corrected to the SHA that was read, but only after its cited lines are confirmed at that SHA. The
+original date stays, since it still records when the reading happened. A file re-read in
+the same pass takes the re-read date instead.
 
 **The legacy single-field `**Engine:**` form is retired.** The two fields came apart from it
 because a single prose field could not express "exists on both engines, but only Zandronum's
@@ -130,23 +136,27 @@ they bear on the primary engine:
   on the Zandronum side: a ZDoom-wiki DECORATE/MAPINFO/GLDEFS page can legitimately describe a
   flag, property, or key that doesn't exist in Zandronum, or whose Zandronum behavior differs from
   what the wiki (describing the feature-ahead GZDoom-family lineage) says.
-- **The 3.2.1-target vs. 3.3-alpha-checkout gap, secondary-engine only.** The Zandronum source used
-  to verify claims against "Zandronum 3.2.1" is a `master` HEAD checkout whose own `version.h`
-  reports `3.3-alpha` — a development snapshot *ahead of* the 3.2.1 target, used only because it's
-  the best available local source to read. This rarely matters (core engine behavior is stable
-  across minor versions), but if a claim in this tree ever turns out not to hold on an actual 3.2.1
-  client, the version gap is the first place to look. When a function/flag/key's name suggests a
-  recent addition, check its introducing commit's ancestry against the 3.2.1 version-bump commit
-  (`28f736fb3`, "changed the version string to 3.2.1") before stamping a Zandronum 3.2.1 claim —
-  see `acs/concepts/event-scripts.md` for a worked example of a feature that exists in the
-  `3.3-alpha` checkout but postdates 3.2.1.
-- **The local Zandronum working tree is not pristine.** It carries an applied ZandronumMCP
-  integration patch — several modified tracked files including `src/p_acs.cpp` (+170 lines
-  relative to upstream) plus untracked `src/mcp_*.cpp` files. Since claims are verified by reading
-  that checkout, a cited `p_acs.cpp` line number may be shifted relative to a clean 3.2.1/3.3-alpha
-  checkout elsewhere. `git diff` the relevant file in the local checkout before quoting a line
-  number or adding a `**Source excerpt:**` block sourced from it, and don't assume line numbers
-  cited here transfer to a different Zandronum checkout unmodified.
+- **Zandronum stamps name the checkout read, and "does this hold on 3.2.1" is a separate
+  version-gate question.** The Zandronum source this tree reads is a `master` checkout whose own
+  `version.h` reports `3.3-alpha`, a development snapshot *ahead of* the 3.2.1 release that
+  consuming projects ship on. Stamp what you read (`Zandronum 3.3-alpha @<sha>`), never the
+  release you hope it matches. Earlier stamps wrote `3.2.1 @28f736fb3` (the 3.2.1 version-bump
+  commit) as a target label while actually reading the `3.3-alpha` HEAD; those were restamped to
+  the SHA read on 2026-09-24, per the exception above. Whether a claim holds on a real 3.2.1
+  client is answered in prose, not by the stamp: when the cited code changed after `28f736fb3`
+  ("changed the version string to 3.2.1"), check the introducing commit's ancestry against it and
+  say in the body if the feature, parameter or behavior postdates 3.2.1. See
+  `acs/concepts/event-scripts.md` for a worked example of a feature that exists in the
+  `3.3-alpha` checkout but postdates 3.2.1. `Applies to: Zandronum=yes` stays as is for such a
+  feature; the version note carries the caveat.
+- **Verify against a clean upstream-branch checkout, never a local fork branch.** Configure the
+  `zandronum`/`uzdoom` rows of `sources.local.md` to a checkout of the engine's upstream default
+  branch with no local changes (a `git worktree` of `origin/HEAD` works well alongside a fork).
+  A local fork branch carries private patches that would leak into generated inventories, shift
+  cited line numbers, and describe behavior no released engine has. Its commits also can't be
+  resolved by anyone else, so a fork-only SHA must never be stamped. `tools/gen_inventory.py`
+  refuses a dirty or off-upstream checkout, and `tools/engine_matrix.py --stale` fails on
+  either engine's stamp that isn't on that engine's checkout history.
 
 **An engine claim isn't always a version claim — a compiler-only finding uses `N/A`.** A tier-A/B
 entry whose subject is genuinely engine-independent (e.g. a `zt-bcc` code-generation bug that

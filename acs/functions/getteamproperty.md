@@ -2,8 +2,8 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
-**Provenance:** wiki page `GetTeamProperty - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetTeamProperty&oldid=1300`) + source-verified against `p_acs.cpp:1595-1666,5455,5468,7180-7182`, `p_acs.h:430-453`, `team.cpp` (`TEAM_CheckIfValid:731`, `TEAM_GetName:741`, `TEAM_CountLivingAndRespawnablePlayers:194`, `TEAM_CountPlayers:173`, `TEAM_GetCarrier:1082`, `TEAM_GetAssistPlayer:1304`, `TEAM_GetSpread:1434`, `TEAM_GetPlayerStartThingNum:1694`, `TEAM_GetTeamItemName:1702`, `TEAM_GetReturnTicks:1119`, `TEAM_GetIntermissionTheme:1724`, `TEAM_GetIntermissionThemeOrder:1734`, `TEAM_GetNumAvailableTeams:1345`), `zstring.cpp:326-333`, `zt-bcc/lib/zcommon.bcs:813-832,1736`. Crash bug and version-gate findings both confirmed via git ancestry (`git merge-base --is-ancestor`), not just source reading.
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
+**Provenance:** wiki page `GetTeamProperty - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetTeamProperty&oldid=1300`) + source-verified against `p_acs.cpp:1595-1666,5455,5468,7180-7182`, `p_acs.h:430-453`, `team.cpp` (`TEAM_CheckIfValid:731`, `TEAM_GetName:741`, `TEAM_CountLivingAndRespawnablePlayers:194`, `TEAM_CountPlayers:173`, `TEAM_GetCarrier:1082`, `TEAM_GetAssistPlayer:1304`, `TEAM_GetSpread:1434`, `TEAM_GetPlayerStartThingNum:1694`, `TEAM_GetTeamItemName:1702`, `TEAM_GetReturnTicks:1119`, `TEAM_GetIntermissionTheme:1713`, `TEAM_GetIntermissionThemeOrder:1724`, `TEAM_GetNumAvailableTeams:1345`), `zstring.cpp:326-333`, `zt-bcc/lib/zcommon.bcs:813-832,1736`. Crash bug and version-gate findings both confirmed via git ancestry (`git merge-base --is-ancestor`), not just source reading.
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
 
@@ -19,8 +19,8 @@ index `-103`, `zt-bcc/lib/zcommon.bcs:1736`), implementation in the static helpe
 - `prop` — one of the `TPROP_*` constants already named in `zt-bcc/lib/zcommon.bcs:813-832`. The
   enum order there (`NAME, SCORE, ISVALID, NUMPLAYERS, NUMLIVEPLAYERS, TEXTCOLOR,
   PLAYERSTARTNUM, SPREAD, CARRIER, ASSISTER, FRAGCOUNT, DEATHCOUNT, WINCOUNT, POINTCOUNT,
-  RETURNTICS, TEAMITEM, WINNERTHEME, LOSERTHEME`) matches the engine's own `ETeamProperty` enum
-  (`p_acs.h:433-450`) value-for-value, so the named constants resolve correctly.
+  RETURNTICS, TEAMITEM, WINNERTHEME, LOSERTHEME`) matches the engine's own anonymous `TPROP_*`
+  enum (`p_acs.h:433-450`) value-for-value, so the named constants resolve correctly.
 
 ## Wiki text is accurate for all 18 named properties, verified against the switch
 
@@ -45,7 +45,7 @@ agree on what they return for an invalid `team`:
 
 - `TEAM_GetName` (`team.cpp:741-746`) returns `""` for an invalid team — safe.
 - `TEAM_GetTeamItemName` (`team.cpp:1702-1709`) and `TEAM_GetIntermissionTheme`
-  (`team.cpp:1724-1730`, backs `WinnerTheme`/`LoserTheme`) both explicitly `return NULL;` for an
+  (`team.cpp:1713-1720`, backs `WinnerTheme`/`LoserTheme`) both explicitly `return NULL;` for an
   invalid team.
 
 `FString::operator+=(const char *tail)` (`zstring.cpp:326-333`) calls `strlen(tail)` with no null

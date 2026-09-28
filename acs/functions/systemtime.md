@@ -2,8 +2,8 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
-**Provenance:** wiki page `SystemTime - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=SystemTime&oldid=1339`) + source-verified against `p_acs.cpp:115-176` (CVAR/CCMD) and `p_acs.cpp:7373-7375` (`ACSF_SystemTime` case). Wiki page is a Zandronum-specific-feature page (confirmed: "This article documents a Zandronum-specific ACS feature") and its description matched the fork source exactly — no discrepancy found. Zandronum-native feature added in commit `f614049b4` ("Added ACS date and time functions SystemTime, GetTimeProperty and Strftime...", 2015-08-30), confirmed via `git merge-base --is-ancestor f614049b4 28f736fb3` (the 3.2.1 version-bump commit) to predate the 3.2.1 target — safe to stamp as verified for 3.2.1, not just the checked-out `3.3-alpha` snapshot.
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
+**Provenance:** wiki page `SystemTime - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=SystemTime&oldid=1339`) + source-verified against `p_acs.cpp:115-179` (CVAR/CCMD), `p_acs.cpp:5791-5797` (`SetCVar` mod-cvar gate), `c_cvars.cpp:195-199` (`CVAR_NOSETBYACS` under `ConsoleCommand`) and `p_acs.cpp:7373-7375` (`ACSF_SystemTime` case). Wiki page is a Zandronum-specific-feature page (confirmed: "This article documents a Zandronum-specific ACS feature") and its description matched the fork source exactly — no discrepancy found. Zandronum-native feature added in commit `f614049b4` ("Added ACS date and time functions SystemTime, GetTimeProperty and Strftime...", 2015-08-30), confirmed via `git merge-base --is-ancestor f614049b4 28f736fb3` (the 3.2.1 version-bump commit) to predate the 3.2.1 target — safe to stamp as verified for 3.2.1, not just the checked-out `3.3-alpha` snapshot.
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
@@ -20,15 +20,26 @@ case ACSF_SystemTime:
 
 - Takes no arguments.
 - Normally returns `(int) time(NULL)` — the real wall-clock system time of the machine running
-  the script (the server, in a networked game; see below).
-- **Overridable per-server via the `acstimestamp` CVAR** (`p_acs.cpp:115`,
+  the script. In a networked game that is the server for ordinary scripts, and each client's own
+  machine for `CLIENTSIDE` scripts. The value is never synced between them.
+- **Overridable per machine via the `acstimestamp` CVAR** (`p_acs.cpp:115`,
   `CVAR(Int, acstimestamp, 0, CVAR_ARCHIVE | CVAR_NOSETBYACS)`). If non-zero, `SystemTime()`
-  returns this value verbatim instead of the real clock. `CVAR_NOSETBYACS` means **ACS itself
-  cannot set or clear this override** — only a human/server operator can, via the `acstime`
-  console command (`p_acs.cpp:117-176`, a `CCMD`, not an ACS-callable function):
+  returns this value verbatim instead of the real clock. The cvar has no `CVAR_SERVERINFO`, so a
+  server's override doesn't reach clients; a client's own `acstimestamp` drives its `CLIENTSIDE`
+  scripts. `CVAR_ARCHIVE` means an override is saved to the ini and survives a restart.
+  **ACS itself cannot set or clear this override.** `SetCVar` refuses it because it isn't a mod
+  cvar (`p_acs.cpp:5791-5797`), `ConsoleCommand()` can't set a `CVAR_NOSETBYACS` cvar
+  (`c_cvars.cpp:195-199`), and the `acstime` command returns early when run from
+  `ConsoleCommand()` (`p_acs.cpp:119-120`). Only a human/server operator can set it, either by
+  setting `acstimestamp` directly or via the `acstime` console command (`p_acs.cpp:117-179`, a
+  `CCMD`, not an ACS-callable function):
   - `acstime` (no args) — prints whether an override is active and what it is.
   - `acstime yyyy-mm-dd [hh:mm]` — sets the override to that local date/time (midnight if time
-    omitted), via `mktime()`.
+    omitted), via `mktime()`. The fields are read with `sscanf`'s `%i`, which treats a leading
+    `0` as octal, so zero-padded `08`/`09` misparse. A month `08`/`09` fails with "Could not read
+    that date.". A day `08`/`09` silently becomes day 0 (the previous month's last day) at hour 8
+    or 9. An hour `08`/`09` becomes hour 0 and the minutes are dropped; a minute `08`/`09` becomes 0. Write `2026-9-8 8:30`
+    instead.
   - `acstime clear` — clears the override (`acstimestamp = 0`), reverting `SystemTime()` to real
     time.
   - This matches the wiki's "The acstime console command can override the result of this

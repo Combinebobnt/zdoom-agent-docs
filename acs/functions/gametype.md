@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** wiki page `GameType - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29,
 `https://wiki.zandronum.com/w/index.php?title=GameType&oldid=1282`) + source-verified (`p_acs.h:658,977`, `p_acs.cpp:11159-11169`, `team.cpp:1748-1875`,
 `deathmatch.cpp:118-289`, `wadsrc/static/gamemode.txt`). The wiki's four base values and its
@@ -81,8 +81,9 @@ of them.
 **Version note:** `PCD_GAMETYPE` and all five `GAME_*` constants (including the
 zcommon.bcs-unexposed `GAME_NET_TEAMGAME`) trace back to `bc562a817` ("original Skulltag 0.97c2
 source"), confirmed via `git merge-base --is-ancestor` to predate the `28f736fb3` 3.2.1
-version-bump commit by the entire project history — this is original Skulltag-era functionality,
-not a recent addition, so the 3.2.1 engine stamp below is solid.
+version-bump commit by the entire project history. This is original Skulltag-era functionality,
+not a recent addition, so it holds unchanged on a real 3.2.1 client, not just the 3.3-alpha
+checkout read here.
 
 ## Engine-family divergence: no team-game branch, no `GAME_NET_TEAMGAME` value at all
 

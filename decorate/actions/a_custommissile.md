@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
-**Provenance:** ZDoom Wiki `A_CustomMissile` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_CustomMissile&oldid=49278) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1159` and `wadsrc/static/actors/actor.txt:206`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** ZDoom Wiki `A_CustomMissile` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_CustomMissile&oldid=49278) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1159` and `wadsrc/static/actors/actor.txt:206`; corrections from `src/thingdef/thingdef_codeptr.cpp:105-124,1159-1305`, `src/actor.h:901-904`, `src/p_mobj.cpp:1705` and `src/p_mobj.cpp:7217-7262`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_CustomMissile)` on `AActor` class (callable from any actor's state table).
 
@@ -13,14 +13,14 @@ A customizable projectile attack for non-player actors, typically used by monste
 
 - **missiletype** — The class name of the projectile to fire (required).
 - **spawnheight** — Raises the projectile spawn point on the actor by this amount in units. Default is `32`. Note: the wiki describes this as `double`, but Zandronum declares it as `float`.
-- **spawnofs_xy** — Moves the projectile spawn point perpendicular to the actor's facing angle (to the right if positive, left if negative). Zandronum's implementation interprets this as an integer, while the wiki describes a double; the practical effect is likely rounding. Default is `0`.
+- **spawnofs_xy** — Moves the projectile spawn point perpendicular to the actor's facing angle (to the right if positive, left if negative). Zandronum reads this as an `int`, while the wiki describes a double; a fractional value is truncated toward zero. Default is `0`.
 - **angle** — Adds this much offset to the calculated aim angle at the target. Default is `0`.
 - **flags** — Bitwise-OR combination of aim-mode flags and modifiers. See "Aim modes and flags" below. Default is `0`.
-- **pitch** — Vertical aiming offset. Positive values aim downward, negative values aim upward. Only used when one of the pitch-control flags is set. Default is `0`.
+- **pitch** — Vertical aim in degrees. Unlike the usual actor pitch convention, positive values aim **upward** and negative values aim downward (the "bad pitch" kept for compatibility; see Behavior notes). Only affects the flight path when `CMF_ABSOLUTEPITCH` or `CMF_OFFSETPITCH` is set (or aim mode 2); `CMF_SAVEPITCH` can still store it. Default is `0`.
 
 ## Aim modes and flags
 
-The `flags` parameter's low 2 bits select one of three aim modes; the remaining bits control pitch and angle behavior. Constants are defined in `wadsrc/static/actors/constants.txt`.
+The `flags` parameter's low 2 bits select one of three aim modes (a value of 3 behaves like mode 0); the remaining bits control pitch and angle behavior. Constants are defined in `wadsrc/static/actors/constants.txt`.
 
 ### Aim modes (bits 0–1, value 0–2)
 
@@ -32,13 +32,13 @@ The `flags` parameter's low 2 bits select one of three aim modes; the remaining 
 
 - **`CMF_ABSOLUTEPITCH`** — Treat the `pitch` parameter as an absolute value rather than an offset to the calculated aim pitch. (Implied by `CMF_AIMDIRECTION`.)
 - **`CMF_OFFSETPITCH`** — Treat the `pitch` parameter as an offset to the calculated aim pitch.
-- **`CMF_SAVEPITCH`** — Store the pitch value used for the missile in the spawned projectile's own `pitch` field (requires `CMF_AIMDIRECTION`, `CMF_ABSOLUTEPITCH`, or `CMF_OFFSETPITCH`).
-- **`CMF_ABSOLUTEANGLE`** — Treat the `angle` parameter as an absolute value rather than an offset to the calculated aim angle. The calling actor's angle is still factored in.
+- **`CMF_SAVEPITCH`** — Store the pitch value in the spawned projectile's own `pitch` field. With `CMF_OFFSETPITCH` that is the combined (aim plus offset) pitch. In aim modes 0 and 1 without `CMF_ABSOLUTEPITCH`/`CMF_OFFSETPITCH`, the raw `pitch` parameter is stored without affecting the flight path.
+- **`CMF_ABSOLUTEANGLE`** — Use the `angle` parameter as the projectile's absolute world angle instead of adding it to the calculated aim angle. Neither the aim at the target nor the caller's facing affects the horizontal direction (the caller's facing still positions the `spawnofs_xy` offset, and the vertical aim is unchanged).
 
 ### Ownership and tracking flags
 
-- **`CMF_TRACKOWNER`** — When a projectile fires another projectile (e.g., an exploding missile that spawns secondary missiles), this flag ensures the secondary missile tracks back to the original owner for proper credit/infighting. Without this flag, the secondary missile points to the intermediate projectile as its owner, which can cause unintended behavior. Default Zandronum behavior (without this flag) preserves 2.0.x-era quirks for mod compatibility.
-- **`CMF_CHECKTARGETDEAD`** — If the target is missing and the chosen aim mode requires a target (modes 0 or 1), abort the attack by transitioning the calling actor to its `See` state if one exists. (Monsters must have health above 0 to successfully enter a state.)
+- **`CMF_TRACKOWNER`** — When the caller is itself a projectile, the new missile's owner (`target`) is walked back through the chain of projectiles to the first non-projectile, so kill credit and infighting go to the original shooter. This happens even without the flag while the caller still has `MISSILE` set. The flag makes the check also count actors whose class default has `MISSILE`, so the walk-back still works after the calling projectile has exploded (`P_ExplodeMissile` clears `MISSILE`). Without the flag in that case, the exploded projectile itself becomes the owner.
+- **`CMF_CHECKTARGETDEAD`** — If the aim target (on Zandronum always `self->target`) is `NULL` and the aim mode needs a target (not mode 2), jump the caller to its `See` state if it has one. Despite the name, only a missing target triggers this: a dead but still-referenced target is fired at normally. Zandronum jumps unconditionally; UZDoom skips the jump for a monster whose health is 0 or less.
 
 ## Return value
 
@@ -47,34 +47,53 @@ None.
 ## Behavior notes
 
 - **Target selection:** The missile always targets `self->target` in Zandronum (no pointer parameter). If `self->target` is `NULL` and the aim mode requires a target, the missile is not spawned and `CMF_CHECKTARGETDEAD` controls whether the actor transitions to `See` state.
-- **Pitch calculations:** The wiki notes this function has "bad pitch calculations which needed to be preserved for backwards compatibility." Zandronum's pitch calculation logic is verifiable in the source `switch` block: aim modes 0 and 1 compute pitch from the trajectory to the target unless `CMF_ABSOLUTEPITCH` or `CMF_OFFSETPITCH` overrides it; aim mode 2 uses the provided pitch directly.
-- **Network behavior (Zandronum-specific):** In client-mode (`NETWORK_InClientMode()`), the missile is spawned but tagged with `NETFL_CLIENTSIDEONLY` to prevent duplicate propagation. In server mode, a `SERVERCOMMANDS_SpawnMissile` command is broadcast to clients to ensure synchronization.
-- **Homing missiles:** If the spawned projectile has `MF2_SEEKERMISSILE` set, its `tracer` field (used by `A_Tracer2` and similar homing actions) is automatically populated with the target actor.
+- **Pitch calculations:** The wiki notes this function has "bad pitch calculations which needed to be preserved for backwards compatibility." In practice: aim modes 0 and 1 use the vertical velocity of the trajectory to the target. `CMF_ABSOLUTEPITCH` replaces it with `pitch`, `CMF_OFFSETPITCH` adds `pitch` to it, and aim mode 2 always uses `pitch` as absolute. In all three, positive `pitch` means upward, the reverse of the normal actor pitch sign.
+- **Aim origin:** Mode 0 temporarily moves the caller to the offset position before aiming, so the offset is accounted for. Mode 1 spawns at the offset point but computes the direction from the caller's own origin, so several offset shots fly parallel.
+- **Network behavior (Zandronum-specific):** Spawning is filtered first. A client only runs the spawn when the caller or the missile class is `NETFL_CLIENTSIDEONLY`, and then tags the missile `NETFL_CLIENTSIDEONLY`. The server skips such client-side-only spawns entirely. For a normal server-side spawn, the server sends `SERVERCOMMANDS_SpawnMissile` to clients.
+- **Homing missiles:** If the caller is not a projectile and the spawned projectile has `SEEKERMISSILE`, its `tracer` is set to the caller's `target`. When the caller is a projectile, the caller's `tracer` is copied instead, but only under a flag test that differs by engine: Zandronum tests `SEEKERMISSILE`'s bit against the caller's first flags word (the bit `STEALTH` uses), UZDoom tests the caller's `SEEKERMISSILE`.
 - **Spectral (friendly) missiles:** If the missile has `MF4_SPECTRAL` set, its `FriendPlayer` field is set based on the target's player relationship to ensure proper spectral missile behavior.
 
 ## Examples
 
 ```text
 // Simple missile attack (aim mode 0)
-Missile:
+Actor FireballZombie : ZombieMan
+{
+  States
+  {
+  Missile:
     POSS E 10 A_FaceTarget
-    POSS F 8 A_CustomMissile("NormalBullet", 48)
+    POSS F 8 A_CustomMissile("DoomImpBall", 32)
     POSS E 8
     Goto See
+  }
+}
 
-// Multiple projectiles at once using parallel aiming (aim mode 1)
-SpreadMissile:
-    DRON E 8
-    DRON F 8 A_CustomMissile("Projectile", 32, -8, 0, CMF_AIMOFFSET)
-    DRON F 8 A_CustomMissile("Projectile", 32, 8, 0, CMF_AIMOFFSET)
-    DRON E 8
+// Two parallel shots from either side (aim mode 1)
+Actor TwinShotImp : DoomImp
+{
+  States
+  {
+  Missile:
+    TROO EF 8 A_FaceTarget
+    TROO G 0 A_CustomMissile("DoomImpBall", 32, -8, 0, CMF_AIMOFFSET)
+    TROO G 6 A_CustomMissile("DoomImpBall", 32, 8, 0, CMF_AIMOFFSET)
     Goto See
+  }
+}
 
-// Directed attack without a target (aim mode 2)
-FixedAngleAttack:
-    DEMON E 8 A_CustomMissile("DemonShot", 64, 0, 0, CMF_AIMDIRECTION, 0)
-    DEMON F 8
+// Fixed-direction spread, 10 degrees upward, relative to facing (aim mode 2)
+Actor FanBaron : BaronOfHell
+{
+  States
+  {
+  Missile:
+    BOSS EF 8 A_FaceTarget
+    BOSS G 0 A_CustomMissile("BaronBall", 32, 0, -15, CMF_AIMDIRECTION, 10)
+    BOSS G 8 A_CustomMissile("BaronBall", 32, 0, 15, CMF_AIMDIRECTION, 10)
     Goto See
+  }
+}
 ```
 
 ## See also

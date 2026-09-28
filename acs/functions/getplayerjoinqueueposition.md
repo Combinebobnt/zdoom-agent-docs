@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-18)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** `GetPlayerJoinQueuePosition - Zandronum Wiki.html` (`https://wiki.zandronum.com/w/index.php?title=GetPlayerJoinQueuePosition&oldid=2248`), verified against the Zandronum source's `src/p_acs.cpp` (ACSF_GetPlayerJoinQueuePosition → `JOINQUEUE_GetPositionInLine` call), and `src/joinqueue.cpp` (`JOINQUEUE_GetPositionInLine` definition at the end of the function list) on 2026-08-18. Source checked against 3.2.1 ancestry via `git merge-base --is-ancestor 0147651cd 28f736fb3` (exit 0).
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function (index -180 in `zcommon.bcs`'s `special` table; dispatched as `ACSF_GetPlayerJoinQueuePosition` in the Zandronum source's `src/p_acs.cpp`).

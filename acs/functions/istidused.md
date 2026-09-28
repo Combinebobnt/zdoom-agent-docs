@@ -2,10 +2,11 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `IsTIDUsed - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28,
 `https://zdoom.org/w/index.php?title=IsTIDUsed&oldid=40891`) + source-verified against the Zandronum source (`p_mobj.cpp:3626-3638`,
-`p_acs.cpp:6361-6362`, `ThingCount`'s `health > 0` filter at `p_acs.cpp:3923-3934`) and
+`p_acs.cpp:6361-6362`, `ThingCount`'s `health > 0` filter at `p_acs.cpp:3923-3934`,
+the map-reset hide path at `p_mobj.cpp:619-647` and `p_things.cpp:517`) and
 `zt-bcc/lib/zcommon.bcs:1675`. The wiki's dead-or-alive and ThingCount-efficiency claims both hold
 exactly against the Zandronum engine fork's source; the `tid == 0` behavior is this doc's source-verified
 addition (not mentioned on the wiki page).
@@ -56,6 +57,15 @@ bool P_IsTIDUsed(int tid)
   error path for an out-of-range or unused `tid` — a TID nothing was ever assigned to just falls
   through the bucket walk and returns `false`, indistinguishable from "used to exist, now
   destroyed."
+- **Zandronum: "removed" can mean hidden, which still counts.** In game modes with the
+  `MAPRESETS` flag (Survival, Invasion, Duel, LastManStanding, TeamLMS in `gamemode.txt`),
+  `HideOrDestroyIfSafe` (`p_mobj.cpp:619-647`) hides a map-placed actor instead of destroying it,
+  offline or on the server. `Thing_Remove` (`p_things.cpp:517`), `A_FadeOut`/`A_FadeTo` with
+  removal, and a state chain ending in a null state all go through it. The hidden actor keeps its
+  TID in the hash, so `IsTidUsed` keeps returning `true` for it until the map resets, while
+  `ThingCount` skips it (`STFL_HIDDEN_INSTEAD_OF_DESTROYED`, `p_acs.cpp:3929-3932`). A client
+  destroys the actor outright, so a client-side script can see `false` where the server sees
+  `true`. Actors spawned at runtime, and all actors in other game modes, are destroyed normally.
 
 **Example:**
 

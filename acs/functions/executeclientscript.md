@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** wiki page `ExecuteClientScript - Zandronum Wiki.html` (`_intake/`, retrieved
 2026-07-28, `https://wiki.zandronum.com/w/index.php?title=ExecuteClientScript&oldid=1311`) + source-verified (`p_acs.cpp:1758-1808,5509-5510,7824-7833,13684-13697,13721-13725`,
 `p_interaction.cpp:3006-3014`, `sv_commands.cpp:3567`, `sv_commands.h:73`). The wiki's core

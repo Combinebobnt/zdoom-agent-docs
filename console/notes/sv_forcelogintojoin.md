@@ -4,8 +4,8 @@
 **Applies to:** UZDoom=no, Zandronum=yes — an external-account login system built on the SRP
 protocol; UZDoom/GZDoom has no equivalent login/account infrastructure at all (see
 "Zandronum-specific" below).
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-17)
-**Provenance:** Zandronum source `src/sv_main.cpp` (CUSTOM_CVAR declaration) and client-authentication logic in `src/sv_main.cpp` and `src/cl_main.cpp`, verified against account-server integration.
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** Zandronum source `src/sv_main.cpp` (CVAR declaration) and client-authentication logic in `src/sv_main.cpp` and `src/cl_main.cpp`, verified against account-server integration. Anonymous account name: `src/sv_main.cpp:7650-7662` (`CLIENT_s::GetAccountName()`). Auth-storage gating: `src/network/cl_auth.h:51-54`, `src/cl_main.cpp:3599-3603`, commits `878b2c985`/`e86513ed6`.
 
 When enabled, requires clients to authenticate against a configured account server before they can join and play. Unauthenticated clients are forced to spectate until they authenticate.
 
@@ -64,8 +64,14 @@ This prevents anonymous/unauthenticated play on servers requiring verified ident
   an already-working default.)*
 - **`login_default_user`** / **`cl_autologin`** — client-side cvars (`src/cl_main.cpp:277`,
   `src/network/cl_auth.h:71`) that automatically retry a login for a saved account on connect;
-  only compiled in when `ENABLE_AUTH_STORAGE` is defined (Windows, or Linux built with
-  `USE_LIBSECRET`).
+  only compiled in when `ENABLE_AUTH_STORAGE` is defined (Windows, or a non-Apple POSIX build
+  with libsecret, which defines `USE_LIBSECRET`). The on-connect login itself
+  (`src/cl_main.cpp:3599-3603`) is still `#ifdef WIN32`, so a libsecret build only logs in
+  when `cl_autologin` is switched on or `login_default_user` is changed while connected
+  (their cvar callbacks, `src/cl_main.cpp:277-282`, `src/network/cl_auth.cpp:82-86`).
+  The libsecret path and the `ENABLE_AUTH_STORAGE` macro were added after 3.2.1 (commits
+  `878b2c985`, `e86513ed6`). In 3.2.1 both cvars and the whole auto-login feature are
+  Windows-only.
 
 ## Distinction from password protection
 
@@ -89,7 +95,11 @@ message `server_CheckLogin()` prints when it rejects a join attempt, `src/sv_mai
 Two extension functions expose this same client state to ACS: `PlayerIsLoggedIn(int player)`
 (`ACSF_PlayerIsLoggedIn`, `src/p_acs.cpp:7257-7264`) returns the client's `loggedIn` flag directly,
 and `GetPlayerAccountName(int player)` (`ACSF_GetPlayerAccountName`, `src/p_acs.cpp:7267-7277`)
-returns the authenticated username (empty string if not logged in). Neither requires
+returns the authenticated username. A client that is not logged in gets a slot-based
+placeholder of the form `<slot>@localhost` (`CLIENT_s::GetAccountName()`,
+`src/sv_main.cpp:7650-7662`), not an empty string. The empty string comes back only when the call
+is not running on a server or the player index is not a valid client. `PlayerIsLoggedIn` likewise
+returns false off a server. Neither requires
 `sv_forcelogintojoin` to be enabled — they read the same per-client login state regardless of
 whether joining is gated on it.
 

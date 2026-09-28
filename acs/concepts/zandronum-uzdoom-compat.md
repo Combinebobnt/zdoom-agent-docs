@@ -5,8 +5,9 @@ and to `zt-bcc`'s own extension binding, not inferred or wiki-sourced).
 **Applies to:** UZDoom=yes, Zandronum=yes — UZDoom is a GZDoom-family fork, checkout currently
 behind its own `origin/trunk`; see `../../shared/AUTHORING.md`'s "Engine scope" caveats before
 treating any UZDoom-side line number here as stable upstream.
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-17)
-**Provenance:** derived directly from the Zandronum source (`src/p_acs.h`, `src/p_acs.cpp`), the
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
+**Provenance:** derived directly from the Zandronum source (`src/p_acs.h`, `src/p_acs.cpp`,
+`src/p_lnspec.cpp:1761-1767`), the
 UZDoom source (`src/playsim/p_acs.cpp`, `src/playsim/p_acs.h`), and the `zt-bcc` compiler source
 (`src/codegen/pcode.h`, `lib/zcommon.bcs`, `src/main.c`) while investigating why an ACS object
 file compiled for Zandronum, loaded under UZDoom, produces wrong behavior with no error message —
@@ -28,8 +29,9 @@ server-or-client-mode check vs. UZDoom's plain `netgame` push); the `CallFunctio
 three `SFLG` bits' definitions on both engines; the 18 chunk tags `zt-bcc` emits and their presence
 in UZDoom's loader (`ALIB` absent from both, as already noted); `LOADACS`'s per-map-load scan on
 both engines; and that `#nocompact` is a real `zt-bcc` pragma. All of it held exactly as already
-written below — this pass found no divergence, only confirmation. See `../../shared/AUTHORING.md`'s
-Engine scope caveats for the local Zandronum checkout's known working-tree drift.
+written below — this pass found no divergence, only confirmation. A 2026-09-27 Zandronum re-read
+corrected several details it missed (index 118's semantics and BCS name, the `CLIENTSIDE` bit's
+meaning, the extension-function count, and zt-bcc's numbering at 381).
 
 ## Base PCD opcodes: numerically identical, with one live collision
 
@@ -38,12 +40,13 @@ Comparing the two engines' `PCD_*` enums (Zandronum `src/p_acs.h`, UZDoom
 exactly. Three narrow exceptions:
 
 - **Index 118**: Zandronum's `PCD_ISMULTIPLAYER` vs. UZDoom's `PCD_ISNETWORKGAME` — same opcode
-  number, different semantics. Zandronum pushes whether the game is running in server *or*
-  networked-client mode; UZDoom pushes the plain `netgame` flag. Both compile from the same
-  `zcommon.bcs` name (`IsMultiplayer()`/`IsNetworkGame()` are exposed as separate BCS calls
-  mapping to this one opcode), so a script using either one runs on both engines without erroring,
-  but can read a different truth value in an edge case (e.g. a networked client that isn't itself
-  hosting).
+  number, different semantics. Zandronum pushes true on the server or in client mode
+  (`NETWORK_InClientMode()`: a connected client or client-demo playback) and false in any offline
+  game, bots included; UZDoom pushes the plain `netgame` flag. zt-bcc exposes the opcode only as
+  the builtin `IsNetworkGame()` (`src/builtin.c`'s `g_funcs[]`); `PCD_ISMULTIPLAYER` is just an
+  assembler name in `lib/zasm.bcs`. A script calling it runs on both engines without erroring. The
+  two agree for a connected client and an offline game, but they read different state, so don't
+  assume they match in edge cases such as demo playback.
 - **Indices 129/130**: Zandronum's `PCD_GETINVASIONWAVE`/`PCD_GETINVASIONSTATE` have no
   corresponding case in UZDoom's interpreter at all — calling either from a Zandronum-compiled
   object hits UZDoom's **unknown-PCD path**, which is loud (see below), not silent. **Reachable
@@ -57,9 +60,16 @@ exactly. Three narrow exceptions:
   this path — no hand-assembly required. UZDoom's own `PCD_LSPEC6`/`PCD_LSPEC6DIRECT` enum entries
   at these slots carry a source comment reading "These are never used," confirming the gap is real
   and permanent, not a build artifact of this checkout.
-- **Index 381**: Zandronum's `PCD_GETTEAMPLAYERCOUNT` vs. UZDoom's `PCD_LSPEC5EX` — latent between
-  the engines but unreachable from `zt-bcc`-compiled output, same as 129/130, **but a third,
-  worse failure mode if this opcode is ever hand-assembled: not a loud unknown-PCD termination.**
+- **Index 381**: Zandronum's `PCD_GETTEAMPLAYERCOUNT` vs. UZDoom's `PCD_LSPEC5EX`. zt-bcc has no
+  `PCD_GETTEAMPLAYERCOUNT`; its own 381 is `PCD_LSPEC5EX`, which it emits for any action special
+  numbered 256 or above (`src/codegen/expr.c:1626-1637`, e.g. `zcommon.bcs`'s 279
+  `Floor_MoveToValueAndCrush` and 280 `Ceiling_MoveToValueAndCrush`). Such a call runs correctly on
+  UZDoom but executes as `PCD_GETTEAMPLAYERCOUNT` on Zandronum, corrupting the script. When the
+  special's result is used, zt-bcc emits `PCD_LSPEC5EXRESULT` (382) instead. Zandronum's enum ends
+  at 381, so that form hits Zandronum's unknown-P-Code path and the script is terminated with a
+  log line. The reverse
+  direction below is unreachable from `zt-bcc` output, **but a third, worse
+  failure mode if this opcode is ever hand-assembled: not a loud unknown-PCD termination.**
   UZDoom *does* have a `case PCD_LSPEC5EX:` at this index (`src/playsim/p_acs.cpp`), unlike
   129/130's genuinely-missing cases, so a Zandronum-compiled `PCD_GETTEAMPLAYERCOUNT` instruction
   runs UZDoom's `PCD_LSPEC5EX` handler instead of hitting the unknown-PCD path. The two opcodes'
@@ -84,7 +94,7 @@ because Zandronum's extensions live there and must be skipped.
 
 Zandronum's own extension functions are bound in `zt-bcc/lib/zcommon.bcs` as raw negative-numbered
 externs (`-100:ResetMap():bool`, `-101:PlayerIsSpectator(int):int`, `-102:ConsolePlayerNumber():int`,
-and so on through the 100–186 range) — a plain, unconditional list with no `#ifdef` gate. Calling
+and so on through the 100–185 range) — a plain, unconditional list with no `#ifdef` gate. Calling
 one of these from BCS compiles straight to `PCD_CALLFUNC` with that absolute index as the function
 number (`zt-bcc/src/codegen/expr.c`'s `c_pcd(codegen, PCD_CALLFUNC, argc, impl->id)`).
 
@@ -101,9 +111,10 @@ only function" description but are opposite in observability — an unknown ACSF
 unknown PCD is loud and fatal to that script. Which one a given Zandronum extension hits depends
 entirely on whether it's bound as a base opcode or a CALLFUNC index. The overwhelming majority of
 Zandronum-specific functionality is reserved as CALLFUNC indices (silent) — the 100-199 ACSF block
-above is nearly 90 functions wide — but **that's a Zandronum-side numbering choice, not a `zt-bcc`
+above holds 90 functions (100-189) in the Zandronum source read here, 86 (100-185) at 3.2.1 — but
+**that's a Zandronum-side numbering choice, not a `zt-bcc`
 compiler-table limitation**: `zt-bcc`'s own PCD table does have room for (and does declare)
-Zandronum-numbered base opcodes at 129/130 (see above) and 381 (see "Index 381" above), so the
+Zandronum-numbered base opcodes at 129/130 (see above; its 381 follows UZDoom numbering), so the
 "almost everything goes through CALLFUNC" pattern is empirical, not structurally guaranteed — don't
 assume a not-yet-audited Zandronum extension is silent without checking which mechanism it uses.
 
@@ -116,14 +127,16 @@ support `-D`/`#ifdef`) is the only way to keep one source tree portable — the 
 won't stop you from shipping a silently-wrong UZDoom build.
 
 **Which specific functions land where** (checked for a real project's actual call sites, not
-exhaustive over all ~87 Zandronum extensions): `PlayerIsSpectator`, `ConsolePlayerNumber`,
+exhaustive over all 90 Zandronum extensions): `PlayerIsSpectator`, `ConsolePlayerNumber`,
 `GetPlayerLivesLeft`, `RequestScriptPuke`/`NamedRequestScriptPuke`, `SystemTime`, `Strftime` are
 all in the reserved-and-unimplemented 100–199 CALLFUNC range — every one of these silently
 returns 0 under UZDoom. `GetUserCVar`, `PlayerIsBot`, `GetPlayerInput` (including the
 `MODINPUT_*` argument enum) and `ConsoleCommand` are **not** Zandronum-specific despite living
 alongside Zandronum-only code in some projects' call sites — they're ordinary ZDoom-family
 opcodes/ACSF entries present and correct on both engines. `ConsoleCommand` specifically is
-recognized on both but is a deliberate no-op on UZDoom (prints a "doesn't support execution of
+recognized on both. On Zandronum it runs the command through `C_DoCommand`, though many
+server-side commands ignore calls made from scripts (`ACS_IsCalledFromConsoleCommand`). It is a
+deliberate no-op on UZDoom (prints a "doesn't support execution of
 console commands from scripts" message every call) rather than silent — worth knowing since it
 looks like it belongs in the silent-failure group but isn't.
 
@@ -138,13 +151,20 @@ relying on the coincidence.
 ## The SFLG script-flag bit that means opposite things
 
 Both engines parse the `SFLG` chunk into a per-script flags word with no validation of unknown
-bits, but two of the three bits Zandronum defines carry different meaning on UZDoom:
+bits, but one of the three bits Zandronum defines carries a different meaning on UZDoom:
 
 - Bit `0x0001` (`SCRIPTF_Net`, "safe to puke in multiplayer") and bit `0x0004`
   (`SCRIPTF_Busy`, "not subject to the runaway-script instruction limit") agree bit-for-bit and
-  semantically between the two engines.
-- Bit `0x0002` is Zandronum's `SCRIPTF_ClientSide` (marks a script as running only on the client
-  that triggered it — see [Client-side scripting](clientside-scripting.md)). UZDoom defines the
+  semantically between the two engines, with one Zandronum exception: under the
+  `ZACOMPATF_NETSCRIPTS_ARE_CLIENTSIDE` compat flag, a `NET` script also counts as clientside
+  (`ACS_IsScriptClientSide`). **Zandronum 3.2.1 predates `SCRIPTF_Busy`:** it was
+  added after that release (see [restart](../functions/restart.md)), so on a 3.2.1 server a
+  `busy` script is still killed after 2,000,000 instructions without a yield. A script that relies
+  on `busy` instead of yielding runs fine on UZDoom and newer Zandronum builds, but gets
+  terminated mid-run on 3.2.1.
+- Bit `0x0002` is Zandronum's `SCRIPTF_ClientSide`. The server doesn't run such a script itself.
+  It tells every client to run it instead (`src/p_acs.cpp:3403-3411`, `src/p_lnspec.cpp:1761-1767`;
+  see [Client-side scripting](clientside-scripting.md)). UZDoom defines the
   same bit as `SCRIPTF_Ignored`, with an explicit comment that the flag has no meaning on that
   engine. A `CLIENTSIDE` script compiled for Zandronum therefore just runs as an ordinary script
   under UZDoom — not an error, but a behavior change worth knowing about deliberately rather than

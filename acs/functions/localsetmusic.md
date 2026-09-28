@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** `LocalSetMusic - ZDoom Wiki` (https://zdoom.org/w/index.php?title=LocalSetMusic&oldid=35967), verified 2026-07-29 against fork source.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
@@ -10,10 +10,10 @@
 Changes the background music, but only for the script's activator — unlike `SetMusic`, which 
 broadcasts the change to all players and persists it for late-joining clients. Compiler builtin 
 (`PCD_LOCALSETMUSIC`, the zt-bcc source's `src/builtin.c:184,307`), implementation in 
-`p_acs.cpp:1433-1451`.
+`p_acs.cpp:11911-11928`.
 
 - `song` — a string containing the music lump name, looked up via `FBehavior::StaticLookupString`
-  (`p_acs.cpp:1437, 1442`). An invalid string index silently no-ops. The special value `"*"` 
+  (`p_acs.cpp:11918, 11925`). An invalid string index silently no-ops. The special value `"*"` 
   restores the current map's default music as defined in MAPINFO, per the wiki.
 - `order` — applies only to tracker-format music (MOD/XM/etc.); specifies the starting pattern 
   order in the song. For non-tracker formats (MP3/OGG/MID), this parameter is ignored. Optional; 
@@ -22,14 +22,14 @@ broadcasts the change to all players and persists it for late-joining clients. C
   the engine, per the wiki. The wiki recommends omitting it entirely as it may be repurposed in 
   future versions.
 - **Activator-specific delivery:** the music change is only heard by `activator` — not broadcast 
-  to all players like `SetMusic` (`p_acs.cpp:1442-1444`). The check is `if (activator == 
+  to all players like `SetMusic` (`p_acs.cpp:11923-11926`). The check is `if (activator == 
   players[consoleplayer].mo)`: the change only applies locally if the executing machine's 
   `consoleplayer` *is* the activator. In multiplayer, each connected client only hears the change 
   if they are the activator.
 - **Zandronum netcode addition not in the ZDoom wiki's model:** when running as a network server 
   (`NETWORK_GetState() == NETSTATE_SERVER`), the server additionally sends the music change to 
   the activator's client with `SERVERCOMMANDS_SetMapMusic(..., activator->player - players, 
-  SVCF_ONLYTHISCLIENT)` (`p_acs.cpp:1435-1440`) — explicitly targeting only that one client. 
+  SVCF_ONLYTHISCLIENT)` (`p_acs.cpp:11914-11921`) — explicitly targeting only that one client. 
   This send is gated on `activator && activator->player` (bots/non-player activators receive no 
   network packet). Vanilla ZDoom has no per-client targeting mechanism; this is purely 
   Zandronum-specific to keep the music genuinely local in multiplayer.
@@ -46,7 +46,7 @@ broadcasts the change to all players and persists it for late-joining clients. C
   set via `LocalSetMusic`. This is the key differentiator from `SetMusic` and is implicit in the 
   implementation (`SVCF_ONLYTHISCLIENT` is a send-only flag; there is no persistent state 
   update).
-- **Sibling comparison:** `SetMusic` (`p_acs.cpp:1418-1431`) broadcasts to all clients and calls 
+- **Sibling comparison:** `SetMusic` (`p_acs.cpp:11881-11893`) broadcasts to all clients and calls 
   `SERVER_SetMapMusic` to persist the change. `LocalSetMusic` is a fully separate `case` block 
   that sends only to the activator's client (or doesn't send at all if server-side `activator` is 
   null), and makes no persistence call. The wiki's framing ("only affects the player who activated 

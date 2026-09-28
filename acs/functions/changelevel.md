@@ -4,7 +4,7 @@
 **Applies to:** UZDoom=yes, Zandronum=yes — the one flag with an `// [AK]` Zandronum-native tag,
 `CHANGELEVEL_HIDENAME`, confirmed to predate the `28f736fb3` 3.2.1 version-bump commit; it does not
 exist in UZDoom at all — see "Zandronum-specific: `CHANGELEVEL_HIDENAME` flag" below.
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-17)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** wiki page `ChangeLevel - ZDoom Wiki.html` (`_intake/`, `https://zdoom.org/w/index.php?title=ChangeLevel&oldid=43453`) +
 source-verified (`p_acs.cpp:12694-12701`, `g_level.cpp:678-737,1471,1479,1920`,
 `g_game.cpp:2094,2108`, `g_level.h:530-541`, `zt-bcc/src/builtin.c:146,462-480`,

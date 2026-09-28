@@ -2,10 +2,10 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_JumpIfArmorType&oldid=42385) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:983-996` and `wadsrc/static/actors/actor.txt:216`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_JumpIfArmorType&oldid=42385) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:983-996` and `wadsrc/static/actors/actor.txt:216`; armor type persistence from `src/g_shared/a_armor.cpp:153,275,299,391-397`; network behavior from `src/thingdef/thingdef_codeptr.cpp:695-758`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
-**Bucket:** Action function (`DEFINE_ACTION_FUNCTION(AActor, A_JumpIfArmorType)` in `src/thingdef/thingdef_codeptr.cpp`).
+**Bucket:** Action function (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_JumpIfArmorType)` in `src/thingdef/thingdef_codeptr.cpp`).
 
 Checks whether the actor's equipped armor matches a specified type. If the armor type matches and the armor amount is at least the minimum threshold, the jump is performed.
 
@@ -17,7 +17,7 @@ action native A_JumpIfArmorType(string Type, state label, int amount = 1)
 
 ## Parameters
 
-- **`Type`** (string): The name of the armor class to check for (e.g., `"BlueArmor"`, `"GreenArmor"`). Compared against the equipped `BasicArmor` item's `ArmorType` field, which is set to the class name of the armor pickup that was picked up.
+- **`Type`** (string): The name of the armor class to check for (e.g., `"BlueArmor"`, `"GreenArmor"`). Compared as a name against the equipped `BasicArmor` item's `ArmorType` field. That comparison is an exact class-name match, with no inheritance check. See "Armor type persistence" below for which pickups set the field.
 - **`label`** (state): The state to jump to if the condition is met.
 - **`amount`** (int, optional, default 1): The minimum armor amount (points) required for the jump to occur. The equipped armor must have at least this amount. **Wiki divergence:** The wiki does not state the default value.
 
@@ -29,15 +29,21 @@ The function checks whether a `BasicArmor` item exists in the actor's inventory.
 2. Compares the armor's current `Amount` against the `amount` parameter.
 3. If both conditions are true (type matches and `Amount >= amount`), the jump occurs.
 
-The action function does **not** set a result value (`ACTION_SET_RESULT(false)` in the source), which is significant for inventory state chains like `CustomInventory.Pickup:` — jump outcomes do not cause the state chain to succeed or fail, allowing subsequent states to be evaluated.
+In Zandronum the action function explicitly sets its result to false (`ACTION_SET_RESULT(false)`), which matters for inventory state chains like `CustomInventory.Pickup:`. The jump outcome by itself does not make the state chain succeed.
 
 ## Network synchronization
 
-The source includes a `[BB]` comment suggesting clients' knowledge of player inventory should allow safe clientside evaluation ("Clients know the player's inventory, so this is hopefully okay"), but this is a Zandronum-specific netcode annotation and the phrasing is hedged. Jump functions perform differently inside anonymous functions due to their network synchronization requirements; see the DECORATE concepts `[network-jump-synchronization](../concepts/network-jump-synchronization.md)` for details.
+In Zandronum the jump passes no client-update flags (`ACTION_JUMP(JumpOffset, 0)`), so the server sends clients no state change when it jumps, and there is no client-mode guard. Each client evaluates the armor check against its own copy of the actor's inventory. The source's `[BB]` comment justifies this with "Clients know the player's inventory, so this is hopefully okay", a hedged assumption. Compare `A_JumpIfCloser`, whose jump does send a frame and position update. See [Jump functions and network synchronization](../concepts/network-jump-synchronization.md), especially its "Cause 2" section on inventory-based conditions lagging the server.
 
-## Important note on armor type persistence
+## Armor type persistence
 
-The `ArmorType` field is set to the class name of whichever armor pickup was picked up most recently. Picking up a different armor type (e.g., `GreenArmor` after `BlueArmor`, or `ArmorBonus` after either) overwrites this field. This means a modder designing conditional pickup logic must account for the fact that repeated pickups of different item types change what armor type is "equipped."
+Not every armor pickup sets `ArmorType`, and it does not always track the most recent pickup:
+
+- A `BasicArmorPickup` (e.g. `GreenArmor`, `BlueArmor`) sets it to its own class name, but only if the pickup is accepted. One offering less than the armor you already have is refused, so `GreenArmor` touched while wearing undamaged `BlueArmor` changes nothing. `GreenArmor` picked up after `BlueArmor` has worn below 100 does overwrite the type.
+- A `BasicArmorBonus` (e.g. `ArmorBonus`) sets it only when you currently have no armor points. An `ArmorBonus` picked up while wearing `BlueArmor` adds points but leaves the type as `BlueArmor`.
+- When armor absorbs damage down to 0 points, the type is reset to none, so no `Type` matches until new armor is picked up.
+
+Conditional pickup logic should account for these cases rather than assume the last armor item touched is the "equipped" type.
 
 ## Examples
 
@@ -90,7 +96,7 @@ ACTOR ArmorShard : CustomInventory
 }
 ```
 
-This item checks two conditions: "Do I have `GreenArmor` with at least 100 armor?"; if yes, pickup fails. If no, "Do I have `GreenArmor` at all?"; if yes, grant an armor shard; if no, pickup fails. This prevents overcapping a fully-healthy green-armor character while allowing undamaged green-armor wearers to pick up shards.
+This item checks two conditions: "Do I have `GreenArmor` with at least 100 armor?"; if yes, pickup fails. If no, "Do I have `GreenArmor` at all?"; if yes, grant an `ArmorBonus`; if no, pickup fails. This refuses the shard once green armor is at 100 or more, while letting green-armor wearers below 100 pick it up.
 
 ## See also
 

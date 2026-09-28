@@ -2,11 +2,11 @@
 
 **Tier:** B
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-17)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** Not wiki-sourced (unfetchable — see `shared/AUTHORING.md`'s "Locating the
 engine/compiler source"). Derived directly from the Zandronum source's `src/p_acs.cpp`
 (`EACSFunctions` enum and the `ACSF_CheckAutomap` case), cross-checked against `zt-bcc`'s
-`lib/zcommon.bcs`, and exercised live via a Zandronum MCP session (declared the wrapper below,
+`lib/zcommon.bcs`, and exercised live in a running Zandronum session (declared the wrapper below,
 loaded it as an autoloaded library via `LOADACS`, and read the return value into a global ACS
 variable across all three states — off/fullscreen/overlay, toggled via the `togglemap` CCMD and
 the `am_overlay` cvar — confirming the values below against what was actually on screen).
@@ -44,6 +44,16 @@ which reports whether a player has chasecam active — a different local render 
 combined with `CheckAutomap()` returning `1`, covers "is the console player currently seeing
 something other than their own first-person 3D view."
 
+## Version gate: does not exist in Zandronum 3.2.1
+
+`CheckAutomap` was not present in the 3.2.1 release. It was added by commit `bdd0f7beb`
+("Add ACS function to check automap status", 2026-06-06), which postdates the 3.2.1 version-bump
+commit `28f736fb3` (2025-08-04) by ten months; `28f736fb3` is an ancestor of `bdd0f7beb`, not the
+other way around. A client running a real 3.2.1 build has neither the `ACSF_CheckAutomap` enum
+entry (`src/p_acs.cpp:5554`) nor its `case` block (`src/p_acs.cpp:9030`), so the `special` wrapper
+above will not resolve to this behavior there. `**Applies to:** Zandronum=yes` still holds for the
+3.3-alpha checkout this entry is verified against; it does not hold for 3.2.1.
+
 ## Zandronum-specific: no UZDoom equivalent ACS function
 
 `CheckAutomap()` is a Zandronum-only extension function — it is not in UZDoom's `EACSFunctions`
@@ -57,13 +67,7 @@ The underlying local-client state this function reads is not Zandronum-specific,
 toggle (`src/am_map.cpp:3548-3583`) are logically identical to Zandronum's, including the same
 third-toggle overlay→fullscreen edge case (`am_overlay == 1 && viewactive` clears only
 `viewactive`, not a full `AM_Stop()`). UZDoom just doesn't expose that state to ACS the way
-Zandronum does — it exposes the two booleans to ZScript instead, as native engine globals:
-
-```text
-DEFINE_GLOBAL(automapactive);
-DEFINE_GLOBAL(viewactive);
-```
-
-(`src/g_game.cpp:3225-3226`). A UZDoom mod that wants `CheckAutomap()`'s three-state result would
+Zandronum does — it exposes the two booleans to ZScript instead, as native engine globals
+registered with `DEFINE_GLOBAL` (UZDoom's `src/g_game.cpp:3226-3227`). A UZDoom mod that wants `CheckAutomap()`'s three-state result would
 have to read both ZScript globals itself and reconstruct the same off/fullscreen/overlay mapping
 this function returns — there's no built-in call that already does it.

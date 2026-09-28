@@ -2,7 +2,7 @@
 
 **Tier:** B
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-05)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** read from the Zandronum source's `src/p_acs.cpp` (`PCD_STARTTRANSLATION`/`PCD_TRANSLATIONRANGE1..3`/`PCD_ENDTRANSLATION` cases), the UZDoom source's `src/playsim/p_acs.cpp` (`PCD_TRANSLATIONRANGE4`/`5`) and `src/common/engine/palettecontainer.cpp` (`FRemapTable::AddColourisation`/`AddTint`), the zt-bcc/bcc compiler source (`src/parse/stmt.c` `read_paltrans`, `src/codegen/stmt.c` `visit_paltrans`), and the original `acc` compiler's `parse.c` (`LeadingCreateTranslation`, read only — never quoted, see `../../shared/AUTHORING.md`). No wiki page involved. 2026-08-05.
 
 `CreateTranslation` looks like an ordinary ACS function call and is not one. It's a

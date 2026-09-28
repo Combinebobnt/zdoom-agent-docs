@@ -2,9 +2,9 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `SetLineActivation - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
-`https://zdoom.org/w/index.php?title=SetLineActivation&oldid=49566`) + source-verified against the Zandronum source's `p_acs.cpp:6814-6832` and
+`https://zdoom.org/w/index.php?title=SetLineActivation&oldid=49566`) + source-verified against the Zandronum source's `p_acs.cpp:6814-6832`, `p_spec.cpp:333-336`, `gamemode.cpp:1130-1168`, `network.cpp:1616-1619` and
 `zt-bcc/lib/zcommon.bcs:784-795,1705-1706`. The wiki's signature, `lineid`/`activation` semantics,
 overwrite-not-OR behavior, and `GetLineActivation`-based read-modify-write workaround all hold
 exactly against Zandronum's source. The `repeat` parameter being a complete no-op in Zandronum,
@@ -39,19 +39,27 @@ semantics in the Zandronum source's `src/p_acs.cpp` (`case ACSF_SetLineActivatio
   `-1` no change), which is real *upstream* behavior gated on the line's `ML_REPEAT_SPECIAL` flag.
   But in the Zandronum source, `ACSF_SetLineActivation`'s case block only ever reads `args[0]` and
   `args[1]` (guarded by `argCount >= 2`, `p_acs.cpp:6815`) — there is no `args[2]` read anywhere in
-  the case, and `ML_REPEAT_SPECIAL` is referenced nowhere in `p_acs.cpp` at all (only read at
-  `p_spec.cpp:317`, from the line's static level-data flags, never written from ACS). Passing a
+  the case, and `ML_REPEAT_SPECIAL` is referenced nowhere in `p_acs.cpp` at all. The flag is only
+  ever set by map-load code (`p_udmf.cpp`, `p_xlat.cpp`, and the compatibility table's line-flag
+  fixes). `P_ActivateLine` reads it at `p_spec.cpp:317`, and a few other places read it too.
+  `Line_SetBlocking`'s flag table (`p_lnspec.cpp:2837-2850`) doesn't include it. Passing a
   third argument compiles cleanly (the `zcommon.bcs` signature has it as an optional trailing
   param) and has zero runtime effect — no error, no partial application, just silently dropped.
   Anyone porting ZDoom-wiki-era BCS that relies on the `repeat` argument to toggle repeatability
-  needs a different mechanism in the Zandronum engine fork (there does not appear to be one
-  exposed to ACS at all — repeatability is set from the linedef's flags at map-load time only).
+  needs a different mechanism in the Zandronum engine fork. No ACS call changes the flag itself.
+  The closest substitute: a once-only line's special is cleared after it fires successfully
+  (`p_spec.cpp:333-336`), so re-setting it with `SetLineSpecial` re-arms the line.
 - **No Zandronum client/server sync call for this function** (no `SERVERCOMMANDS_*` call in
   either `ACSF_SetLineActivation` or `ACSF_GetLineActivation`, unlike e.g. `ChangeCeiling`'s
-  `SERVERCOMMANDS_SetSectorFlat`). This is consistent rather than a bug: activation flags gate
-  whether an action special *fires* at all, which is evaluated authoritatively server-side
-  (`P_ActivateLine`/`P_TestActivateLine`, `p_spec.h:180-181`) — there's no client-visible state to
-  keep in sync, unlike a texture change which clients must render.
+  `SERVERCOMMANDS_SetSectorFlat`). Most line specials only fire on the server
+  (`P_ActivateLine`/`P_TestActivateLine`, `p_spec.h:180-181`), so the server's copy is what gates
+  them. But clients do read `activation` locally. `P_ActivateLine` runs on clients too, and
+  `GAMEMODE_IsHandledSpecial` (`gamemode.cpp:1137-1168`) lets the local player predict
+  `ThrustThing`/`ThrustThingZ` lines (`network.cpp:1616-1619`) and lets spectators use teleport
+  lines (`gamemode.cpp:1130-1133`), both through `P_TestActivateLine`'s activation check. The
+  automap also colors trigger and teleporter lines from it (`am_map.cpp:2310`, `2358`). Since
+  nothing is sent and clients don't run the server's script, a client keeps the map-load value
+  unless a `CLIENTSIDE` script makes the same call on that client.
 
 ## Engine-family divergence: `repeat` parameter is implemented, unlike the Zandronum engine fork
 

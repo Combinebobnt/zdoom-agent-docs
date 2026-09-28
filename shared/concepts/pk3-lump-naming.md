@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-14)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** read directly from the Zandronum source, verified 2026-08-14. No wiki page
 backs this; it is not documented in the wiki's PK3 page.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under
@@ -50,9 +50,10 @@ exists and renders fine.
 
 ## 3. Names truncate to 8 characters, and the truncation can collide
 
-`Name[8] = 0` means `MYVERYLONGNAME.txt` and `MYVERYLONGOTHER.txt` are both `MYVERYLO`.
-`FullName` keeps the original path, so full-path lookups still distinguish them, but any
-8.3-style name lookup does not.
+`uppercopy` (`w_wad.cpp:111-119`) copies at most 8 characters, and `Name[8] = 0` only
+terminates the 9-byte field. So `MYVERYLONGNAME.txt` and `MYVERYLONGOTHER.txt` are both
+`MYVERYLO`. `FullName` keeps the original path, so full-path lookups still distinguish them,
+but any 8-character short-name lookup does not.
 
 ## Related: directory-to-namespace mapping
 

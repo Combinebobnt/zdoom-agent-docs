@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_SetTranslucent` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_SetTranslucent&oldid=46825) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:2974-2996`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** ZDoom Wiki `A_SetTranslucent` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_SetTranslucent&oldid=46825) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:2974-2996` and `src/network.cpp:1598-1612`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** action function (defined on `AActor`).
 
@@ -15,14 +15,14 @@ Sets an actor's alpha value and render style mode.
 - **style** (optional): int specifying the translucency blend mode. Defaults to 0 (normal translucency) per the DECORATE declaration `actor.txt:225`. 
   - **0**: Normal translucency blending (opaque at alpha 1.0).
   - **1**: Additive blending.
-  - **2**: Fuzz effect (post-blur distortion; alpha value is ignored).
+  - **2**: Fuzz effect (the Spectre-style fuzz render style; alpha value is ignored).
   - **Other values**: Silently default to additive blending (mode 1 behavior) — the function treats any value outside `{0, 2}` as additive, not as an error.
 
 ## Notes
 
 - **Wiki divergence — A_SetRenderStyle supersession claim does not apply to Zandronum.** The ZDoom Wiki states this function "has been superseded by A_SetRenderStyle." A_SetRenderStyle does not exist in Zandronum's codebase and never did; this advice applies only to GZDoom/UZDoom-family engines. Zandronum modders should continue using A_SetTranslucent.
 - **Engine-specific constants unavailable.** Zandronum does not define `STYLE_*` enum constants for the mode parameter — modders must pass raw integers (0, 1, 2), not names like `STYLE_Add`. The GZDoom family added this enum late in development.
-- **Network-aware.** In multiplayer, alpha and RenderStyle changes are replicated to clients via `SERVERCOMMANDS_SetThingProperty` (Zandronum 3.2.1+). This function executes server-side only; calls on clients return immediately unless the actor has `+CLIENTSIDEONLY`.
+- **Network-aware.** In multiplayer, alpha and RenderStyle changes are replicated to clients via `SERVERCOMMANDS_SetThingProperty` (added in 2017 by commit `2a785a2f1`, so 3.2.1 has it). On a client, the call returns immediately unless the actor is client-handled, meaning it has `+CLIENTSIDEONLY` or no network ID (`NetID == 0`, `src/network.cpp:1598-1612`). The server only replicates for actors that are not client-handled.
 - **Parameter-index note for reviewers of the C++ source.** The underlying `DEFINE_ACTION_FUNCTION_PARAMS` macro uses `ACTION_PARAM_INT(mode, 1)` — the second argument is the parameter *index* (1 = second parameter), not the default value. The actual default (0) comes from the DECORATE declaration in `actor.txt:225`, not the C++ code.
 
 ## Engine-family divergence: no client/server authority split

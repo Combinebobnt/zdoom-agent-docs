@@ -36,8 +36,15 @@ Router only. See `AGENTS.md` for where MAPINFO parsing lives in engine source,
 - [Skill block definition](concepts/skill-block.md) — tier A. Defines difficulty levels with
   monster/damage scaling, respawn rules, actor replacement, and menu properties. Zandronum and
   GZDoom/UZDoom families diverge significantly: nine properties are UZDoom-only, DefaultSkill
-  behavior differs (Zandronum errors on duplicates, UZDoom uses last), and Zandronum's fixed-point
+  behavior differs (Zandronum errors on any second one, so a PWAD's `DefaultSkill` is fatal unless
+  `clearskills` came first; UZDoom uses last), and Zandronum's fixed-point
   storage quantizes very small factors.
+- [Zandronum map-definition extensions](concepts/zandronum-map-extensions.md) — tier A.
+  Zandronum-specific `map` block properties, sourced from the Zandronum wiki (not the ZDoom wiki
+  the other files here cite, so kept as its own file per the licensing split): multiplayer/campaign
+  features (`islobby`, `nobotnodes`) and intermission customization (`gamemode`, `winnerpic`,
+  `loserpic`, `winnermusic`, `losermusic`); includes version-availability breakdown (some
+  properties pre-3.2.1, others 3.3-alpha and above only).
 
 ## Inventory tables (generated)
 

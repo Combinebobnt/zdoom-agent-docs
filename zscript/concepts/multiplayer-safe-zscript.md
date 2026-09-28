@@ -40,6 +40,8 @@ Each random seed has a state that advances when a function using that seed is ca
 
 `consoleplayer` is the player number for the current client — it's 0 on the host, 1 for the first guest, etc. Every client has a different value for `consoleplayer`. Using this value in `play`-scoped code means each client executes different logic and desynchronizes.
 
+(The one sanctioned exception to this rule is the network-event pattern in "Network events: synchronizing UI changes back to play" below — reading `consoleplayer` directly in `play` scope is unsafe, but the one-peer-sends/all-peers-apply mechanism that pattern relies on is not the same thing, even though it starts from `ui`-scoped code that necessarily only runs for one client.)
+
 **The pitfall:**
 ```zscript
 // Wrong: each client has a different consoleplayer value
@@ -160,6 +162,14 @@ When overriding player logic (especially `PlayerThink()` or `Tick()`):
 5. **Re-apply original safety guards** — if completely overriding `PlayerThink()` or `Tick()`, make sure to replicate the safety logic the original implementation has; it doesn't happen automatically.
 
 ## Network events: synchronizing UI changes back to play
+
+This is the sanctioned exception to "never use `consoleplayer` in `play` scope" above, not a
+violation of it: the pattern below always starts on one client's own machine (necessarily, since
+UI input is local), sends that input over the network, and lets **every** client apply it
+identically in `play` scope keyed on the sender's actual player number — not on `consoleplayer`
+read from inside `play` scope itself. A reader who only knows the `consoleplayer` rule can misread
+a correct arbitrator-broadcast implementation like this as broken; it isn't, because no `play`-scoped
+code ever branches on its own local `consoleplayer` value.
 
 To send a message from `ui` scope (menu, HUD) back to the `play` scope (the simulation), use `EventHandler.SendNetworkEvent()`:
 

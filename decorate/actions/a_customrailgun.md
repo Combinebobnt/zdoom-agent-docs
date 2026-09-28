@@ -2,12 +2,12 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_CustomRailgun` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_CustomRailgun&oldid=53914) + verified against Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1998` and `wadsrc/static/actors/constants.txt`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_CustomRailgun` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_CustomRailgun&oldid=53914) + verified against Zandronum source's `src/thingdef/thingdef_codeptr.cpp:1998` and `wadsrc/static/actors/constants.txt`; color parsing `src/thingdef/thingdef_parse.cpp:100`, trace/puffs `src/p_map.cpp:4835`, trail/spawnclass `src/p_effect.cpp:704`, unlagged gating `src/unlagged.cpp:368`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_CustomRailgun)` in `src/thingdef/thingdef_codeptr.cpp`.
 
-Fires a customizable rail beam attack (hitscan, piercing beam with particle trail) for monsters or any non-weapon actor. Supports optional target aiming and velocity-leading calculations. The beam pierces all targets along its path by default (can be limited with `RGF_NOPIERCING`).
+Fires a customizable rail beam attack (hitscan, piercing beam with particle trail) for monsters or any non-weapon actor. Supports optional target aiming, with the aim trailing a moving target's velocity. The beam pierces all targets along its path by default (can be limited with `RGF_NOPIERCING`).
 
 ## Engine-family divergence
 
@@ -15,7 +15,7 @@ UZDoom's `A_CustomRailgun` (`src/playsim/p_actionfunctions.cpp`, `DEFINE_ACTION_
 
 - **The full 19-parameter signature is real.** UZDoom's native declaration (`wadsrc/static/zscript/actors/actor.zs`) matches the ZDoom Wiki's 19-parameter form exactly, adding `spiraloffset` (int, default `270`), `limit` (int, default `0`), and `veleffect` (double, default `3`) beyond the 16 parameters Zandronum accepts. The "Zandronum limitation" callout under Signature does not apply to UZDoom.
 - **`spiraloffset` is genuinely configurable**, unlike Zandronum where the spiral always starts at a fixed 270-degree angle. The value is passed straight through to the particle-trail routine.
-- **`veleffect` is genuinely configurable**, unlike Zandronum where the velocity-leading multiplier used in `aim` modes 1/2 is hardcoded to `3`.
+- **`veleffect` is genuinely configurable**, unlike Zandronum where the velocity-trailing multiplier used in `aim` modes 1/2 is hardcoded to `3`.
 - **`limit` is present in the signature but is a no-op.** The function parses a `limit` argument, but `p_actionfunctions.cpp` unconditionally overwrites it with `p.limit = 0` before calling `P_RailAttack`, discarding whatever was passed. The pierce limit cannot actually be configured through this parameter in the current UZDoom source, despite the signature matching the wiki.
 - **`RGF_NORANDOMPUFFZ` is implemented** (`RAF_NORANDOMPUFFZ = 32` in `src/playsim/p_local.h`, honored in `P_RailAttack` to set `PF_NORANDOMZ` on the puff), unlike Zandronum 3.2.1 where it is not exported.
 - **No client/server authority gating.** UZDoom's `A_CustomRailgun` has no equivalent of Zandronum's client-mode early return or unlagged position reconciliation — the function always runs to completion on every machine. UZDoom's source tree has no `NETWORK_InClientMode`/`SERVERCOMMANDS_*`-style client/server split anywhere, so the "Network behavior (multiplayer)" subsection below does not apply.
@@ -43,13 +43,13 @@ Horizontal offset in map units (from the actor's center) where the beam originat
 
 ### `color1` (color, optional, default "")
 
-Color of the spiral particle trail surrounding the beam. Empty string `""` makes the spiral invisible; `0` draws it in a random shade of blue (selected at beam-fire time, not per particle). Accepts RRGGBB hex, named colors from `X11R6RGB` lump, or any DECORATE color constant. Default is `""` (invisible).
+Color of the spiral particle trail surrounding the beam. The DECORATE parser stores the empty string `""` as 0, which draws the spiral in random shades of blue (picked separately for each particle). `"none"` is stored as -1 and makes the spiral invisible. Any other string (RRGGBB hex or a named color from the `X11R6RGB` lump) is marked internally so that even black never collides with 0. Default is `""` (random blue).
 
 ### `color2` (color, optional, default "")
 
-Color of the core/center beam. Empty string `""` makes the core invisible; `0` draws it in a random shade of gray. Same color formats as `color1`. Default is `""` (invisible).
+Color of the core/center beam. `""` (stored as 0) draws the core in random shades of gray, picked per particle; `"none"` makes it invisible. Same color formats as `color1`. Default is `""` (random gray).
 
-**Player-pawn note:** When called from a player pawn with both `color1==0` and `color2==0`, the engine overrides these with the player's railgun color settings (team color in team game modes, individual player color in deathmatch). This differs from the upstream ZDoom/GZDoom behavior of using random blue/gray shades.
+**Player-pawn note:** When called from a player pawn with both colors left at `""` (0), Zandronum overrides them with the player's railgun color settings. In team game modes, for a player on a team, the spiral takes the team's railgun color and the core the player's own railgun color. Otherwise the spiral takes the player's railgun color and the core is white. This differs from the upstream ZDoom/GZDoom behavior of using random blue/gray shades.
 
 ### `flags` (int, optional, default 0)
 
@@ -57,15 +57,15 @@ Bitfield controlling rail behavior. Flags are combined with `|`. Zandronum defin
 
 #### Zandronum flags (Zandronum 3.2.1)
 
-- `RGF_SILENT` (1) — Suppresses the weapon/actor attack sound. Without this flag, the attack fires with the actor's `AttackSound` property (monsters/inventory), or the weapon's `AttackSound` (if called from a weapon).
+- `RGF_SILENT` (1) — Suppresses the weapon/actor attack sound. Without this flag, the attack fires with the actor's `AttackSound` property (non-player callers), or the ready weapon's `AttackSound` (player callers), falling back to `weapons/railgf` when that is unset.
 
-- `RGF_NOPIERCING` (2) — Stops the beam at the first enemy hit, rather than passing through all targets. Useful for single-target railguns; by default the beam pierces all actors in its path.
+- `RGF_NOPIERCING` (2) — Stops the beam at the first actor hit (not only enemies), rather than passing through all targets. Useful for single-target railguns; by default the beam pierces all actors in its path.
 
 - `RGF_EXPLICITANGLE` (4) — Treats `spread_xy` and `spread_z` as explicit firing angles (in degrees, added directly to aim direction) rather than maximum random deviation. Without this flag, spreads are applied as random offsets (angles chosen randomly from ±0 to ±spread value).
 
 - `RGF_FULLBRIGHT` (8) — Rail particles render at full brightness, ignoring sector lighting. Without this flag, particles fade with the map's light levels.
 
-- `RGF_CENTERZ` (16) — Vertical offset (`spawnofs_z`) originates from half the actor's height rather than from the actor's attack Z-offset (8 map units for non-players). Without this flag, offset is applied relative to the attack Z-offset.
+- `RGF_CENTERZ` (16) — The beam originates at half the actor's height plus `spawnofs_z`. Without this flag, the attack Z-offset is added on top of that (8 map units for non-players, `AttackZOffset` scaled by crouch for players).
 
 #### Flags in ZDoom wiki not present in Zandronum
 
@@ -75,19 +75,21 @@ Bitfield controlling rail behavior. Flags are combined with `|`. Zandronum defin
 
 Determines the attack direction:
 
-- `0` — Shoot in the direction the actor is looking (default). Does not require a target.
+- `0` — Shoot in the direction the actor is facing (default). Does not require a target. Pitch is still auto-aimed at whatever lies in the aim cone.
 
-- `1` — Aim at the actor's current target, with velocity leading (the engine predicts target position by subtracting `target.velx * 3` and `target.vely * 3` to lead the shot). Returns silently without firing if the target is NULL.
+- `1` — Aim at the actor's current target, with the aim trailing behind it: the engine subtracts `target.velx * 3` and `target.vely * 3` from the target's position, so the shot goes where the target was, not where it is heading. The beam is fired from the `spawnofs_xy`-offset origin parallel to that aim line. Returns silently without firing if the target is NULL.
 
-- `2` — Aggressive leading aim: same as `1`, but also offsets the firing position relative to the aimed direction before re-aiming, creating a more direct "lead towards the actor's predicted position" effect. Returns silently without firing if the target is NULL.
+- `2` — Same as `1`, but the shooter's position is first shifted by `spawnofs_xy` (which is then zeroed) and the angle is recomputed from there, so the beam converges on the aim point instead of running parallel to it. Returns silently without firing if the target is NULL. In Zandronum's source this shift indexes the fine sine/cosine tables with the raw, unshifted actor angle rather than a fine-angle index, so the shift is not computed from a valid table entry.
+
+With `aim` 1 or 2, a target with `MF_SHADOW` adds a random yaw error. Zandronum's `actor.txt` declares `aim` as `bool aim = false`, but DECORATE parses `bool` parameters as integers, so `2` reaches the code intact.
 
 ### `maxdiff` (double, optional, default 0.0)
 
-Jagged/lightning-like distortion of the beam path. Higher values increase warping; 0 produces a perfectly straight beam. Internally used to randomize beam segmentation. Default is 0.0 (straight).
+Jagged/lightning-like distortion of the drawn beam. Higher values increase warping; 0 produces a perfectly straight beam. It jitters only the core trail particles (and `spawnclass` actors) within ±`maxdiff`; the hit trace itself stays straight. Default is 0.0 (straight).
 
 ### `pufftype` (class<Actor>, optional, default "BulletPuff")
 
-Actor class spawned where the beam hits (impact effect). By default, the puff only appears in rare circumstances (e.g., hitting a dormant/invisible monster) unless the puff actor has the `ALWAYSPUFF` flag. Regardless of visibility, the puff's `DamageType` property is still applied to targets, enabling custom damage type handling. Default is `BulletPuff`.
+Actor class spawned where the beam hits (impact effect). On an actor hit, the puff appears only if the victim has `NOBLOOD` or is `DORMANT` or `INVULNERABLE`, unless the puff actor has the `ALWAYSPUFF` flag. Where the beam ends on a wall, a puff spawns only with `ALWAYSPUFF`. Floor and ceiling puffs with `ALWAYSPUFF` were added after Zandronum 3.2.1 (commit `f26a7bcbc`); a 3.2.1 build spawns none there. Regardless of visibility, the puff's `DamageType` property is still applied to targets, enabling custom damage type handling. Default is `BulletPuff`.
 
 ### `spread_xy` (double, optional, default 0.0)
 
@@ -107,7 +109,7 @@ Maximum distance in map units the beam travels before vanishing. Set to 0 to use
 
 ### `duration` (int, optional, default 0)
 
-Lifetime of rail particles in tics (1/35 second each). Set to 0 to use the engine default of 35 tics (1 second). Default is 0 (uses 35 tics).
+Lifetime of rail particles in tics (1/35 second each). Set to 0 to use the engine default of 35 tics (1 second) for the spiral and 33 tics for the core. Default is 0.
 
 ### `sparsity` (double, optional, default 1.0)
 
@@ -115,15 +117,15 @@ Distance between individual trail particles as a multiplier. Values < 1.0 pack p
 
 ### `driftspeed` (double, optional, default 1.0)
 
-Speed at which particles drift away from their spawn point along the beam path, as a multiplier. Higher values make the trail dissipate/widen more quickly. Default is 1.0 (normal drift).
+Speed at which particles drift away from their spawn point, outward from the beam, as a multiplier. Higher values make the trail dissipate/widen more quickly. Default is 1.0 (normal drift).
 
 ### `spawnclass` (class<Actor>, optional, default "none")
 
-If non-null (not `"none"`), spawn this actor class along the beam trail instead of using particle effects. Actors spawn at intervals determined by `sparsity` (units apart along the beam). Each spawned actor inherits the shooter's pitch and is linked as an owned actor (preventing self-damage from the trail). **Warning:** Spawning many actors per tic (especially additive-renderstyle actors) causes severe performance loss. Using particle effects or limiting spawn frequency is strongly recommended. Default is `"none"` (use particle effects).
+If non-null (not `"none"`), spawn this actor class along the beam trail instead of using particle effects. Actors spawn at intervals determined by `sparsity` (map units apart along the beam; in Zandronum a `sparsity` below 1 means 32 units). In Zandronum each spawned actor only gets the beam's yaw; its pitch and `target` are left unset. UZDoom also sets its pitch to the beam's and its `target` to the shooter. In Zandronum multiplayer the server skips trail drawing entirely, so these actors exist only on clients. **Warning:** Spawning many actors per tic (especially additive-renderstyle actors) causes severe performance loss. Using particle effects or limiting spawn frequency is strongly recommended. Default is `"none"` (use particle effects).
 
 ### `spawnofs_z` (double, optional, default 0.0)
 
-Vertical offset in map units (from the actor's center) where the beam originates. Positive values shift the beam origin upward, negative downward. Offset is applied from the actor's center by default, or from half the actor's height if `RGF_CENTERZ` is set. Default is 0.0 (no offset).
+Vertical offset in map units where the beam originates. Positive values shift the beam origin upward, negative downward. In Zandronum the base is half the actor's height plus the attack Z-offset (8 units for non-players, `AttackZOffset` for players) by default, or just half the actor's height if `RGF_CENTERZ` is set. Default is 0.0 (no offset).
 
 ## Behavior notes
 
@@ -137,11 +139,11 @@ The function silently returns (no-op) in these cases:
 
 If the actor has the `MF_STEALTH` flag set, the function sets `visdir = 1`, making the actor briefly visible to players (detected during attack).
 
-The actor's `MF_AMBUSH` flag is unconditionally cleared when the function fires (regardless of success/failure).
+The actor's `MF_AMBUSH` flag is cleared once the no-target check has passed, even on a client that then skips the attack. It is not cleared when `aim` is 1 or 2 and there is no target.
 
-### Velocity leading in aim modes
+### Velocity trailing in aim modes
 
-When `aim` is 1 or 2, the engine calculates a predicted intercept point by subtracting `target.velx * 3` and `target.vely * 3` from the target's position. This 3-multiplier (`veleffect` in upstream ZDoom) is **hardcoded in Zandronum** and cannot be configured; the wiki's `veleffect` parameter does not exist here.
+When `aim` is 1 or 2, the engine aims at a point behind the target by subtracting `target.velx * 3` and `target.vely * 3` from the target's position. This makes the shot lag a moving target rather than lead it. This 3-multiplier (`veleffect` in upstream ZDoom) is **hardcoded in Zandronum** and cannot be configured; the wiki's `veleffect` parameter does not exist here.
 
 ### Spread calculation
 
@@ -158,9 +160,9 @@ Pierce limit is not configurable. The beam either pierces all targets (`RGF_NOPI
 ### Network behavior (multiplayer)
 
 In Zandronum multiplayer:
-- **Server-side authority:** The server calculates the beam path and damage; clients do not perform this calculation themselves unless unlagged drawing is enabled.
-- **Unlagged client-side drawing:** If the server enables client-side unlagging via the `UNLAGGED_DrawRailClientside()` path, clients may render a rail beam locally for latency compensation, but damage application remains server-authoritative.
-- **Positioning synchronization:** Actor position is reconciled before the beam fires (via `UNLAGGED_Reconcile`) and restored afterward (via `UNLAGGED_Restore`) to ensure consistent line-of-trace results.
+- **Server-side authority:** The server calculates the beam path and damage; clients skip the attack (unless the actor is client-handled) and draw the trail when the server tells them to.
+- **Unlagged client-side drawing:** `UNLAGGED_DrawRailClientside()` only applies when the shooter is a player, unlagged is not disabled by `ZADF_NOUNLAGGED`, and that player has unlagged turned on. A client then runs the rail locally for its own player only, but damage application remains server-authoritative. Monster callers never qualify.
+- **Positioning synchronization:** For such a player shooter (not a bot), the server rewinds the other players and sector planes to where that player saw them (via `UNLAGGED_Reconcile`) for the trace and restores them afterward (via `UNLAGGED_Restore`). The shooter itself is not rewound, and monster shots are never reconciled.
 
 ## Differences from ZDoom/GZDoom
 
@@ -169,7 +171,7 @@ The ZDoom Wiki page documents upstream ZDoom/GZDoom features not present in Zand
 - **`RGF_NORANDOMPUFFZ` flag:** Does not exist in Zandronum. The puff Z-offset is always randomized (within reason).
 - **`spiraloffset` parameter:** Not in Zandronum — spiral always starts at a fixed 270-degree angle.
 - **`limit` parameter:** Not in Zandronum — pierce limit is not configurable (always pierces all targets unless `RGF_NOPIERCING` is set).
-- **`veleffect` parameter:** Not in Zandronum — velocity leading multiplier is hardcoded to 3.0.
+- **`veleffect` parameter:** Not in Zandronum — velocity-trailing multiplier is hardcoded to 3.0.
 - **Color overrides for players:** When `color1==0` and `color2==0` on a player-pawn caller, Zandronum substitutes the player's team/individual railgun color settings, not random blue/gray shades as upstream ZDoom suggests.
 
 When writing code intended to run on both Zandronum and GZDoom-family engines, be aware of these parameter and behavior differences.
@@ -223,7 +225,7 @@ actor RailDrone : Monster
 
 This fires a blue+white rail with 20 damage, straight ahead. No aiming or spread.
 
-### Targeted rail with leading aim
+### Targeted rail with target aim
 
 ```text
 A_CustomRailgun(
@@ -232,7 +234,7 @@ A_CustomRailgun(
   "FF6600",      // color1 (orange spiral)
   "FFFF00",      // color2 (yellow core)
   RGF_FULLBRIGHT | RGF_EXPLICITANGLE,  // flags
-  2,             // aim (lead target's velocity)
+  2,             // aim (at target, trailing its velocity)
   0.0,           // maxdiff
   "BulletPuff",  // pufftype
   0.0,           // spread_xy
@@ -244,7 +246,7 @@ A_CustomRailgun(
 );
 ```
 
-This fires a bright orange+yellow rail that leads the target's movement, pierces all enemies, and deals 30 damage.
+This fires a bright orange+yellow rail aimed at the target (trailing slightly behind a moving target), pierces all enemies, and deals 30 damage.
 
 ### Dual off-center rails with spread
 

@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
-**Provenance:** ZDoom Wiki `A_CheckSightOrRange` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_CheckSightOrRange&oldid=44212) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3330-3401`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_CheckSightOrRange` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_CheckSightOrRange&oldid=44212) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:3330-3401`; corrections backed by `src/thingdef/thingdef_codeptr.cpp:695-753` (`DoJump`), `src/thingdef/thingdef_states.cpp:377-397` (integer jump offsets), `src/p_sight.cpp:686` (`SF_IGNOREVISIBILITY`), `src/g_game.cpp:1183` (co-op spy camera) and `src/p_lnspec.cpp:2899-2912` (`ChangeCamera`).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_CheckSightOrRange)` in `src/thingdef/thingdef_codeptr.cpp:3374`.
 
@@ -21,7 +21,7 @@ The jump destination when both distance and sight checks fail (actor is far away
 
 The function iterates through all active players in the game. For each player:
 
-1. **Distance check (performed first, cheaper than sight tests):** Calculates the distance from the actor to the player's pawn and separately to the player's camera viewpoint (if they are viewing through a non-player camera, e.g., co-op spy or a free camera). If the actor is within the specified distance of either viewpoint, the check returns true ("in range").
+1. **Distance check (performed first, cheaper than sight tests):** Calculates the distance from the actor to the player's pawn and separately to the player's camera viewpoint (only if that camera is a non-player actor, e.g. a map camera set by `ChangeCamera`). If the actor is within the specified distance of either viewpoint, the check returns true ("in range").
 
 2. **Sight check (only if distance fails):** If distance check is false, calls `P_CheckSight(camera, self, SF_IGNOREVISIBILITY)` to test line of sight. See "Line of sight semantics" below.
 
@@ -33,7 +33,7 @@ The function iterates through all active players in the game. For each player:
 
 The sight check uses `P_CheckSight(..., SF_IGNOREVISIBILITY)`, which:
 
-- Ignores invisibility flags (`MF_SHADOW`, `RF_INVISIBLE`) and alpha (`RenderStyle` with zero alpha).
+- Ignores `RF_INVISIBLE` and a `RenderStyle`/alpha combination that makes the actor invisible. `+SHADOW` is never consulted by `P_CheckSight`, with or without this flag.
 - Ignores whether the player is actually **facing** the actor — only whether a potential line of sight exists. If a player is positioned where they could see the actor if they turned, the check returns true.
 - Uses the same 3/4-height eye position as `P_CheckSight`, not the player pawn's center.
 
@@ -44,7 +44,7 @@ The wiki states the check measures "between the center of the calling actor and 
 - **On the viewer side:** The distance is measured from the player's eye position (3/4 of the viewer's height above its base), not from the viewer's center.
 - **On the actor side:** The distance to the actor is clamped to the actor's vertical extent (`z` to `z + height`). If the viewer's eye height falls within this range, the vertical component (`dz`) is **zero**, making the check effectively 2D (horizontal distance only). Otherwise, the distance is measured to the nearest vertical edge of the actor's bounds.
 
-This means the distance behavior varies depending on whether the actor and viewer are on the same floor or at different elevations — in the common case where they are roughly at the same height, the check degenerates to a 2D distance check even without an explicit parameter.
+The check is therefore effectively 2D only when the actor's vertical extent spans the viewer's eye height. Standing on the same floor as a default 56-unit-tall player (eye reference 42 units up), an actor must be at least 42 units tall for the vertical component to be zero. A shorter actor, such as a small effect sprite, still gets a vertical component equal to the gap between its top and the player's eye height.
 
 ## Engine-family divergence: reference point for the vertical clamp
 
@@ -53,24 +53,24 @@ Zandronum and UZDoom both clamp the vertical component of the distance check to 
 - **Zandronum** anchors from the player/camera's **eye height**, 3/4 of the actor's height above its base, the same formula the source comments as matching `P_CheckSight`'s eye height (see above).
 - **UZDoom** anchors from the player/camera's **vertical center**, via the shared `AActor::Center()` helper (`Z() + Height / 2`) — the midpoint of the actor's height, not its eye/view height. UZDoom's `DoCheckSightOrRange` helper (`src/playsim/p_actionfunctions.cpp:1762-1797`, shared by both `A_CheckSightOrRange` and `A_CheckRange`) still names the local variable `eyez`, but the value it holds is the mid-height center, not an eye position.
 
-This changes the outcome only when a player/camera and the checked actor are vertically offset (e.g. one standing on a ledge above the other) by an amount that falls between the two reference heights — a difference of up to 1/4 of the player's height. When both are near the same floor height, the clamp collapses to 0 in both engines and the divergence has no effect. This affects the distance check only; the sight-check branch (`P_CheckSight`) is unaffected since it does not use this clamped vertical value.
+The two reference heights are 1/4 of the viewer's height apart, and the vertical component differs between engines whenever either reference height falls outside the checked actor's extent. That includes the same-floor case. Against a default 56-unit player on the same floor, Zandronum's component is zero only for an actor at least 42 units tall, UZDoom's for one at least 28 units tall. A 16-unit actor gets a 26-unit vertical component on Zandronum but a 12-unit one on UZDoom. Both engines agree on a zero component only when the actor spans both reference heights. This affects the distance check only; the sight-check branch (`P_CheckSight`) is unaffected since it does not use this clamped vertical value.
 
 ## Engine-family divergence: parameters
 
-The ZDoom wiki shows an optional third parameter, `bool 2d_check`, which does **not exist in Zandronum**. Passing a third argument will cause a parse error in Zandronum. (See above for why the 2D-vs-3D behavior is less relevant in practice due to the eye-height clamping.)
+The ZDoom wiki shows an optional third parameter, `bool 2d_check`, which does **not exist in Zandronum**. Passing a third argument is a fatal DECORATE parse error in Zandronum (`Expected ')', got ','.`). (See above for when the eye-height clamping already yields a 2D result.)
 
-The wiki also suggests both `int offset` and `state label` variants; Zandronum has only the `state label` variant (see `wadsrc/static/actors/actor.txt:313`), though `ACTION_PARAM_STATE` may handle both spellings internally.
+The wiki also lists `int offset` and `state label` variants. In Zandronum both are the same `state` parameter (`wadsrc/static/actors/actor.txt:313`), which accepts either a state label or an integer offset literal (`src/thingdef/thingdef_states.cpp:377-397`). Offset N targets the state N after the calling one, and 0 means no jump. A negative offset is a parse error ("Negative jump offsets are not allowed"), and so is a positive offset on a multi-frame state line.
 
 **UZDoom does implement the `2d_check`-equivalent parameter.** UZDoom's `A_CheckSightOrRange(double distance, statelabel label, bool two_dimension = false)` (`wadsrc/static/zscript/actors/checks.zs:156`) accepts a third boolean matching the wiki's description; when `true`, the vertical component of the distance check is forced to zero regardless of the clamping logic above, giving an explicit pure-2D check rather than relying on same-height degeneration.
 
 ## Network considerations
 
-**This function runs on both server and client**, unlike `A_Look` or `A_CheckSight` which have explicit client-mode early-returns. The source code comment `[BB] This is hopefully okay.` indicates uncertainty in the original implementation.
+**This function runs on both server and client**, unlike `A_Look` or `A_CheckSight` which have explicit client-mode branches. The source code comment `[BB] This is hopefully okay.` indicates uncertainty in the original implementation.
 
 This means:
-- On a network-authoritative server, the function evaluates each player's true position and camera state and makes the jump decision.
+- On the server, the function evaluates each player's position and camera state and makes its own jump decision.
 - On a client, the function uses the client's local world state to make the same decision independently, based on potentially out-of-sync player positions or camera state.
-- For actors without `NETFL_CLIENTSIDEONLY`, this client-side evaluation is **not sent to other machines** — only the server's decision propagates via state changes (the `ACTION_JUMP` call with `0` parameter, which differs from `A_CheckSight`'s `CLIENTUPDATE_FRAME`).
+- **Neither decision is sent to other machines.** The jump is `ACTION_JUMP(jump, 0)`, and without `CLIENTUPDATE_FRAME` (which `A_CheckSight` passes), `DoJump` sends clients no state update even when the server takes the jump (`src/thingdef/thingdef_codeptr.cpp:695-753`). For actors without `NETFL_CLIENTSIDEONLY`, a client can therefore take a different branch than the server.
 - For `+CLIENTSIDEONLY` actors, each client simulates its own copy and this divergence is acceptable (the flag documents such actors as visuals-only with no cross-machine consistency requirement).
 
 The practical risk is low for typical use cases (defensive checks where a false-negative result does not cause game-breaking behavior), but code using this for high-stakes decisions should be aware of this network topology.
@@ -84,7 +84,7 @@ The client/server authority split described above is specific to Zandronum's net
 The function checks line of sight and distance to both:
 
 - Each active player's pawn (`players[i].mo`).
-- Each active player's camera viewpoint, **if non-NULL and not a player pawn itself** (e.g., a free-floating camera spawned by Chasecam, Spectate, or custom camera-switching logic).
+- Each active player's camera viewpoint, **if non-NULL and not a player pawn itself** (e.g. a map camera actor set by `ChangeCamera`). Co-op spying points the camera at another player's pawn, so it adds no extra check, and chasecam is a player cheat flag rather than a camera change.
 
 Camera textures are **not** checked — the actor does not know whether it is being viewed through a camera texture portal.
 
@@ -98,6 +98,6 @@ The helper function `DoCheckSightOrRange` guards against `camera == NULL` with a
 
 - `A_CheckSight` — checks whether **any** player can see the actor (no distance component).
 - `A_CheckRange` — checks only distance to players (no line of sight component).
-- `A_JumpIfInTargetLOS` — checks whether the **target** is in line of sight *from* the actor.
-- `A_JumpIfTargetInLOS` — similar, alternate naming.
+- `A_JumpIfTargetInLOS` — jumps if the actor can see its **target**.
+- `A_JumpIfInTargetLOS` — the reverse direction: jumps if the actor is within its target's line of sight and field of view.
 - [Jump functions and network synchronization](../concepts/network-jump-synchronization.md) — detailed coverage of how state jumps interact with client/server in multiplayer.

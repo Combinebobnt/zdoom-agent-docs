@@ -1,6 +1,8 @@
 # Python tool cruft
 __pycache__/
 *.pyc
+# Optional local venv for tools/browse.py's markdown renderer
+.venv/
 
 # OS cruft
 .DS_Store
@@ -12,6 +14,10 @@ __pycache__/
 # not part of this repo's own content. Machine/session-specific, never committed.
 /.claude/
 /.mcp.json
+# Same for other agent harnesses. Root-anchored, so agents/<harness>/ adapters stay tracked.
+/.codex/
+/.gemini/
+/.opencode/
 
 # Maintainer-only machinery
 maintainer/

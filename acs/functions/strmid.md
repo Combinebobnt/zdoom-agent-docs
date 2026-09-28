@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `StrMid - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
 `https://zdoom.org/w/index.php?title=StrMid&oldid=37594`) + source-verified against `p_acs.cpp:6661-6683` (`ACSF_StrMid` case) and
 `zt-bcc/lib/zcommon.bcs:1696` (index `-67`) on 2026-07-29.
@@ -36,16 +36,15 @@ as `StrMid(str,int,int):str`). Implementation in the Zandronum source's `src/p_a
   - A **negative `start`** becomes a huge `pos`, which is always `>= oldlen` (no real string is
     that long), so it hits the "empty string" return path above — same outward result as `start`
     being too large, just for the opposite reason.
-  - A **negative `length`** becomes a huge `newlen`. This does *not* hit the same "too long, clamp
-    to remainder" branch through the obvious `pos + newlen > oldlen` comparison — `pos + newlen`
-    is itself `size_t` arithmetic and overflows/wraps back down when `newlen` is astronomically
-    large, which would make the naive `>` comparison **miss** the overrun. The fork's code
-    accounts for this with a second condition, `pos + newlen < pos` (`p_acs.cpp:6677`, the
-    standard unsigned-overflow-detection idiom: if the sum wrapped below one of its own operands,
-    it overflowed) — so the overflow case is still caught and still clamps `newlen` to
+  - A **negative `length`** becomes a huge `newlen`. `pos + newlen` is itself `size_t`
+    arithmetic. When `start` is smaller than `-length`, the sum doesn't wrap and the plain
+    `pos + newlen > oldlen` comparison catches it. When `start >= -length` (e.g. `start` 5,
+    `length` -1), the sum wraps back below `pos`, which the `>` comparison alone would miss. The
+    code covers that with a second condition in the same `if`, `pos + newlen < pos`
+    (`p_acs.cpp:6677`, the standard unsigned-overflow idiom). Either way `newlen` is clamped to
     `oldlen - pos`. Net effect: a negative `length` behaves exactly like a `length` large enough to
-    reach the end of the string, i.e. "give me the rest of `string` from `start`" — not an error,
-    not an empty string, and not the same code path as the negative-`start` case above. Neither
+    reach the end of the string, i.e. "give me the rest of `string` from `start`". It is not an
+    error, not an empty string, and not the same code path as the negative-`start` case above. Neither
     behavior is mentioned on the wiki, and conflating them (assuming any negative argument just
     produces `""`) would be a plausible but wrong guess from the wiki text alone.
 
@@ -54,8 +53,6 @@ unsigned-wraparound behavior of negative arguments, which the wiki is silent on.
 
 ## See also
 
-[`StrLeft`](https://zdoom.org/wiki/StrLeft)/[`StrRight`](https://zdoom.org/wiki/StrRight) share
-the same `oldstr == NULL || *oldstr == '\0'` empty-string short-circuit and the same
-length-clamping pattern one case above `ACSF_StrMid` in the same switch
-(`p_acs.cpp:6640-6659`) — not documented here since they're being processed as separate intake
-files in this batch.
+[`StrLeft`](strleft.md)/[`StrRight`](strright.md) share the same `oldstr == NULL || *oldstr ==
+'\0'` empty-string short-circuit and a similar length-clamping pattern, one case above
+`ACSF_StrMid` in the same switch (`p_acs.cpp:6640-6659`). They have their own doc files.

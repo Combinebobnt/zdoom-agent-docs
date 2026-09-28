@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-17)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** Zandronum source `src/callvote.cpp` + verified against declared CVAR behavior and flag aliasing.
 
 Master bitfield that controls which vote types are disabled on the server. Multiple individual `sv_no*vote` cvars (e.g., `sv_nokickvote`, `sv_nomapvote`) are **Flag-type aliases** into this single bitfield — setting one alias updates the master, and vice versa.
@@ -48,15 +48,15 @@ The flag-aliasing pattern — where one "master" bitfield cvar has multiple name
 source entirely — no declaration, and no case-insensitive mention of `vote` anywhere in the tree at
 all (not even in a comment). This is the same underlying absence documented in `callvote.md`:
 UZDoom's netcode carries no client-side voting surface, so there is no bitfield for a cvar like this
-one to gate. Setting `sv_forbidvoteflags` (or any `sv_no*vote` alias) in a UZDoom config or via
-`ConsoleCommand()` hits `C_DoCommand`'s command/cvar dispatch (`src/common/console/c_dispatch.cpp`):
-`FindCVarSub` finds no matching cvar, so it falls through to `Printf ("Unknown command \"%.*s\"\n",
-...)` and does nothing else — the same visible-but-easy-to-miss failure mode `callvote.md` documents
-for the `callvote` command itself, not a silently-created cvar.
+one to gate. Setting `sv_forbidvoteflags` (or any `sv_no*vote` alias) from the UZDoom console or in a
+config hits `C_DoCommand`'s command/cvar dispatch (`src/common/console/c_dispatch.cpp`): the cvar
+lookup finds nothing, so it prints `Unknown command "sv_forbidvoteflags"` and does nothing else. That
+is the same visible-but-easy-to-miss failure mode `callvote.md` documents for the `callvote` command
+itself, not a silently-created cvar. ACS's `ConsoleCommand()` never reaches that dispatcher on
+UZDoom; it only prints "UZDoom doesn't support execution of console commands from scripts"
+(`src/playsim/p_acs.cpp`) and does nothing else.
 
-On Zandronum, the current checkout (`src/callvote.cpp` and `src/callvote.h`, both clean relative to
-this checkout's local patch — `git status`/`git diff --stat` show no modifications to either file)
-confirms the bitfield layout table above exactly: the `FORBIDVOTE_*` enum in `src/callvote.h:71-83`
+On Zandronum, the current checkout (`src/callvote.cpp` and `src/callvote.h`) confirms the bitfield layout table above exactly: the `FORBIDVOTE_*` enum in `src/callvote.h:71-83`
 assigns each vote type the same bit position listed, and `src/callvote.cpp:1566-1588` declares
 `sv_forbidvoteflags` as `CUSTOM_CVAR( Int, ..., CVAR_ARCHIVE | CVAR_SERVERINFO )` followed by the
 matching `CVAR( Flag, ... )` alias for each bit. The "synchronized views of the same bitfield, not

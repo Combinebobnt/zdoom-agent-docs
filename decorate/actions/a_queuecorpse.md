@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_QueueCorpse` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_QueueCorpse&oldid=32300) + verified against the Zandronum source's `src/g_shared/a_action.cpp:448-451` and UZDoom's `src/playsim/a_action.cpp:94-99`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** ZDoom Wiki `A_QueueCorpse` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_QueueCorpse&oldid=32300) + verified against the Zandronum source's `src/g_shared/a_action.cpp:448-451` (queue mechanics and cvar callback: `a_action.cpp:377-437`) and UZDoom's `src/playsim/a_action.cpp:94-99`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_QueueCorpse)` in `src/g_shared/a_action.cpp` — callable from any actor's state table.
 
@@ -28,7 +28,7 @@ When called, this action checks whether the corpse queue is enabled (`sv_corpseq
 - If the queue is already at capacity, the **oldest entry is destroyed, which also destroys its corpse actor** (the corpse reference is still set at destruction time).
 - A single call to `A_QueueCorpse` evicts at most one corpse to make room — if an actor calls this multiple times, each call adds a new queue entry, and dequeuing a single entry via `A_DeQueueCorpse` removes only the first match found.
 
-The queue itself is a first-in-first-out list of `DCorpsePointer` thinkers. A `Count` field on the oldest (first) entry in the list tracks the total number of corpses currently queued; new entries do not initialize their own count (they inherit it from the rotation of the oldest entry as corpses are queued and evicted).
+The queue itself is a first-in-first-out list of `DCorpsePointer` thinkers. A `Count` field on the oldest (first) entry in the list tracks the total number of corpses currently queued. Every new entry starts with `Count = 0`, and each queue add increments only the oldest entry's count. When the oldest entry is destroyed, its count minus one is written onto the next-oldest entry, which becomes the new head.
 
 **Critical asymmetry with overflow:** When an actor calls `A_DeQueueCorpse`, the queue system **nullifies the `Corpse` reference *before* destroying the pointer**, which prevents the actor from being destroyed — this is the entire reason that action exists, for resurrection use cases. In contrast, overflow eviction destroys the corpse actor by keeping the reference set at destruction time. See `A_DeQueueCorpse` for the full details of this mechanism.
 
@@ -37,11 +37,19 @@ The queue itself is a first-in-first-out list of `DCorpsePointer` thinkers. A `C
 Place this action in the death state of a monster that should participate in corpse queue management:
 
 ```text
-Death:
-    MONS A 0 A_QueueCorpse;
-    MONS ABCD 5;
-    MONS A -1 A_Fall;
-    Stop;
+ACTOR QueuedZombie : ZombieMan
+{
+    States
+    {
+    Death:
+        POSS H 5 A_QueueCorpse
+        POSS I 5 A_Scream
+        POSS J 5 A_NoBlocking
+        POSS K 5
+        POSS L -1
+        Stop
+    }
+}
 ```
 
 ## The corpse queue mechanism and `sv_corpsequeuesize`
@@ -50,7 +58,7 @@ The queue is controlled by the `sv_corpsequeuesize` server cvar, a `CUSTOM_CVAR`
 
 - **`sv_corpsequeuesize > 0`**: the queue is enabled and limited to N corpses. Calling `A_QueueCorpse` adds an actor to the queue; if the queue reaches capacity, the oldest corpse is destroyed.
 - **`sv_corpsequeuesize <= 0`**: the queue is disabled. Calls to `A_QueueCorpse` are silent no-ops — no queue entry is created, and no corpse will ever be automatically evicted (all corpses persist indefinitely). This is the behavior referenced in historical commit messages as "setting CVAR to -1 disables corpse queuing completely."
-- **Lowering the cvar at runtime** (via console or server script) triggers the `CUSTOM_CVAR` callback, which trims the queue to fit the new size in a `while` loop — a different trimming behavior than the single-eviction-per-call performed when a new corpse is queued normally.
+- **Lowering the cvar at runtime** (via console or server script) triggers the `CUSTOM_CVAR` callback, which trims the queue to fit the new size in a `while` loop — a different trimming behavior than the single-eviction-per-call performed when a new corpse is queued normally. The callback only trims when the new value is greater than 0. Setting the cvar to 0 or below leaves every already-queued entry in place; the queue just stops accepting new corpses.
 
 The wiki's description "limited to a specific amount" correctly captures this, though the action's own implementation shows it only checks `> 0`, not a specific numeric limit — the limit check happens at queue-add time inside the `DCorpsePointer` constructor.
 

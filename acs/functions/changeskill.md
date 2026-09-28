@@ -4,10 +4,10 @@
 **Applies to:** UZDoom=yes, Zandronum=yes — function was introduced in 2007, ancestry of the
 `28f736fb3` version-bump commit, so present in all Zandronum versions including 3.2.1 (UZDoom's own
 introduction history wasn't traced this pass).
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-17)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** wiki page `ChangeSkill - ZDoom Wiki.html` (`_intake/`, source URL
 `https://zdoom.org/w/index.php?title=ChangeSkill&oldid=37542`) + source-verified
-(`p_lnspec.cpp:3276-3287`, `g_level.cpp:2076-2081`, `doomstat.cpp:NextSkill declaration`,
+(`p_lnspec.cpp:3276-3287`, `g_level.cpp:1337-1342`, `doomstat.cpp:NextSkill declaration`,
 `g_level.cpp:NextSkill initialization`). The wiki correctly describes the skill-index parameters
 (0–4 are the defaults) and that skill changes take effect "at the next map change." The wiki's
 statement "you can also use the following (defined in zdefs.acs)" applies to ZDoom; Zandronum

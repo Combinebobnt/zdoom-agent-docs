@@ -2,8 +2,8 @@
 
 **Tier:** B — spot-checked against fork source (the Zandronum source's `src/p_acs.cpp`, the zt-bcc source's `src/parse/library.c`, `src/codegen/chunk.c`), not an exhaustive trace of bcc's full namespace/import semantics (BCS's `using`/namespace-qualified imports go well beyond what this file covers).
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
-**Provenance:** `_intake/Libraries - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=Libraries&oldid=42547`), verified 2026-07-29.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
+**Provenance:** `_intake/Libraries - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=Libraries&oldid=42547`), verified 2026-07-29. Missing-library/unresolved-function unload and `MIMP`/`AIMP` last-match: Zandronum `src/p_acs.cpp:3118-3154` (`IsGood`), `src/p_acs.cpp:2736-2782`, `src/p_setup.cpp:3455`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
@@ -52,10 +52,17 @@
   of the two a typical library-lump/map-script split actually uses wasn't
   checked in this pass — not needed for this file, which documents the engine-side mechanism, not
   any particular project's wiring.)
-- **Runtime missing-library is a soft failure, not a hard error**: if a `LOAD`-chunk-listed
-  library lump can't be found at map-load time, the engine just `Printf`s *"Could not find ACS
-  library %s."* and leaves that import slot unresolved (any function call into it silently stays
-  unbound rather than crashing anything at load time) — matches the wiki's implicit framing.
+- **Runtime missing-library is a soft failure only if nothing needed a function from it**: if a
+  `LOAD`-chunk-listed library lump can't be found at map-load time, the engine `Printf`s *"Could
+  not find ACS library %s."* and never adds it to the module's `Imports` list (`p_acs.cpp:2677-2686`).
+  Its scripts are simply absent, and map variables and arrays the importer expected from it stay
+  unbound. But any function the importer takes from that library stays unresolved, and right
+  after loading the map's `BEHAVIOR`, `P_LoadBehavior` runs `StaticCheckAllGood`
+  (`p_setup.cpp:3455`). `IsGood` (`p_acs.cpp:3118-3154`) prints *"Could not find ACS function %s for use in %s."*, and
+  `P_LoadBehavior` then prints *"ACS scripts unloaded."* and unloads every ACS module, the map's own included.
+  A library's function arity mismatch against the importer's declaration fails the same check.
+  Only libraries the map's own `BEHAVIOR` pulls in are checked this way. `LOADACS` libraries load
+  later (`p_setup.cpp:4087`) and get no such check.
   **Divergence from that:** a missing `#import` *source file* at compile time is not a soft
   failure at all — `bcc` hard-errors and bails out of the whole compile. The wiki doesn't
   distinguish these two "library not found" cases (compile-time source-file miss vs. runtime
@@ -80,8 +87,8 @@
   here.)
 
   `StaticModules` push order was verified end to end, not just inferred from a doc comment:
-  `P_LoadBehavior` (`p_setup.cpp:3454`, called from `p_setup.cpp:4028`) always loads the level's
-  own `BEHAVIOR` via `StaticLoadModule` first, and `StaticLoadModule`'s `FBehavior` constructor
+  `P_LoadBehavior` (`p_setup.cpp:3454`, called from `p_setup.cpp:4028` when the map has a
+  `BEHAVIOR` lump) always loads the level's own `BEHAVIOR` via `StaticLoadModule` first, and `StaticLoadModule`'s `FBehavior` constructor
   pushes itself onto `StaticModules` (`p_acs.cpp:2350`, `LibraryID = StaticModules.Push(this)
   << LIBRARYID_SHIFT`) *before* it parses its own `LOAD` chunk and recursively
   `StaticLoadModule`s any `#import`/`#linklibrary`-named libraries — so the map's own module
@@ -96,12 +103,18 @@
   order within any one file.
 - **Cross-library function/map-variable import resolution (the `FNAM`/`MIMP`/`AIMP` chunks bcc
   emits and the engine resolves in `FBehavior`'s constructor, `p_acs.cpp:2694` onward) is a
-  separate mechanism from script-number resolution above**, and it is first-match too, but for a
-  different reason: it only fires for a symbol the *importing* module itself left unresolved
-  (`func->Address == 0 && func->ImportNum == 0`), so only the first library in the importer's own
-  `Imports` list that actually defines the symbol gets bound — a second imported library
-  defining the same function name is silently never consulted. The wiki doesn't mention this
-  path having any conflict behavior at all (it only calls out scripts as conflict-prone).
+  separate mechanism from script-number resolution above**, and its conflict rule differs by
+  symbol kind. **Functions are first-match**, for a different reason than scripts: the function
+  loop only fires for a symbol the *importing* module itself left unresolved
+  (`func->Address == 0 && func->ImportNum == 0`), and it also skips a library that merely
+  imports the function itself. So only the first library in the importer's own `Imports` list
+  that actually defines the function gets bound, and a second imported library defining the same
+  function name is silently never consulted. **Map variables and arrays are last-match.** The
+  `MIMP` and `AIMP` loops (`p_acs.cpp:2736-2782`) run inside the same per-library iteration but
+  bind on any name-table hit with no such guard, overwriting a binding an earlier library made.
+  So two libraries exporting the same map variable or array name resolve to the one listed later
+  in the importer's import order. The wiki doesn't mention this path having any conflict behavior
+  at all (it only calls out scripts as conflict-prone).
 - **BCS/`bcc`'s `#import` is a much heavier mechanism than the wiki's ACC-era description
   implies.** The wiki frames `#import` as "grab the declared scripts/functions/`#libdefine`
   constants for use, nothing else." `zt-bcc` actually parses the *entire* imported source file
@@ -126,7 +139,7 @@
   accepted.
 - Not checked at all in this pass: the wiki's number/name-conflict claim technically covers
   *functions* too ("Functions" is listed as one of the imported element categories) — this file
-  only verified the *script*-number case end-to-end. Given the `FNAM`/`MIMP` first-match behavior
+  only verified the *script*-number case end-to-end. Given the `FNAM` first-match behavior
   documented above, the same "first, not last" correction likely extends to functions, but that
   wasn't independently traced through a concrete conflicting-function-name scenario.
 
@@ -191,9 +204,11 @@ library-name text in the output, which does not distinguish "inlined with a real
   resolve against at runtime via `LOADACS`/an explicit `#import`/`#linklibrary`-driven load. **The
   unnamed case has no name to bind against at all**, so there is no error at compile time (the
   reference is accepted the same way any cross-module reference is) but no evident way for that
-  reference to ever resolve at runtime either — this was not tested in-engine, so "does it crash,
-  no-op, or Printf a warning like the named-but-lump-missing case" is unconfirmed, only that the
-  compiled object never contains a real body for that function regardless.
+  reference to ever resolve at runtime either. Not tested in-engine. From Zandronum source, if
+  that object is (or is imported by) the map's own `BEHAVIOR`, the unresolved function fails the
+  load-time `IsGood` check described in the missing-library bullet above: the engine prints
+  *"Could not find ACS function %s for use in %s."* and unloads all ACS for the map. What a call
+  into it does in a `LOADACS`-loaded module, which gets no such check, is unconfirmed.
 
 **Practical consequence:** there is no way to attach a real function *implementation* to an
 existing `#import`-reachable header and have it actually execute — not by keeping the header
@@ -268,7 +283,7 @@ have been renamed** by the GZDoom-family refactor, so grepping those specific na
 nothing — not every symbol, though: `ns_acslibrary` (the load-order namespace, cited above and
 below) is unrenamed and greps fine as-is (`FileSys::ns_acslibrary`, `p_acs.cpp:2602` on UZDoom),
 and the table below's `StaticModules` row keeps its own member name, just moved to a different
-class. Zandronum's file-scope statics on `FBehavior` are instance members of a per-level
+class. Zandronum's static members of `FBehavior` are instance members of a per-level
 `FBehaviorContainer` (reachable as the level's own `Behaviors` object) in UZDoom's
 `src/playsim/p_acs.cpp`:
 
@@ -278,7 +293,7 @@ class. Zandronum's file-scope statics on `FBehavior` are instance members of a p
 | `FBehavior::StaticLoadModule` | `FBehaviorContainer::LoadModule` |
 | `FBehavior::StaticLoadDefaultModules` | `FBehaviorContainer::LoadDefaultModules` |
 | `FBehavior::StaticStartTypedScripts` | `FBehaviorContainer::StartTypedScripts` |
-| `FBehavior::StaticModules` (file-scope static array) | `FBehaviorContainer::StaticModules` (member array, one container per level) |
+| `FBehavior::StaticModules` (static member array, `p_acs.h:538`) | `FBehaviorContainer::StaticModules` (member array, one container per level) |
 | `P_LoadBehavior` | `MapLoader::LoadBehavior` |
 
 Confirmed structurally unchanged behind those renames, each read directly in UZDoom source: for
@@ -286,8 +301,9 @@ both of the load paths documented above (`LOADACS` and a `LOAD` chunk), library 
 only in the ACS-library namespace (`ns_acslibrary`) and the map's own `BEHAVIOR` is loaded from the
 map's own lump, never from that namespace; the `LOAD` chunk is parsed
 in the module's own initialization and recursively loads each named library; a `LOAD`-listed lump
-that can't be found is still a soft failure with the same "could not find ACS library" console
-message and an unresolved import slot; `LOADACS` is still scanned across every loaded file and each
+that can't be found still prints the same "could not find ACS library" console message and is
+still left out of the import list, and the map loader still runs the same all-modules check after
+loading the map's `BEHAVIOR`, unloading all ACS when a function stays unresolved; `LOADACS` is still scanned across every loaded file and each
 listed name loaded unconditionally for every map; cross-module script lookup is still a linear
 first-match scan over the module array in push order; the push happens before the module parses its
 own `LOAD` chunk, and the map loader still loads the map's own `BEHAVIOR` before running the
@@ -324,7 +340,7 @@ properties of this path are worth knowing before using it:
   and returns the existing module: the library keeps whatever earlier index it already had, and a
   `loadacs` key naming an already-`LOADACS`ed lump changes nothing.
 
-**Scoped correction to the `FNAM`/`MIMP`/`AIMP` bullet above, as read in UZDoom source:** the
+**The `FNAM`/`MIMP`/`AIMP` split above holds on UZDoom too, as read in UZDoom source:** the
 "only fires for a symbol the importing module left unresolved" guard applies to the **function**
 (`FNAM`) loop only. The map-variable (`MIMP`) and array (`AIMP`) loops run inside the same
 per-imported-library iteration but bind unconditionally whenever the library has a matching *name
@@ -334,5 +350,4 @@ merely importing it itself; the map-variable and array paths have no equivalent 
 **map variables and
 arrays are last-match, the opposite of imported functions**. Two libraries exporting the same map
 variable name resolve to the one listed later in the importing module's own import order, while two
-exporting the same function name resolve to the earlier. This was verified in UZDoom for this pass;
-the bullet above predates it.
+exporting the same function name resolve to the earlier.

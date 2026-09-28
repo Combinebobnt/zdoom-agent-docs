@@ -2,43 +2,43 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-18)
-**Provenance:** Zandronum Wiki page `GivePlayerMedal` (retrieved 2026-08-18, https://wiki.zandronum.com/w/index.php?title=GivePlayerMedal&oldid=2253) + source-verified against the Zandronum source's `src/p_acs.cpp:8900-8910` (case ACSF_GivePlayerMedal implementation) and `src/medal.cpp:412-487` (MEDAL_GiveMedal implementation), `zt-bcc/lib/zcommon.bcs:-179` (function signature in extension-function table).
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
+**Provenance:** Zandronum Wiki page `GivePlayerMedal` (retrieved 2026-08-18, https://wiki.zandronum.com/w/index.php?title=GivePlayerMedal&oldid=2253) + source-verified against the Zandronum source's `src/p_acs.cpp:8900-8907` (case ACSF_GivePlayerMedal implementation) and `src/medal.cpp:412-487` (MEDAL_GiveMedal implementation), `wadsrc/static/gamemode.txt` (which modes set `PLAYERSEARNMEDALS`), `src/cl_main.cpp:4904-4907` and `protocolspec/spec.players.txt:273-277` (client side of the broadcast), `zt-bcc/lib/zcommon.bcs:-179` (function signature in extension-function table).
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
-**Bucket:** extension function (index −179 in `zcommon.bcs`'s `special` table; dispatched as `ACSF_GivePlayerMedal` in `src/p_acs.cpp:8900-8910`).
+**Bucket:** extension function (index −179 in `zcommon.bcs`'s `special` table; dispatched as `ACSF_GivePlayerMedal` in `src/p_acs.cpp:8900-8907`).
 
-Awards a medal to a player. Server-side only; the function will always return `0` when called from a client or in single-player mode.
+Awards a medal to a player. It runs wherever the calling script runs except on a client: offline it awards locally, on a server it awards and tells clients, and on a client (or during client demo playback) it returns `0` without doing anything. In a stock cooperative, survival or invasion game (including ordinary single-player) it also returns `0`, because those game modes don't earn medals.
 
 ## Parameters
 
 - **`player`**: player number (index) of the player to award the medal to. Must be a valid player index (0 through `MAXPLAYERS-1`).
-- **`medal`**: the name of the medal to be awarded as a string. The medal must exist in the server's medal definition list; an invalid medal name causes the function to return `0`.
-- **`silent`**: if `true`, suppresses the medal's visual and audio feedback — the medal is recorded as earned but not displayed on the screen, above the player's head, or accompanied by any medal sounds. If `false`, the normal medal announcements occur (subject to the `cl_medals` cvar on the receiving client and `ZADF_NO_MEDALS` admin flag on the server).
+- **`medal`**: the name of the medal to be awarded as a string. The medal must exist in the loaded MEDALDEF medal list; an unknown medal name causes the function to return `0`.
+- **`silent`**: if `true`, suppresses the medal's visual and audio feedback. The medal is still counted as earned, but it is not queued for the on-screen display, no icon floats above the player's head and no medal sound plays. If `false`, a client (or an offline game) shows the normal announcement unless its `cl_medals` cvar is off. `silent` does not affect anything else: the `ZADF_NO_MEDALS` flag refuses the whole award either way (see below).
 
 ## Return value
 
 Returns **`1`** on success (medal awarded), **`0`** on failure. Failure occurs when:
 
-- The function is called from a client (or in single-player mode via `NETWORK_InClientMode()` check).
-- The player index is invalid (out of range, player actor is null, or player disconnected).
-- The medal name is invalid (not found in the server's medal list).
-- The server has medals disabled via the `ZADF_NO_MEDALS` admin flag.
-- The game mode is in a countdown phase or is configured so players don't earn medals (`GMF_PLAYERSEARNMEDALS` flag is not set).
+- The function is called on a client, or during client demo playback (`NETWORK_InClientMode()`).
+- The game is in a countdown, or the current game mode lacks the `PLAYERSEARNMEDALS` flag. In stock `gamemode.txt` every mode sets it except Cooperative, Survival and Invasion.
+- The player index is invalid (out of range, or the player has no body, e.g. not in the game).
+- The medal name is invalid (not found in the medal list).
+- Medals are disabled via the `ZADF_NO_MEDALS` flag.
+- A `GAMEEVENT_MEDALS` `EVENT` script sets the event result to `0`, vetoing the award (`src/medal.cpp:430-432`).
 
-## Server-side execution
+## Where it runs
 
-This function enforces server-side execution: a client that calls `GivePlayerMedal` will receive an immediate return value of `0`, even if the player index and medal name are otherwise valid. This is a strict check in `src/p_acs.cpp:8902` via `NETWORK_InClientMode()` — any environment that is not the authoritative server (including spectators running a `CLIENTSIDE` script) cannot execute the medal award.
+The only network gate in the function itself is the client check at `src/p_acs.cpp:8903`: a client script (including a `CLIENTSIDE` script) gets `0` even if the player index and medal name are otherwise valid. Offline, the award and its display happen locally. On a server, the award is applied and then broadcast with the `GivePlayerMedal` server command (`src/medal.cpp:482-484`), carrying the player, the medal index and the `silent` flag (`protocolspec/spec.players.txt:273-277`). Each client re-runs the same award routine with those values (`src/cl_main.cpp:4904-4907`), so the client's own countdown, game-mode and `ZADF_NO_MEDALS` checks and its `cl_medals` setting decide what it shows.
 
 ## Medal display behavior
 
-The `silent` parameter controls client-side medal display logic (`src/medal.cpp:437`). When `silent` is `false`:
-- The medal is queued for visual display on the player's client (subject to `cl_medals` cvar).
-- The medal announcement is triggered (medal icon animation, associated sounds).
-- If the player is a bot, the bot is notified via `BOTEVENT_RECEIVEDMEDAL`.
+Display is gated on three things at `src/medal.cpp:437`: the machine is not a server, `cl_medals` is on, and `silent` is `false`. When all hold:
+- The medal is queued for visual display (replacing a lower medal of the same chain already in the queue).
+- If it is at the front of the queue, the announcement is triggered (on-screen text and icon, the floating icon above the player, associated sounds).
 
-When `silent` is `true`, none of the client-side display occurs; the medal is only recorded internally as earned for statistics/event purposes.
+When `silent` is `true`, none of the display occurs. The rest of the award still happens: the medal's awarded count goes up, a bot player is notified via `BOTEVENT_RECEIVEDMEDAL` (`src/medal.cpp:476-480`, regardless of `silent`), and a server still sends the command to clients.
 
-If the server is in countdown or medals are administratively disabled, the medal is neither displayed nor recorded, regardless of the `silent` flag.
+If the game is in a countdown or medals are disabled, the medal is neither displayed nor recorded, regardless of the `silent` flag.
 
 ## Zandronum-specific: UZDoom absence
 

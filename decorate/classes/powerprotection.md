@@ -2,11 +2,11 @@
 
 **Tier:** B
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-17)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** Source-derived (no wiki page consulted) — verified against the Zandronum source's
 `src/g_shared/a_artifacts.h:209` (native C++ class `APowerProtection : public APowerup`) and
 `src/g_shared/a_artifacts.cpp` (`APowerProtection::ModifyDamage`), plus `src/p_interaction.cpp`
-(`P_DamageMobj`'s passive-modifier call site).
+(`P_DamageMobj`'s passive-modifier call site, and its `DMG_FORCED` gate at line 1259).
 **Bucket:** `src/g_shared/a_artifacts.h:209` (native C++ class), implementation in
 `src/g_shared/a_artifacts.cpp` — **corrected 2026-08-17: this class overrides three `Powerup`
 lifecycle methods, not just `ModifyDamage`.** `InitEffect`/`EndEffect` (lines 1649/1674) handle a
@@ -55,9 +55,12 @@ Mechanically it iterates rather than recursively chains (see "Stacking and order
    - If neither exists, **no reduction is applied at all** for this hit — the class's own
      `DamageFactors` table takes over damage reduction entirely once it's non-empty, and an
      uncovered damage type passes through at full strength.
-2. If the class has **no** `DamageFactor` entries declared anywhere (`DamageFactors` is null or
-   empty), a hardcoded default factor of `FRACUNIT/4` (**0.25**) is used instead, applied to
-   **every** damage type unconditionally.
+2. If the class has **no** `DamageFactor` table entries (`DamageFactors` is null or empty, counting
+   entries inherited from parent classes), a hardcoded default factor of `FRACUNIT/4` (**0.25**) is
+   used instead, applied to **every** damage type unconditionally. A bare `DamageFactor <value>`
+   with no type string doesn't count: it sets the actor's scalar `DamageFactor` property, not the
+   table, so `ModifyDamage` ignores it and still uses 0.25. Only a typed entry (including
+   `"Normal"` or `""`) populates the table.
 
 The trap: a modder who subclasses `PowerProtection` expecting an inert base ("I'll add
 `DamageFactor` entries for the types I care about, everything else stays full damage") gets the
@@ -110,12 +113,15 @@ order as Zandronum.
 ## Engine-family divergence: telefrag-magnitude damage
 
 On Zandronum, `PowerProtection`'s passive `ModifyDamage` call (`target->Inventory->ModifyDamage(...)`
-in `P_DamageMobj`, `src/p_interaction.cpp:1310-1314`) is gated only by `target->Inventory != NULL` —
-there is no `damage < TELEFRAG_DAMAGE` check anywhere around it, unlike the `MF2_INVULNERABLE` check
-a few lines earlier in the same function, which explicitly requires `damage < TELEFRAG_DAMAGE`
-(`src/p_interaction.cpp:1212`) to apply. So on Zandronum, `PowerProtection` (and `DamageFactor`,
-similarly ungated at `src/p_interaction.cpp:1337`) reduces telefrag-magnitude damage exactly the
-same as any other hit.
+in `P_DamageMobj`, `src/p_interaction.cpp:1310-1314`) has no damage-magnitude gate. It needs a
+non-null `target->Inventory`, and like every special damage check it sits inside the
+`if (!(flags & DMG_FORCED))` block (`src/p_interaction.cpp:1259`), so `DMG_FORCED` damage skips
+it (and a `+DORMANT` target returns before it). There is no `damage < TELEFRAG_DAMAGE` check,
+unlike the `MF2_INVULNERABLE` check earlier in the same function, which explicitly requires
+`damage < TELEFRAG_DAMAGE` (`src/p_interaction.cpp:1212`) to apply. The engine's telefrag calls
+(`src/p_map.cpp:435,516`) don't pass `DMG_FORCED`. So on Zandronum, `PowerProtection` (and
+`DamageFactor`, applied at `src/p_interaction.cpp:1339-1342` under `DMG_NO_FACTOR`/`DMG_FORCED`
+gates but no magnitude gate) reduces telefrag-magnitude damage exactly the same as any other hit.
 
 **UZDoom does not agree.** `P_DamageMobj` (`src/playsim/p_interaction.cpp`) computes a local boolean
 near the top of the function (line 1087) recording whether the raw incoming damage is at or above
@@ -138,17 +144,20 @@ unconditionally, with no floor or magnitude check... even when the incoming dama
 ## Flag-transfer half (`InitEffect`/`EndEffect`)
 
 Previously undocumented on this page: `PowerProtection` does more than reduce damage via
-`ModifyDamage`. On `InitEffect`, it transfers a fixed set of protection-related actor flags from
-itself onto its `Owner` — but only for flags the owner doesn't already have set (and clears them
-from itself once transferred, so `EndEffect` only reverts what it granted, not pre-existing owner
-flags); `EndEffect` reverses the transfer. This is identical in *effect* on both engines, expressed
-through each engine's own flag-storage convention:
+`ModifyDamage`. On `InitEffect`, it copies onto its `Owner` whichever of seven protection-related
+flags the powerup itself has set, but only for flags the owner doesn't already have (it clears
+the rest from itself, so `EndEffect` only reverts what it granted, not pre-existing owner flags);
+`EndEffect` reverses the transfer. The seven are the eligible set, not a fixed grant: stock
+`PowerProtection` sets none of them, and `PowerupGiver` copies no flags to the powerup it spawns,
+so nothing transfers unless the powerup class itself declares e.g. `+NORADIUSDMG` or `+NOPAIN`.
+This is identical in *effect* on both engines, expressed through each engine's own flag-storage
+convention:
 
-- Zandronum (`src/g_shared/a_artifacts.cpp:1649-1683`, native `flags3`/`flags5` bitmasks): transfers
-  `MF3_NORADIUSDMG`, `MF3_DONTMORPH`, `MF3_DONTSQUASH`, `MF3_DONTBLAST`, `MF3_NOTELEOTHER` (the
+- Zandronum (`src/g_shared/a_artifacts.cpp:1649-1683`, native `flags3`/`flags5` bitmasks): eligible
+  flags are `MF3_NORADIUSDMG`, `MF3_DONTMORPH`, `MF3_DONTSQUASH`, `MF3_DONTBLAST`, `MF3_NOTELEOTHER` (the
   `PROTECTION_FLAGS3` bundle) and `MF5_NOPAIN`, `MF5_DONTRIP` (`PROTECTION_FLAGS5`).
 - UZDoom (`wadsrc/static/zscript/actors/inventory/powerups.zs:1736-1793`, named ZScript bool
-  properties): transfers the same seven flags by their ZScript names —
+  properties): the same seven flags by their ZScript names —
   `bNoRadiusDmg`, `bDontMorph`, `bDontSquash`, `bDontBlast`, `bNoTeleOther`, `bNoPain`, `bDontRip`.
 
 Same seven flags, same transfer-if-owner-lacks-it / revert-on-end semantics, on both engines — clean

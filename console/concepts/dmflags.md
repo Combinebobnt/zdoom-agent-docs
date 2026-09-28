@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-02)
-**Provenance:** Zandronum source `src/doomdef.h:243-527` verified against actual flag-checking code in `src/*.cpp`. Cross-checked against ZDoom Wiki `DMFlags` page (https://zdoom.org/w/index.php?title=DMFlags&oldid=54806, saved 2026-08-02) to identify ZDoom/Zandronum dmflags divergence; see "Engine-family divergence" section below.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** Zandronum source `src/doomdef.h:243-527` verified against actual flag-checking code in `src/*.cpp` (corrections backed by `src/g_shared/a_pickups.cpp:568`, `src/g_doom/a_doommisc.cpp:54`, `src/d_main.cpp:433-447`, `src/p_user.cpp:696-707`, `src/p_user.cpp:3472-3473`, `src/p_setup.cpp:3610-3637`; zadmflags version history from commits 24cfb5fdc and bf80aff21 against release commits 070070494 (3.2) and ec9af1ec8 (3.1)). Cross-checked against ZDoom Wiki `DMFlags` page (https://zdoom.org/w/index.php?title=DMFlags&oldid=54806, saved 2026-08-02) to identify ZDoom/Zandronum dmflags divergence; see "Engine-family divergence" section below.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
@@ -64,7 +64,7 @@ Bits 22-23 form a 2-bit selector for crouch behavior, analogous to jump:
 
 ### `DF_NO_ITEMS` (dmflags bit 1, value 2)
 
-**This flag is declared but not implemented.** The source code at `src/p_mobj.cpp:6173-6177` has the check present but the actual logic is commented out:
+**This flag is declared but not implemented.** Its only live reference is the `sv_noitems` cvar binding (`src/d_main.cpp:456`). The copy of the check in `P_SpawnMapThing` at `src/p_mobj.cpp:6173-6177` sits inside a larger `/* ... */` block (`src/p_mobj.cpp:6154-6186`), and its body is line-commented as well:
 
 ```c
 if (dmflags & DF_NO_ITEMS)
@@ -74,7 +74,7 @@ if (dmflags & DF_NO_ITEMS)
 }
 ```
 
-The enum comment explains why: "[RC] Currently not implemented (no easy way to find if it's an object, like AArtifact)." Setting this flag has no effect on gameplay. (This non-functionality is documented in the Zandronum source code comment; the ZDoom wiki does not discuss this flag.)
+The live spawn filter is `P_RemoveThings` in `src/p_setup.cpp`, whose dmflags block (`src/p_setup.cpp:3610`) keeps its `DF_NO_ITEMS` branch commented out too (`src/p_setup.cpp:3628-3637`). The enum comment explains why: "[RC] Currently not implemented (no easy way to find if it's an object, like AArtifact)." Setting this flag has no effect on gameplay. (This non-functionality is documented in the Zandronum source code comment; the ZDoom wiki does not discuss this flag.)
 
 ## Source code comment inversions
 
@@ -88,12 +88,12 @@ The enum comment explains why: "[RC] Currently not implemented (no easy way to f
 
 The flag *names* accurately describe the intended effect; the comments are simply wrong in the source. This does not affect gameplay (the code checks the bit, not the comment), but it can confuse modders reading the source.
 
-## Interaction with `alwaysapplydmflags` (Zandronum-specific)
+## Interaction with `alwaysapplydmflags` (Zandronum gating)
 
-`alwaysapplydmflags` is a Zandronum-specific cvar (not in ZDoom) that controls whether dmflags apply outside of deathmatch game modes:
+`alwaysapplydmflags` controls whether deathmatch-oriented dmflags apply outside deathmatch. The cvar exists on both engines (UZDoom declares it in `src/g_cvars.cpp`); the notes below describe Zandronum's gating only:
 
-- **DF_FORCE_RESPAWN** requires `alwaysapplydmflags = true` to function in non-deathmatch modes.
-- **DF2_BARRELS_RESPAWN** only works in non-deathmatch modes if `alwaysapplydmflags = true`.
+- **DF_FORCE_RESPAWN** auto-respawns dead players only in deathmatch, team games, or with `alwaysapplydmflags = true` (`src/p_user.cpp:3472-3473`).
+- **DF2_BARRELS_RESPAWN** is not gated by game mode or `alwaysapplydmflags`. `A_BarrelDestroy` checks only the flag itself (`src/g_doom/a_doommisc.cpp:54`), so barrels respawn in any mode when it is set.
 
 Check the `alwaysapplydmflags` cvar notes for full semantics.
 
@@ -103,7 +103,7 @@ The tables and flags documented on this page enumerate Zandronum's full dmflags 
 
 ### dmflags bit 19: Zandronum-specific `DF_RESPAWN_SUPER`
 
-**Zandronum dmflags bit 19:** `DF_RESPAWN_SUPER` (value 524288) — respawn players with invulnerability and invisibility active.
+**Zandronum dmflags bit 19:** `DF_RESPAWN_SUPER` (value 524288). Lets invulnerability and invisibility items (`IF_BIGPOWERUP`) respawn when item respawning is on; without it `AInventory::ShouldRespawn` never respawns them (`src/g_shared/a_pickups.cpp:568`). It does not give respawning players any powerup.
 
 **UZDoom dmflags bits 18-19:** Form a 2-bit freelook selector, identical to the jump/crouch selectors documented above. Bit 19 is part of `DF_YES_FREELOOK = 2 << 18` and has no independent `DF_RESPAWN_SUPER` equivalent. UZDoom has `DF2_RESPAWN_SUPER` at dmflags2 bit 27 instead (separate flag with identical behavior), but this is not present in Zandronum.
 
@@ -134,7 +134,7 @@ The following dmflags2 bits exist and are functional in Zandronum but are commen
 
 UZDoom's dmflags2 extends beyond bit 26 (where Zandronum stops) with additional bits 27-31:
 
-- **Bit 27:** `DF2_RESPAWN_SUPER` — respawn invulnerability and invisibility (UZDoom's replacement for Zandronum's dmflags bit 19)
+- **Bit 27:** `DF2_RESPAWN_SUPER`. Invulnerability and invisibility items can respawn (UZDoom's replacement for Zandronum's dmflags bit 19)
 - **Bit 28:** `DF2_NO_COOP_THING_SPAWN` — don't spawn multiplayer things in co-op games
 - **Bit 29:** `DF2_ALWAYS_SPAWN_MULTI` — always spawn multiplayer items
 - **Bit 30:** `DF2_NOVERTSPREAD` — don't allow vertical spread for hitscan weapons
@@ -146,13 +146,13 @@ UZDoom's dmflags2 extends beyond bit 26 (where Zandronum stops) with additional 
 
 ## Version gates for Zandronum-specific dmflags
 
-The Zandronum dmflags (ZADF_*) were added incrementally across versions. **The following flags were added *after* Zandronum 3.2.1** and should not be documented as 3.2.1-stable:
+The Zandronum dmflags (ZADF_*) were added incrementally across versions. **All zadmflags bits 0-28 are present and implemented in the 3.2.1 release** (checked at its release commit 28f736fb3). The following three were added during 3.2 development, after the 3.1 release, so 3.1 and earlier clients lack them:
 
-- `ZADF_DONT_HIDE_STATS` (zadmflags bit 24, value 16777216) — added 2022-08-20
-- `ZADF_NO_ALLY_ICONS` (zadmflags bit 27, value 134217728) — added 2024-07-14
-- `ZADF_NO_ENEMY_ICONS` (zadmflags bit 28, value 268435456) — added 2024-07-14
+- `ZADF_DONT_HIDE_STATS` (zadmflags bit 24, value 16777216). Added 2022-08-20 in commit 24cfb5fdc; first released in 3.2.
+- `ZADF_NO_ALLY_ICONS` (zadmflags bit 27, value 134217728). Added 2024-07-14 in commit bf80aff21; first released in 3.2.
+- `ZADF_NO_ENEMY_ICONS` (zadmflags bit 28, value 268435456). Added 2024-07-14 in commit bf80aff21; first released in 3.2.
 
-The remaining Zandronum dmflags (bits 0-23, 25-26) predate or coincide with 3.2.1. See individual flag documentation for current version stamps.
+This page does not establish the first release for the other bits. See individual flag documentation for current version stamps.
 
 ## Engine-family divergence: UZDoom/GZDoom family vs. Zandronum
 
@@ -185,18 +185,18 @@ This file documents Zandronum semantics throughout; see the detailed divergence 
 | 5 | 32 | (unused) | — | — |
 | 6 | 64 | `DF_SAME_LEVEL` | Don't advance maps on exit | Deathmatch only |
 | 7 | 128 | `DF_SPAWN_FARTHEST` | Spawn away from other players | Deathmatch only |
-| 8 | 256 | `DF_FORCE_RESPAWN` | Auto-respawn after death | Deathmatch only; requires `alwaysapplydmflags` in other modes |
+| 8 | 256 | `DF_FORCE_RESPAWN` | Auto-respawn after death | Deathmatch and team games; requires `alwaysapplydmflags` in other modes |
 | 9 | 512 | `DF_NO_ARMOR` | Armor items don't spawn | Deathmatch only |
 | 10 | 1024 | `DF_NO_EXIT` | Kill any player who exits | Deathmatch only |
 | 11 | 2048 | `DF_INFINITE_AMMO` | Infinite ammunition | — |
 | 12 | 4096 | `DF_NO_MONSTERS` | Monsters don't spawn | — |
 | 13 | 8192 | `DF_MONSTERS_RESPAWN` | Monsters respawn after death | — |
-| 14 | 16384 | `DF_ITEMS_RESPAWN` | Items respawn (except invuln/invisibility) | — |
+| 14 | 16384 | `DF_ITEMS_RESPAWN` | Items respawn (except invuln/invisibility unless `DF_RESPAWN_SUPER`) | — |
 | 15 | 32768 | `DF_FAST_MONSTERS` | Monsters use FastSpeed property | — |
 | 16-17 | 65536, 131072 | `DF_NO_JUMP` / `DF_YES_JUMP` | Control jump behavior | See section above; 2-bit field |
 | 18 | 262144 | `DF_NO_FREELOOK` | Freelook disabled | — |
-| 19 | 524288 | `DF_RESPAWN_SUPER` | Respawn with invulnerability and invisibility | **Zandronum only** |
-| 20 | 1048576 | `DF_NO_FOV` | FOV locked to default (90) | — |
+| 19 | 524288 | `DF_RESPAWN_SUPER` | Invulnerability and invisibility items can respawn (with `DF_ITEMS_RESPAWN`) | **Zandronum only** |
+| 20 | 1048576 | `DF_NO_FOV` | Only the net arbitrator may set FOV; its FOV is applied to all players | — |
 | 21 | 2097152 | `DF_NO_COOP_WEAPON_SPAWN` | Multiplayer-only weapons don't spawn in coop | Coop only |
 | 22-23 | 4194304, 8388608 | `DF_NO_CROUCH` / `DF_YES_CROUCH` | Control crouch behavior | See section above; 2-bit field |
 | 24 | 16777216 | `DF_COOP_LOSE_INVENTORY` | Lose all inventory on death | Coop only |
@@ -220,7 +220,7 @@ This file documents Zandronum semantics throughout; see the detailed divergence 
 | 6 | 64 | `DF2_YES_DOUBLEAMMO` | Double ammo from items | — |
 | 7 | 128 | `DF2_YES_DEGENERATION` | Slow health loss above 100% (Quake-style) | — |
 | 8 | 256 | `DF2_YES_FREEAIMBFG` | BFG can be aimed vertically | **Zandronum name**; UZDoom: `DF2_NO_FREEAIMBFG` (inverted semantics) |
-| 9 | 512 | `DF2_BARRELS_RESPAWN` | Barrels respawn (non-deathmatch requires `alwaysapplydmflags = true`) | — |
+| 9 | 512 | `DF2_BARRELS_RESPAWN` | Barrels respawn (any game mode; not gated by `alwaysapplydmflags`) | — |
 | 10 | 1024 | `DF2_NO_RESPAWN_INVUL` | No invulnerability on respawn | **Zandronum name**; UZDoom: `DF2_YES_RESPAWN_INVUL` (inverted semantics) |
 | 11 | 2048 | `DF2_SHOTGUNSTART` | All players start with shotgun | **Zandronum only** |
 | 12 | 4096 | `DF2_SAME_SPAWN_SPOT` | Respawn at death location (Coop) | — |
@@ -238,7 +238,7 @@ This file documents Zandronum semantics throughout; see the detailed divergence 
 | 24 | 16777216 | `DF2_DONTCHECKAMMO` | Weapon switching doesn't require ammo | — |
 | 25 | 33554432 | `DF2_KILLBOSSMONST` | Killing BossBrain kills all its spawns | — |
 | 26 | 67108864 | `DF2_NOCOUNTENDMONST` | Don't count end-sector monsters toward kill quota | — |
-| 27 | 134217728 | `DF2_RESPAWN_SUPER` | Respawn invulnerability and invisibility | **UZDoom only** |
+| 27 | 134217728 | `DF2_RESPAWN_SUPER` | Invulnerability and invisibility items can respawn | **UZDoom only** |
 | 28 | 268435456 | `DF2_NO_COOP_THING_SPAWN` | Don't spawn multiplayer things in co-op games | **UZDoom only** |
 | 29 | 536870912 | `DF2_ALWAYS_SPAWN_MULTI` | Always spawn multiplayer items | **UZDoom only** |
 | 30 | 1073741824 | `DF2_NOVERTSPREAD` | Don't allow vertical spread for hitscan weapons | **UZDoom only** |
@@ -272,11 +272,11 @@ This file documents Zandronum semantics throughout; see the detailed divergence 
 | 21 | 2097152 | `ZADF_SHOOT_THROUGH_ALLIES` | Hitscans/projectiles pass through teammates | 3.2.1 |
 | 22 | 4194304 | `ZADF_DONT_PUSH_ALLIES` | Attacks don't thrust teammates | 3.2.1 |
 | 23 | 8388608 | `ZADF_DONT_KEEP_JOIN_QUEUE` | Clear join queue between maps | 3.2.1 |
-| 24 | 16777216 | `ZADF_DONT_HIDE_STATS` | Reveal player health/armor in PVP | **post-3.2.1** |
+| 24 | 16777216 | `ZADF_DONT_HIDE_STATS` | Reveal player health/armor in PVP | 3.2.1 (added in 3.2) |
 | 25 | 33554432 | `ZADF_DONT_OVERRIDE_PLAYER_COLORS` | Prevent cl_overrideplayercolors | 3.2.1 |
 | 26 | 67108864 | `ZADF_NO_SPAWN_TELEFOG` | Teleport fog disabled on spawn | 3.2.1 |
-| 27 | 134217728 | `ZADF_NO_ALLY_ICONS` | Ally icons hidden | **post-3.2.1** |
-| 28 | 268435456 | `ZADF_NO_ENEMY_ICONS` | Enemy icons hidden | **post-3.2.1** |
+| 27 | 134217728 | `ZADF_NO_ALLY_ICONS` | Ally icons hidden | 3.2.1 (added in 3.2) |
+| 28 | 268435456 | `ZADF_NO_ENEMY_ICONS` | Enemy icons hidden | 3.2.1 (added in 3.2) |
 
 ## Compatibility flags
 

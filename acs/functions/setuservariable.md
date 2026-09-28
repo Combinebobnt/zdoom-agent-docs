@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes — Zandronum source used is a 3.3-alpha checkout (see ../../shared/AUTHORING.md's "Engine scope" section for the 3.2.1-target-vs-checkout gap).
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-17)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** Verified against Zandronum source (p_acs.cpp, case ACSF_SetUserVariable) from the ZDoom Wiki page, https://zdoom.org/w/index.php?title=page&oldid=45355.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
@@ -16,11 +16,12 @@ Sets a user variable on one or more actors.
 
 - `tid`: The thing ID(s) to target. If 0, targets the script's activator. If nonzero, the function iterates through all actors with that TID. Same on both engines.
 - `name`: The name of the variable to set. **On Zandronum**, must be of the form `user_*` (enforced by the `bUserVar` gate — see "User variable restrictions" below). **On UZDoom, this restriction does not exist** — any non-native scalar field reachable by name in the class symbol table can be targeted, `user_`-prefixed or not. See "Engine-family divergence" below.
-- `value`: The value to assign. Passed as a fixed-point ACS integer. **On Zandronum**, always stored as a raw 32-bit integer (the only supported field type). **On UZDoom**, the stored representation depends on the target field's actual type — see "Engine-family divergence" below.
+- `value`: The value to assign. Passed as a raw 32-bit ACS value. **On Zandronum**, always stored as a raw 32-bit integer (the only supported field type). **On UZDoom**, the stored representation depends on the target field's actual type — see "Engine-family divergence" below.
 
 ## Behavior
 
 The function attempts to set the named field on all matching actors. It returns an actor count as follows:
+- If the `name` string isn't already a known engine name (the lookup never creates one), returns 0 and touches nothing.
 - If `tid` is 0: returns 1 (whether or not the activator exists; see Quirks below).
 - If `tid` is nonzero: returns the count of actors it actually iterated through (0 if no actors match that TID).
 
@@ -30,7 +31,7 @@ In practice, the return value is inaccessible from ACS/BCS code — the function
 
 ### User variable restrictions (Zandronum)
 
-- Only `int`-typed user variables can be set. Declarations of `double` or `bool` user variables in DECORATE are rejected at parse time (Zandronum's DECORATE parser enforces `user_*` variables to be `int` only, unlike the ZDoom wiki's claim of supporting `double` and `bool`).
+- Only `int`-typed user variables can be set. Naming an `int` array user variable is not rejected: the write goes to element 0 (the helper is shared with `SetUserArray`, called with index 0). Declarations of `double` or `bool` user variables in DECORATE are rejected at parse time (Zandronum's DECORATE parser enforces `user_*` variables to be `int` only, unlike the ZDoom wiki's claim of supporting `double` and `bool`).
 - Native variables (declared with the `native` keyword in DECORATE) cannot be set.
 - Both restrictions stem from the same gate: the static `SetUserVariable` helper (`src/p_acs.cpp:5593-5621`) requires the resolved symbol to carry the `bUserVar` flag, which DECORATE's `ParseUserVariable` only ever sets on `int`-typed, `var`-declared, non-native fields. See "Engine-family divergence" below — UZDoom does not have this gate at all, so neither restriction holds there in the same form.
 

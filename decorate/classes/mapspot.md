@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** ZDoom Wiki Classes:MapSpot (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=Classes%3AMapSpot&oldid=42840) + verified against
 Zandronum source `wadsrc/static/actors/shared/sharedmisc.txt` (DECORATE definition), `src/p_teleport.cpp`
 (teleport-destination fallback), and `src/gamemode.cpp` (damage-event script context).

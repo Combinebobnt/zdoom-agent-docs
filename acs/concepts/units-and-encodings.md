@@ -2,8 +2,8 @@
 
 **Tier:** B (wiki-sourced concept page; tic counting, fixed-point/angle encodings, and the `speed`/8 scaling were traced to source; the Boom speed-constant table and the general "every `SPEED()`-using special behaves the same" extrapolation were not; engine-family SPEED() macro divergence is source-verified).
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-16)
-**Provenance:** wiki page `Definitions - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28, `https://zdoom.org/w/index.php?title=Definitions&oldid=49529`) + verified against the Zandronum source (`doomdef.h`, `win32/i_system.cpp`, `p_lnspec.cpp`) for the TICRATE/precision and `speed`-scaling claims (2026-07-28). Fixed-point/ angle/pitch encoding definitions are language-level facts, not independently re-derived from engine source (there is no fork-specific behavior to diverge here). The Boom door/platform/stair speed table is wiki-sourced background, not source-verified.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
+**Provenance:** wiki page `Definitions - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28, `https://zdoom.org/w/index.php?title=Definitions&oldid=49529`) + verified against the Zandronum source (`doomdef.h`, `win32/i_system.cpp`, `p_lnspec.cpp`) for the TICRATE/precision and `speed`-scaling claims (2026-07-28). Fixed-point/ angle/pitch encoding definitions are language-level facts, not independently re-derived from engine source (there is no fork-specific behavior to diverge here). The Boom door/platform/stair speed table is wiki-sourced background, not source-verified. Octic users and tic-clock backends checked 2026-09-27 against Zandronum `p_lnspec.cpp:76-78,250,290,844`, `g_shared/a_movingcamera.cpp:368,394`, `g_shared/a_camera.cpp:78`, `win32/i_system.cpp:289-302,345-371`, `sdl/i_system.cpp:178-197,269-308` and `sv_main.cpp:651-699`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 Fixed-point numbers, byte/fixed-point angles and pitches, tic/octic time units, and the
@@ -38,11 +38,15 @@ it's the language's own type definition, not fork-specific behavior.
 - **Fixed-point pitch**: same fixed-point-angle encoding as above but the useful range is only
   `-0.25` (90° up) to `0.25` (90° down), since pitch is limited to a half-turn.
 
-## Units of time: tic vs octic — and the GZDoom-only precision fix does NOT apply here
+## Units of time: tic vs octic
 
 - **Tic**: nominally 1/35 second; actor/state logic runs on tics.
-- **Octic**: nominally 1/8 second; sector movers (doors, lifts, crushers, stairs)
-  and camera/actor-mover interpolation run on octics. *Note:* the `OCTICS(a)` macro
+- **Octic**: nominally 1/8 second. Only a few time arguments use it: the delay of
+  `Door_CloseWaitOpen`, `Generic_Door` and `Generic_Lift`, and the travel and hold times on
+  camera/actor-mover path nodes (`InterpolationPoint` args 1 and 2), and a `SecurityCamera`'s
+sweep cycle time (arg 2). Most other sector-mover
+  delays (`Door_Raise`, the `Plat_*` and `Stairs_Build*` specials) are in tics, and every mover
+  steps once per tic at its `speed`. *Note:* the `OCTICS(a)` macro those specials use
   (`((a)*TICRATE)/8`, identical on both engines) uses integer division, so `OCTICS(1)` = 4 tics
   (not 4.375), representing exactly 4/35 ≈ 114 milliseconds.
 
@@ -67,4 +71,4 @@ not a claim verified against any specific project's own scripts.
 
 ## Engine-family divergence
 
-The fixed-point number format, byte/fixed-point angle/pitch encodings, and the tic/octic time units are identical on both engines. The `SPEED()` macro semantic (divide raw argument by 8 to get map-units-per-tic) is also identical, but the implementation differs: Zandronum's macro multiplies by a fixed-point constant and passes an `int` to movement functions, while UZDoom's macro divides as a floating-point literal and passes a `double`. Callers observe no difference — pass the same value on both engines and get the same movement-per-tic behavior. Both engines' `OCTICS()` macro uses integer division and truncates identically. Additionally, both engines derive tic count from elapsed time (not from accumulating sleep durations), so there is no tic-rate drift on either engine; 35 tics reliably correspond to 1 second of elapsed time on both.
+The fixed-point number format, byte/fixed-point angle/pitch encodings, and the tic/octic time units are identical on both engines. The `SPEED()` macro semantic (divide raw argument by 8 to get map-units-per-tic) is also identical, but the implementation differs: Zandronum's macro multiplies by a fixed-point constant and passes an `int` to movement functions, while UZDoom's macro divides as a floating-point literal and passes a `double`. Callers observe no difference — pass the same value on both engines and get the same movement-per-tic behavior. Both engines' `OCTICS()` macro uses integer division and truncates identically. The tic clock differs by build. UZDoom derives the tic count from elapsed clock time. Zandronum's dedicated server and its Windows client do too (the Windows timer-event mode is disabled for a consistent tic rate). Zandronum's SDL (Linux/macOS) client instead counts `SIGALRM` signals from an interval timer set to `1000000/TICRATE` microseconds, and falls back to elapsed time only if that timer can't be set, so its tic count is not directly tied to elapsed time.

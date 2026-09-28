@@ -2,8 +2,8 @@
 
 **Tier:** B (wiki-sourced concept page, spot-checked against Zandronum source for the load-bearing claims — existence of each type, the `REOPEN` gap, the two spectator-interaction notes, the `UNLOADING` execution-mode claim, the `KILL`/`NOKILLSCRIPTS` nuance — but the `ACS_Terminate`/ `ENTER` interaction and the closed-script compiler grammar were not traced to source, so this doesn't qualify as tier A).
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
-**Provenance:** wiki page `Script types - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28, `https://zdoom.org/w/index.php?title=Script_types&oldid=50186`) + verified against the Zandronum source's `src/p_acs.h` (`SCRIPT_*` enum) and every `StaticStartTypedScripts(SCRIPT_*, ...)` call site across the Zandronum source's `src` (2026-07-28). The `ACS_Terminate`-vs-`ENTER` claim and the closed-script-grammar claim are wiki/observed-only, not traced through VM/parser source — see notes above. The `StaticStopMyScripts`-on-spectate finding under **ENTER** (added 2026-07-28) is fully source-verified (`p_interaction.cpp:2546,2781,2772`, `p_acs.cpp:3659-3679,13028-13030`).
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** wiki page `Script types - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28, `https://zdoom.org/w/index.php?title=Script_types&oldid=50186`) + verified against the Zandronum source's `src/p_acs.h` (`SCRIPT_*` enum) and every `StaticStartTypedScripts(SCRIPT_*, ...)` call site across the Zandronum source's `src` (2026-07-28). The `ACS_Terminate`-vs-`ENTER` claim and the closed-script-grammar claim are wiki/observed-only, not traced through VM/parser source — see notes above. The `StaticStopMyScripts`-on-spectate finding under **ENTER** (added 2026-07-28) is fully source-verified (`p_interaction.cpp:2546,2781,2772`, `p_acs.cpp:3659-3679,13028-13030`). The `OPEN`-script creation-vs-execution ordering and the `WorldLoaded` resolution under **OPEN** (added 2026-08-27) are fully source-verified against UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-13): `src/maploader/specials.cpp:850`, `src/playsim/p_acs.cpp:3329-3347`, `p_acs.h:440`, `src/g_game.cpp:1329-1340`, `p_acs.h:454`, `src/g_level.cpp:1489,1521,1537`, `src/p_saveg.cpp:939`, `src/events.cpp:662-668`; not traced for Zandronum in this pass.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 What `SCRIPT_*` types actually exist in Zandronum and UZDoom, which of the ZDoom wiki's ten still apply,
@@ -59,10 +59,47 @@ in the enum isn't mistaken for dead/vestigial values.
 
 - **OPEN** — world-activated, runs once per level load. Confirmed callers: `g_game.cpp:3294`,
   `p_spec.cpp:1796/1800`. Matches the wiki: don't rely on an activator in an `OPEN` script.
+  **In UZDoom, "runs once per level load" hides a creation-vs-execution split.** `OPEN` scripts
+  are *created* in the map loader, not run there: `SpawnSpecials` ends with
+  `StartTypedScripts(SCRIPT_Open, NULL, false)` (`src/maploader/specials.cpp:850`), and
+  `FBehavior::StartTypedScripts` (`src/playsim/p_acs.cpp:3329-3347`) only calls `RunScript()`
+  immediately when `runNow` is true — `p_acs.h:440` defaults that parameter to `false`, so the
+  bytecode's first actual execution waits for a thinker tick (`RETURN` passes `runNow = true`,
+  `src/g_level.cpp:1521`, so it isn't deferred the same way; `REOPEN` defers like `OPEN`). The
+  in-tic order is: gameaction (`P_SetupLevel` creates the `OPEN` thinkers) → `RunPlayerCommands`
+  (`src/g_game.cpp:1329-1340`) → `P_Ticker` → `RunThinkers`, where the `OPEN` bytecode actually
+  runs — `DACSThinker` sits at `STAT_SCRIPTS` (`p_acs.h:454`), ticking in that same `RunThinkers`
+  pass.
+
+  A savegame restore skips this window entirely rather than reordering it: `UnSnapshotLevel`
+  (`src/g_level.cpp:1489`) reaches `Thinkers.DestroyAllThinkers()` (`src/p_saveg.cpp:939`) before
+  any `OPEN` bytecode gets a tick, destroying the freshly-created `OPEN` thinkers and replacing
+  them with the restored ACS state — `OPEN` scripts genuinely do not run again on load-from-save,
+  they aren't merely delayed. The engine's actual answer to "run code once per level regardless of
+  how it was reached" is `localEventManager->WorldLoaded()` (`src/g_level.cpp:1537`): it's called
+  after `UnSnapshotLevel` and before any `OPEN` bytecode, as a plain synchronous call outside the
+  thinker-tick ordering above, so it has no equivalent race to design around. `src/events.cpp:662-668`
+  only skips it for *non-static* handlers on a restore — a `StaticEventHandler`'s `WorldLoaded`
+  override always fires, on a fresh level and on a restore alike. See
+  [Event handlers: `StaticEventHandler` and `EventHandler`](../../zscript/classes/eventhandler.md)
+  for the handler's full lifecycle. Not traced for Zandronum in this pass — the ordering claim
+  above is UZDoom-source-specific.
 - **ENTER** — player-activated, once per player per level. **Confirmed in Zandronum: spectators never trigger
   it** — `g_game.cpp:4286` and `p_mobj.cpp:5763` both gate the `StaticStartTypedScripts(SCRIPT_Enter, ...)`
   call on `bSpectating == false`. This matches the wiki's "In Skulltag, spectators never trigger
   an ENTER script" note, and it still holds in Zandronum. (UZDoom has no spectator system, so this note does not apply there.)
+  **Also confirmed in Zandronum: a joining client's `ENTER` scripts are deferred until that client
+  has authenticated the level** (source-verified 2026-09-20). `P_SpawnPlayer` skips the
+  `StaticStartTypedScripts` call for a non-bot player whose client state isn't `CLS_SPAWNED`,
+  setting `bRunEnterScripts` instead (`p_mobj.cpp:5753-5763`); the scripts are started later from
+  the connection path (`sv_main.cpp:1680,7203`), after `SERVER_SendFullUpdate` and after the
+  player's pawn has been spawned on every other client. Bots are exempt and run theirs inline.
+  Consequence worth relying on for a broadcast `ENTER CLIENTSIDE` script: by the time its start
+  command goes out, every client can resolve the activator's NetID, so the
+  `PlayerNumber() != ConsolePlayerNumber()` guard can't misfire from a NULL activator on the join
+  path. See [Client-side scripting](clientside-scripting.md) for what *does* reorder around that
+  point — the server-side sibling's pushed-down writes apply before the `CLIENTSIDE` body's first
+  statement.
   The wiki's claim that an infinite-loop `ENTER` script can't be stopped by the `ACS_Terminate`
   action special (only by the `terminate` keyword from inside the script) is plausible given how
   `ACS_Terminate` works (`p_lnspec.cpp:1866` → `P_TerminateScript` → `SetScriptState(...,

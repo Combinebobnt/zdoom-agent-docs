@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-17)
-**Provenance:** Zandronum source `src/d_netinfo.cpp:99` and `zandronum/docs/commands.txt` + verified against the implementation's clamping logic.
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** Zandronum source `src/d_netinfo.cpp:99` and `docs/zandronum-history.txt:1105,366` (introduction, then the default change from 3 to 1) + verified against the implementation's clamping logic.
 
 Controls how frequently the server sends updated player positions to the client. Valid values are clamped to **1, 2, or 3 tics** — attempting to set this cvar outside that range will silently clamp to the nearest boundary (1 if below, 3 if above).
 
@@ -21,4 +21,4 @@ This cvar is marked `CVAR_USERINFO | CVAR_ARCHIVE`, so it's transmitted as part 
 
 `cl_ticsperupdate` does not exist on UZDoom at all — confirmed absent from the entire checkout (not just `d_netinfo.cpp`), not merely undocumented. This isn't a missing knob so much as a mismatch of netcode models: Zandronum uses a client/server-authoritative architecture where the server periodically broadcasts each player's actual position and clients extrapolate between updates, so "how often the server sends a position update" is a meaningful, tunable rate. UZDoom/GZDoom-family netcode (`NetUpdate()`, `src/d_net.cpp:1309`) is a ticcmd-lockstep peer model instead — every peer exchanges input commands (with consistency checks and a duplication factor for lag compensation) and independently simulates every tic from those commands, rather than one side broadcasting authoritative positions at a throttled rate. There is no equivalent "position-update frequency" to throttle in that model, so the concept `cl_ticsperupdate` controls doesn't carry over, not just its specific cvar name.
 
-Attempting to set `cl_ticsperupdate` under UZDoom (console, config file, or ACS's `ConsoleCommand()`) prints `Unknown command "cl_ticsperupdate"` and the write silently fails to apply.
+Attempting to set `cl_ticsperupdate` under UZDoom from the console or a config file prints `Unknown command "cl_ticsperupdate"` and the write silently fails to apply. Via ACS's `ConsoleCommand()` it never reaches the console dispatcher at all: UZDoom's `ConsoleCommand` p-codes only print a "doesn't support execution of console commands from scripts" error and discard their arguments.

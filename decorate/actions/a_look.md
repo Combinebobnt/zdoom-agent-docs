@@ -2,17 +2,16 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
 **Provenance:** ZDoom Wiki A_Look (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_Look&oldid=53797) + verified against the
 Zandronum source's `src/p_enemy.cpp:1931-2058` (`DEFINE_ACTION_FUNCTION(AActor, A_Look)`).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/p_enemy.cpp:1931` (`DEFINE_ACTION_FUNCTION(AActor, A_Look)`).
 
 The default `Spawn`-state action for most monsters: idles until it detects a target (a player, or
-whatever last made noise nearby), then transitions to the actor's `See` state (or wanders, if it
-has one and no target is found yet). This function has been extended by `A_LookEx` (which adds
-parameterization for search distance and field-of-view control) and `A_Look2` — in new code,
-consider using those for maximum flexibility.
+whatever last made noise nearby), then transitions to the actor's `See` state. `A_LookEx` is the
+parameterized version (search distance, field of view, wake state); `A_Look2` is a separate
+Strife-derived variant used by Strife's peasants, acolytes and similar actors.
 
 ## Zandronum-specific: server-authoritative, but not a pure no-op on clients
 
@@ -33,18 +32,26 @@ would miss that stealth-monster facing state is intentionally still touched on c
 - **`MF5_INCONVERSATION` early-out.** If the actor has the `INCONVERSATION` flag set, `A_Look`
   returns immediately before any target acquisition logic — the actor won't look for or switch
   to targets while in a conversation state.
-- **`CF_NOTARGET` early-out.** If the candidate target is a player with the `CF_NOTARGET` cheat
-  flag set, `A_Look` returns without setting a `See` state — the monster stays idle against a
-  noclip-style notarget player, same as base ZDoom.
+- **`CF_NOTARGET` early-out.** If the heard target (`LastHeard`, or the sector's `SoundTarget`
+  under `COMPATF_SOUNDTARGET`/`MF_NOSECTOR`; only consulted when `TIDtoHate` is 0) is a player with
+  the `CF_NOTARGET` cheat flag set, `A_Look` returns at once for that call. This skips everything
+  after it, including the sight search for other players, so a monster that last heard a notarget
+  player won't wake that tic even if another player is in view. `P_NoiseAlert` already ignores
+  noise made by a notarget player, so this mostly arises when the cheat is turned on after the
+  noise. UZDoom adds a second condition
+  here; see the divergence section below.
 - **`Thing_SetGoal`-on-spawn special case.** If the actor's map `special` is `Thing_SetGoal` with
   `args[0] == 0`, `A_Look` consumes the special on its first call (`self->special = 0`) and sets up
-  a patrol goal from `args[1]`/`args[2]`/`args[3]` — a mapper-facing linedef-special convention
-  that only fires from this one action function, not documented anywhere else in Zandronum's
-  action-function set.
-- **Friendly-monster path calls `P_LookForPlayers`, not the hostile path.** `self->IsFriend(targ)`
-  branches to player-seeking (with `MF4_LOOKALLAROUND` respected) before falling back to
-  `A_Wander` — a friendly monster with no `SeeState` at all silently calls `A_Wander` as a
-  substitute rather than erroring or staying idle.
+  a patrol goal from `args[1]` (PatrolPoint TID), `args[2]` (delay in seconds before chasing the
+  goal) and `args[3]` (nonzero sets `CHASEGOAL`). `A_LookEx` carries the same special case;
+  `A_Look2` does not.
+- **Heard-an-ally path.** If the heard target is shootable and `self->IsFriend(targ)` is true
+  (both carry `MF_FRIENDLY`, plus team checks in deathmatch/teamgame; e.g. a friendly monster that
+  heard a player), `A_Look` doesn't target
+  it. It runs the normal search (`P_LookForPlayers`, with `MF4_LOOKALLAROUND` respected; for a
+  friendly actor that search looks for enemies first) and goes to `See` if that finds something.
+  Otherwise it enters its `See` state anyway, without a new target, to wander looking for a fight.
+  A monster with no `SeeState` calls `A_Wander` instead of erroring or staying idle.
 
 ## Engine-family divergence: CF_NOTARGET early-out also requires the FRIENDLY flag
 
@@ -71,12 +78,14 @@ candidate player to carry `MF_FRIENDLY` before excluding them, so that path is u
 
 ## Target acquisition gates based on actor flags
 
-- **`MF_AMBUSH` flag gate.** If the actor has the `AMBUSH` flag set, even after acquiring a
-  target, `A_Look` requires a direct line of sight (via `P_CheckSight` with
-  `SF_SEEPASTBLOCKEVERYTHING` flags) before entering the `See` state — without it, the actor
-  remains idle despite having a target. This allows ambush-style monsters to wait for the player
-  to come into view before attacking. Actors without `AMBUSH` enter `See` immediately when a
-  valid hostile target is found.
+- **`MF_AMBUSH` flag gate.** This gate applies to the heard target only. A non-`AMBUSH` actor
+  that hears a shootable non-ally takes it as `target` and enters `See` with no sight check at
+  all. An `AMBUSH` actor also stores it as `target`, but only goes to `See` if `P_CheckSight`
+  (with `SF_SEEPASTBLOCKEVERYTHING`) passes. If that fails, it falls through to the normal sight
+  search (`P_LookForPlayers`) and stays in its current state unless that search finds someone.
+  So an ambush monster uses noise only to pick whom to sight-check. A heard target in line of
+  sight wakes it from any direction, while an unheard player must be inside its 180-degree field
+  of view (unless it has `LOOKALLAROUND`) or within melee range.
 
 ## See also
 

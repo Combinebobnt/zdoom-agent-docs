@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_DamageSiblings` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_DamageSiblings&oldid=46972) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4517-4545` and `wadsrc/static/actors/actor.txt`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_DamageSiblings` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_DamageSiblings&oldid=46972) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:4517-4545` and `wadsrc/static/actors/actor.txt`; telefrag/damage-factor and parse-error corrections from `src/p_interaction.cpp:1337-1352`, `src/thingdef/thingdef_states.cpp:430` and `src/sc_man.cpp:458`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:4517` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_DamageSiblings)`).
 
@@ -11,7 +11,7 @@ Damages all actors that share the calling actor's master (spawner), excluding th
 
 ## Parameters
 
-- **`amount`** — the amount of damage to inflict (required). Positive values damage; negative values heal. An amount of 1,000,000 or higher is treated specially and results in killing the target regardless of health or damage resistance.
+- **`amount`** — the amount of damage to inflict (required). Positive values damage; negative values heal. An amount of 1,000,000 or higher is treated specially. On UZDoom it kills the target regardless of health or damage resistance. On Zandronum it skips the invulnerability checks, but damage factors still scale it (see "Telefrag damage" below).
 - **`damagetype`** — the name of the damage type to use when processing damage (default `"none"`). Passed to `P_DamageMobj` as the `mod` parameter, determining whether a special death state (e.g., `Death.Fire`) is triggered.
 
 ## Behavior
@@ -31,10 +31,10 @@ When called, the action:
 
 ### Damage behavior
 
-- **Invulnerability:** An `+INVULNERABLE` sibling **will not be harmed**. The function uses only `DMG_NO_ARMOR` and not `DMG_FORCED`, so invulnerable targets reject the damage.
+- **Invulnerability:** An `+INVULNERABLE` sibling **will not be harmed**. The function uses only `DMG_NO_ARMOR` and not `DMG_FORCED`, so invulnerable targets reject the damage. This is not absolute for a non-player target: `P_DamageMobj` only rejects the damage when the inflictor lacks `+FOILINVUL`, and the inflictor here is the calling actor, so a caller with `+FOILINVUL` bypasses the target's invulnerability (`p_interaction.cpp:1212-1220`).
 - **Armor:** Damage bypasses armor entirely — the `DMG_NO_ARMOR` flag prevents armor reduction.
 - **Damage factors:** Damage factors **are applied** — properties like `DamageFactor` will modify the final damage taken. There is no `DMSS_NOFACTOR`-equivalent flag in Zandronum.
-- **Telefrag damage:** If `amount >= 1000000`, the damage check bypasses damage resistance and invulnerability, forcing a kill under normal conditions.
+- **Telefrag damage:** If `amount >= 1000000`, the target's `+INVULNERABLE` check is skipped. Damage resistance is not: `DamageFactor`, per-damagetype factors, protection powerups and `+DORMANT` still apply, so a `DamageFactor` of 0 still blocks it (`p_interaction.cpp:1337-1352`). A player's god mode and buddha checks compare the already-factored damage, so a factor that brings it below 1,000,000 lets them apply again.
 
 ### Healing behavior
 
@@ -42,7 +42,7 @@ Negative `amount` values trigger healing via `P_GiveBody` for each sibling:
 
 - Returns without effect if the target is dead or health ≤ 0.
 - Clamps healing to the target's maximum health.
-- **BUG (Zandronum 3.2.1):** The `amount` parameter is negated and **reassigned inside the while loop**. After the first sibling is healed, `amount` is now positive, so all *subsequent* siblings in the same call are **damaged** instead of healed. If you have multiple siblings and need to heal all of them with a single `A_DamageSiblings` call, this function is unreliable — do not use it for that purpose in Zandronum. Workarounds: (1) call the function once per sibling, or (2) use separate `A_DamageChildren` or `A_DamageMaster` calls if your actor hierarchy permits.
+- **BUG (Zandronum 3.2.1, still present at 3.3-alpha):** The `amount` parameter is negated and **reassigned inside the while loop**. After the first matching sibling is processed (even one that is dead or already at full health), `amount` is positive, so all *subsequent* siblings in the same call are **damaged** instead of healed. Calling it again does not help, since every call walks all siblings. `A_DamageChildren` has the identical in-loop negation, so it is no substitute. To heal several siblings, have each sibling heal itself from its own states, for example with the `HealThing` action special.
 
 ## Performance note
 
@@ -50,7 +50,7 @@ This function scans the entire thinker list (all actors in the level) on every c
 
 ## Network behavior
 
-**Zandronum multiplayer:** The action carries no explicit network synchronization guard in the action function itself — `P_DamageMobj` and `P_GiveBody` are responsible for server/client state replication. On servers, damage is applied and propagated to clients. On network clients, execution depends on the actor's `+CLIENTSIDEONLY` flag.
+**Zandronum multiplayer:** The action has no client-mode guard, unlike `A_KillSiblings`, which returns early on clients for non-`CLIENTSIDEONLY` actors (`thingdef_codeptr.cpp:3583`). Clients run state action functions too (`p_mobj.cpp:586`), so a client executes the sibling scan locally. There, `P_DamageMobj` still lowers the sibling's local health, but deaths are server-side: `Die` is only called outside client mode (`p_interaction.cpp:1746`). `P_GiveBody` sends no server command itself, and on a client it refuses to heal a player whose health that client may not know (`a_pickups.cpp:234`).
 
 ## Engine-family divergence: no client/server authority split
 
@@ -62,7 +62,7 @@ The table in "Zandronum-specific" above describes the wiki's extra parameters an
 
 ## Engine-family divergence: the Zandronum healing bug does not reproduce on UZDoom
 
-The "Healing behavior" section above documents a Zandronum-only bug: `amount` is negated and reassigned in place inside the shared `while` loop, so after the first sibling is healed every subsequent sibling in the same call is damaged instead. UZDoom's `A_DamageSiblings` loop (`p_actionfunctions.cpp:4106-4110`) calls the `DoDamage` helper function once per sibling, passing the action function's own `amount` local by value on every iteration; `DoDamage` negates and reassigns `amount` only inside its own function-local copy (`p_actionfunctions.cpp:3949-3953`), which is discarded when it returns. The caller's `amount` is never mutated across iterations. As a result, a negative `amount` correctly heals **every** sibling in a single UZDoom `A_DamageSiblings` call — the workarounds described in the Zandronum bug note (call once per sibling, or use `A_DamageChildren`/`A_DamageMaster` instead) are unnecessary on UZDoom.
+The "Healing behavior" section above documents a Zandronum-only bug: `amount` is negated and reassigned in place inside the shared `while` loop, so after the first sibling is healed every subsequent sibling in the same call is damaged instead. UZDoom's `A_DamageSiblings` loop (`p_actionfunctions.cpp:4106-4110`) calls the `DoDamage` helper function once per sibling, passing the action function's own `amount` local by value on every iteration; `DoDamage` negates and reassigns `amount` only inside its own function-local copy (`p_actionfunctions.cpp:3949-3953`), which is discarded when it returns. The caller's `amount` is never mutated across iterations. As a result, a negative `amount` correctly heals **every** sibling in a single UZDoom `A_DamageSiblings` call — the workaround described in the Zandronum bug note (each sibling healing itself) is unnecessary on UZDoom.
 
 ## Zandronum-specific: drastically simplified vs. GZDoom/UZDoom
 
@@ -80,11 +80,11 @@ The "Healing behavior" section above documents a Zandronum-only bug: `amount` is
 
 **Special god/buddha resistance notes:** The wiki claims this function respects `god2` and `buddha2` protective effects on players. These flags **do not exist in Zandronum at all** — they are GZDoom/UZDoom-only. In Zandronum, only the basic `CF_GODMODE` and `CF_BUDDHA` cheats exist (handled by `P_DamageMobj`), plus the `+INVULNERABLE` flag for actors.
 
-**If you port code from the wiki to Zandronum,** compilation will fail with "unknown identifier" errors for any `DMSS_*` flags, and passing more than two arguments to `A_DamageSiblings` will fail with a "too many arguments" error. The wiki's example code **will not compile** in Zandronum.
+**If you port code from the wiki to Zandronum,** passing more than two arguments to `A_DamageSiblings` aborts DECORATE parsing with a fatal "Expected ')', got ','." script error at the third argument, before any `DMSS_*` flag is even read. The wiki's example code **will not load** in Zandronum.
 
 ## Related functions
 
 - **`A_DamageMaster`** — damages the master (spawner) only. Zandronum version takes `amount` and `damagetype`. Also uses `DMG_NO_ARMOR`.
-- **`A_DamageChildren`** — damages all actors with `master == self`. Zandronum version takes `amount` and `damagetype`.
+- **`A_DamageChildren`** — damages all actors with `master == self`. Zandronum version takes `amount` and `damagetype`. Has the same multi-target healing bug in Zandronum.
 - **`A_KillSiblings`** — kills all sibling actors outright (damage = sibling health). Takes only `damagetype` parameter.
 - **`A_SpawnItemEx`** — the primary source of master-sibling relationships; sets the `master` pointer with `SXF_SETMASTER` flag.

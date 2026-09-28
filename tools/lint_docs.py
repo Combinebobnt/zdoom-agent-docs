@@ -22,6 +22,8 @@ Checks, per section with an existing INDEX.md:
     not just the header block's -- a families/*.md carries one per member function.
   - acs/INDEX.md's Families/Prose/Signature-only subsections stay alphabetically ordered (the one
     section with an established convention for this -- see sections.py's "ordered_headings")
+  - every generated subagent adapter under agents/ matches a fresh tools/gen_agents.py run from
+    its agents/procedures/ source (the same check as `gen_agents.py --check`)
 
 Run after hand-editing any doc file, or after regenerating an inventory.
 
@@ -37,6 +39,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import sections as S  # noqa: E402
+import gen_agents  # noqa: E402
 
 ROOT = S.ROOT
 
@@ -925,6 +928,10 @@ def lint():
             check_wiki_provenance(path, text, ok_list)
             check_wiki_license(path, text, ok_list)
 
+    for msg in gen_agents.check():
+        print(f"LINT: {msg}", file=sys.stderr)
+        ok_list.append(False)
+
     ok = not ok_list
     if ok:
         print(f"LINT: clean -- {total_files[0]} doc files across {len(S.SECTIONS)} sections, all linked, all tiered/provenanced.", file=sys.stderr)
@@ -1226,6 +1233,25 @@ _SELF_TESTS = [
 ]
 
 
+def _self_test_gen_agents():
+    """An adapter whose body differs from its canonical procedure must be reported as drift."""
+    src = ROOT / gen_agents.PROCEDURES_DIR / "zdoom-docs-lookup.md"
+    rendered = gen_agents.render(src.stem, src.read_text())
+    problems = []
+    if gen_agents.drift(rendered, dict(rendered)):
+        problems.append("unmodified adapters reported as drift")
+    tampered = dict(rendered)
+    rel = next(iter(sorted(tampered)))
+    tampered[rel] = tampered[rel].replace("## Search order", "## Search orders", 1)
+    if tampered[rel] == rendered[rel]:
+        problems.append("fixture edit didn't change the adapter")
+    elif not any(rel in m for m in gen_agents.drift(rendered, tampered)):
+        problems.append(f"hand-edited {rel} not reported as drift")
+    for p in problems:
+        print(f"SELF-TEST FAIL [gen_agents drift]: {p}", file=sys.stderr)
+    return 1 if problems else 0
+
+
 def _run_self_test():
     """Fixtures for rules the tree does not yet exercise. Every rule the schema split adds is
     dormant until the marking pass stamps a real file, so without these the only evidence they
@@ -1253,10 +1279,12 @@ def _run_self_test():
             print(f"SELF-TEST FAIL [{name}]: {'; '.join(problems)}", file=sys.stderr)
             if out.strip():
                 print(f"    output: {out.strip()[:300]}", file=sys.stderr)
+    failures += _self_test_gen_agents()
+    total = len(_SELF_TESTS) + 1
     if failures:
-        print(f"lint_docs.py --self-test: {failures} of {len(_SELF_TESTS)} failed", file=sys.stderr)
+        print(f"lint_docs.py --self-test: {failures} of {total} failed", file=sys.stderr)
         return 1
-    print(f"lint_docs.py --self-test: clean -- {len(_SELF_TESTS)} fixtures", file=sys.stderr)
+    print(f"lint_docs.py --self-test: clean -- {total} fixtures", file=sys.stderr)
     return 0
 
 

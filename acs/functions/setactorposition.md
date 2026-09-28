@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** wiki page `SetActorPosition - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
 `https://zdoom.org/w/index.php?title=SetActorPosition&oldid=40289`) + source-verified against `p_acs.cpp:11987-11996`, `p_things.cpp:164-218`,
 `p_map.cpp:1640-1657`, `p_acs.cpp:4445-4456` (`SingleActorFromTID`). No wiki/fork behavioral
@@ -67,6 +67,12 @@ can therefore see `SetActorPosition` on a player fail intermittently — and rev
 teleport, no fog, no network message — specifically because a *monster* (not another player)
 happens to occupy the destination at that instant, which is easy to misdiagnose as a
 network/prediction bug rather than a genuine blocked-destination rejection.
+
+The converse also bites: with either cvar on, `SetActorPosition` can place one player pawn exactly
+on another. The bot pathfinder does not consult `P_CheckUnblock`, so two bots stacked this way both
+get `PATH_UNREACHABLE` for every goal and no pathing thrust to separate them. See
+[A solid actor overlapping the pawn blocks every path](../../bots/concepts/bot-pathing-reachability.md#a-solid-actor-overlapping-the-pawn-blocks-every-path)
+for the mechanism and the minimum spacing a placement script should keep.
 
 ## Engine-family divergence: teleport-fog spawn is actor-customizable, not hardcoded
 

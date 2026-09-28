@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
-**Provenance:** `Warp - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=Warp&oldid=51056`), verified 2026-07-29 against the Zandronum source's `src/p_acs.cpp`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** `Warp - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=Warp&oldid=51056`), verified 2026-07-29 against the Zandronum source's `src/p_acs.cpp:6953-7115`; the `WARPF_BOB`/`WARPF_COPYVELOCITY`/`WARPF_COPYPITCH` no-op correction (2026-09-25) is against `src/p_acs.cpp:227-247` and zt-bcc's `lib/zcommon.bcs:1154-1158`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 `bool Warp(int tid, fixed xofs, fixed yofs, fixed zofs, fixed angle, int flags [, str success_state [, bool exact]])`
@@ -39,11 +39,11 @@ Teleports the calling actor to a reference actor's location, with optional offse
 - `WARPF_STOP` — Set the caller's velocity to zero after the warp completes.
 - `WARPF_TOFLOOR` — Set the caller's Z position relative to the floor of the destination location (computed after XY positioning), not relative to the reference actor's Z. Useful for floor-relative placement in new areas.
 - `WARPF_TESTONLY` — Do not actually warp; only check whether it *would* succeed and allow the state jump if the warp-check passes. Caller remains at its original position.
-- `WARPF_BOB` — Apply the reference actor's float-bob offsets to the warp destination, making the caller follow the bob pattern.
+- `WARPF_BOB` — On UZDoom, applies the reference actor's float-bob offsets to the warp destination, making the caller follow the bob pattern. On Zandronum: declared in Zandronum's own `WARPF` enum (`src/p_acs.cpp:244`), but `case ACSF_Warp:` (`src/p_acs.cpp:6953-7115`) never tests it. Setting this flag has no effect on Zandronum.
 - `WARPF_MOVEPTR` — Warp the *reference* actor instead of the calling actor. All other flags and offset calculations remain the same, but the caller's state jump (and success/failure determination) is still handled by the calling actor.
 - `WARPF_USEPTR` — Interpret `tid` as an actor pointer (e.g., `AAPTR_TARGET`, `AAPTR_MASTER`) instead of a numeric TID.
-- `WARPF_COPYVELOCITY` — Copy the reference actor's velocity to the caller after warping, regardless of the angle applied.
-- `WARPF_COPYPITCH` — Copy the reference actor's pitch to the caller, then add the `pitch` parameter if provided. (**Note:** `pitch` parameter is **not implemented** in Zandronum; see **Fork/wiki notes** below.)
+- `WARPF_COPYVELOCITY` — On UZDoom, copies the reference actor's velocity to the caller after warping. On Zandronum: a BCS-level constant only (`0x4000` in zt-bcc's `zcommon.bcs`); Zandronum's own `WARPF` enum (`src/p_acs.cpp:227-247`) does not declare it at all, and `case ACSF_Warp:` never tests it. Setting this bit compiles but has no effect on Zandronum; velocity is only ever zeroed (`WARPF_STOP`) or left unchanged there.
+- `WARPF_COPYPITCH` — On UZDoom, copies the reference actor's pitch to the caller, then adds the `pitch` parameter. On Zandronum: same story as `WARPF_COPYVELOCITY`: a BCS-level constant only (`0x8000`), absent from Zandronum's engine-side enum and never tested in `case ACSF_Warp:`. Not just the `pitch` parameter (see **Fork/wiki notes** below) but the pitch-copy itself has no effect on Zandronum.
 
 ### Appearance/interpolation flags
 
@@ -69,8 +69,8 @@ If the warp fails, the caller remains at its original position (restored via `Se
 When the warp succeeds:
 - The caller is repositioned to the destination.
 - The caller's angle is set to `angle` (computed as described above).
-- Velocity is zeroed (if `WARPF_STOP` is set), copied from the reference actor (if `WARPF_COPYVELOCITY` is set), or left unchanged.
-- Pitch is copied from the reference actor (if `WARPF_COPYPITCH` is set). (**Not implemented** in Zandronum.)
+- Velocity is zeroed (if `WARPF_STOP` is set) or left unchanged; `WARPF_COPYVELOCITY` has no effect on Zandronum (see **Flags** above).
+- Pitch is never copied from the reference actor on Zandronum; `WARPF_COPYPITCH` has no effect there (see **Flags** above).
 - Interpolation data is updated per the `WARPF_*INTERPOLATION` flags.
 - If `success_state` is provided and matches (exactly or partially, per `exact`), the caller jumps to that state.
 - Networking: The server sends a `SERVERCOMMANDS_MoveThingIfChanged` to synchronize the warp to all clients.
@@ -85,7 +85,15 @@ This is a server-side operation in multiplayer. The server handles the warp and 
 
 - `heightoffset` (ZDoom only) — Not available. Zandronum does not support height-relative offsets.
 - `radiusoffset` (ZDoom only) — Not available. Zandronum does not support radius-relative offsets.
-- `pitch` (ZDoom only) — Not available as a parameter. `WARPF_COPYPITCH` copies pitch from the reference actor but cannot add an offset.
+- `pitch` (ZDoom only) — Not available as a parameter, and `WARPF_COPYPITCH` does not copy pitch either; the flag is never tested by Zandronum's `case ACSF_Warp:`, so neither the copy nor an offset happens.
+
+Separately, three flag bits are inert on Zandronum for a different reason than the missing
+parameters above: `WARPF_BOB` is declared in Zandronum's own `WARPF` enum (`src/p_acs.cpp:244`)
+but never tested by `case ACSF_Warp:` (`src/p_acs.cpp:6953-7115`); `WARPF_COPYVELOCITY` and
+`WARPF_COPYPITCH` are BCS-level constants in zt-bcc's `zcommon.bcs` (`0x4000`/`0x8000`) with no
+matching entry in Zandronum's engine-side enum at all. All three compile fine, since `flags` is
+just a plain integer, but Zandronum's implementation never checks any of them, so setting them has
+no effect there regardless of argument count.
 
 ## Engine-family divergence: `heightoffset`/`radiusoffset`/`pitch` are implemented on UZDoom, and there is no cross-client sync command
 

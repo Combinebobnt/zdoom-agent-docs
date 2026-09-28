@@ -4,20 +4,23 @@
 **Applies to:** UZDoom=yes, Zandronum=yes — both bind `quicksave` to F6 by default and read/write
 a remembered quicksave slot; the underlying save-path logic diverges in several respects (see
 below).
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3
-(2026-08-17)
-**Provenance:** Verified against the UZDoom source's `src/menu/doommenu.cpp`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb
+(2026-09-26)
+**Provenance:** Verified against the UZDoom source's `src/menu/doommenu.cpp`. Zandronum's ACS
+path checked against `src/p_acs.cpp:11284-11299` and `src/c_dispatch.cpp:1160-1169`.
 
 Bound to F6 by default (`wadsrc/static/engine/commonbinds.txt` on UZDoom;
 `src/c_bind.cpp:100` on Zandronum). Saves to a remembered "quicksave slot" without going through
 the Save menu, so it's the fastest of the manual save triggers.
 
 On both engines the very first gate no-ops with an "invalid" sound (`menu/invalid`) if `!usergame`
-(not currently in an active game — e.g. demo playback/recording, or the title screen) or the
-player is dead in singleplayer; separately, and distinctly, it no-ops **silently** (no sound at
-all) if `gamestate != GS_LEVEL` (e.g. currently in a menu or intermission screen rather than in a
-level). These are two different conditions with two different outcomes, not one combined "not
-currently in a level" case as an earlier revision of this note described.
+(not currently in an active game — e.g. demo playback, or the title screen) or the
+player is dead in singleplayer. Recording a demo doesn't count: the new game started after
+`G_RecordDemo` sets `usergame` back to true. Separately, and distinctly, it no-ops **silently**
+(no sound at all) if `gamestate != GS_LEVEL` (e.g. an intermission or finale screen). Opening a
+menu over a level leaves `gamestate` at `GS_LEVEL`, so this gate doesn't fire just because a menu
+is open. These are two different conditions with two different outcomes, not one combined "not
+currently in a level" case.
 
 Past that shared gate, on UZDoom (`src/menu/doommenu.cpp`'s `CCMD (quicksave)`), in actual
 execution order:
@@ -52,14 +55,17 @@ prompt on this engine — every quicksave onto an existing slot goes through it.
 
 UZDoom's ACS `PCD_CONSOLECOMMAND`/`PCD_CONSOLECOMMANDDIRECT` opcodes are unconditionally
 disabled — they print an error and no-op (`src/playsim/p_acs.cpp:10371-10378`) — so no ACS script
-can trigger `quicksave` indirectly there, matching the blanket claim previously in this file (and
-still accurate as scoped in
+can trigger `quicksave` indirectly there (as scoped in
 [autosave-triggers.md](../../zscript/concepts/autosave-triggers.md), which only claims UZDoom).
 Zandronum's ACS keeps these opcodes fully working (`src/p_acs.cpp:11284-11299`): they call
-`C_DoCommand()` for real, and since `quicksave` is a plain `CCMD` rather than an `UNSAFE_CCMD`,
-a script calling the zt-bcc/ACS builtin bound to this opcode (`ConsoleCommand("quicksave")`)
-genuinely triggers a quicksave on Zandronum. So the "console commands aren't reachable from ACS"
-framing below holds for UZDoom only — it does not hold on Zandronum.
+`C_DoCommand()` for real. `quicksave` has no `ACS_IsCalledFromConsoleCommand()` guard, so a
+script calling the zt-bcc/ACS builtin bound to this opcode (`ConsoleCommand("quicksave")`) reaches
+the CCMD on Zandronum. It then runs the same flow as above: the Save menu if no slot is set, else
+the confirmation prompt, so a script can't complete a save without the player confirming. Whether
+the command is a plain `CCMD` or an `UNSAFE_CCMD` doesn't matter on this path: the unsafe check
+(`src/c_dispatch.cpp:1160-1169`) only refuses inside an unsafe-execution scope, and the ACS
+opcodes never open one. So the "console commands aren't reachable from ACS" framing below holds
+for UZDoom only. It does not hold on Zandronum.
 
 This is one of the [UI-scope manual save triggers](../../zscript/concepts/autosave-triggers.md) —
 on UZDoom, unlike `Level.MakeAutoSave()` (a ZScript method with no Zandronum equivalent, since

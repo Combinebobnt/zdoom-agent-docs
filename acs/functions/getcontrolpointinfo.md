@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** wiki page `GetControlPointInfo - Zandronum Wiki.html` (`_intake/`, retrieved
 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetControlPointInfo&oldid=2273`) + source-verified against `p_acs.cpp:7996-8026`/`5547`,
 `sectinfo.h:61-70`, `sectinfo.cpp:267-312`, `domination.cpp:90-102`, `teaminfo.h:38`,

@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
-**Provenance:** ZDoom Wiki (verified against Zandronum fork implementation, 2026-07-29, https://zdoom.org/w/index.php?title=TeleportOther&oldid=44556)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki (verified against Zandronum fork implementation, 2026-07-29, https://zdoom.org/w/index.php?title=TeleportOther&oldid=44556); destination fallback chain corrected against the Zandronum source's `src/p_teleport.cpp:251-316` (`SelectTeleDest`), 2026-09-25
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 ## Signature
@@ -17,7 +17,7 @@ Action special with index 76. All three parameters are mandatory (no optional pa
 ## Parameters
 
 - **`other_tid`** — The TID of the actor(s) to teleport. If `0`, the function does nothing and returns `0`.
-- **`dest_tid`** — The TID of the destination marker. Must be a `TeleportDest` or `TeleportDest2` actor class; a plain mapspot or unrelated actor with this TID will **not** be recognized. If `0` or no destination is found, the function returns `0`.
+- **`dest_tid`** — The TID of the destination marker. Preferentially a `TeleportDest` or `TeleportDest2` actor class; if none exists with this TID, a plain mapspot or certain other non-solid actors with this TID are used instead (see Destination-class fallback chain below). If `0` or no destination is found at all, the function returns `0`.
 - **`fog`** — Control of teleport effects. Any nonzero value (not just `1`) enables fog spawning at source and destination, plus velocity halt (see Behavior below). `0` disables fog and preserves velocity.
 
 ## Return Value
@@ -30,7 +30,7 @@ Teleports all actors with the specified `other_tid` to the location of the desti
 
 **Multiple actors:** If multiple actors share the same `other_tid`, all of them are teleported to the same destination.
 
-**Destination class requirement:** The destination is found via `NActorIterator(NAME_TeleportDest, dest_tid)` — only actors of class `TeleportDest` or its subclasses (e.g. `TeleportDest2`) are recognized. A plain mapspot with the destination TID will silently fail. **This is a fork/wiki divergence** — the wiki describes the parameter generically as "TID of the map spot" without specifying the class constraint.
+**Destination-class fallback chain:** The destination search (`SelectTeleDest`, the Zandronum source's `src/p_teleport.cpp:251-316`) first tries `NActorIterator(NAME_TeleportDest, dest_tid)`, matching actors of class `TeleportDest` or its subclasses (e.g. `TeleportDest2`). If none exist with that TID, it falls back to a `NAME_MapSpot` actor with the same TID, and if that also doesn't exist, to any actor with that TID that isn't flagged `MF_SOLID`. Only if none of these exist does the search fail and the function return `0`. This makes the wiki's generic "TID of the map spot" description closer to the real behavior than a strict `TeleportDest`-only requirement would be.
 
 **Height handling:** If the destination is a `TeleportDest2`, the teleported actor lands at the destination's z-coordinate. Otherwise, actors land at `ONFLOORZ` (floor height of the destination sector).
 

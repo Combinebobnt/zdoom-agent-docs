@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-17)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** Zandronum source `src/doomstat.cpp` (CUSTOM_CVAR declaration showing `CVAR_SERVERINFO | CVAR_GAMEPLAYSETTING`, with no `CVAR_LATCH` flag).
 
 Controls the damage multiplier for friendly fire (damage dealt by a player to a teammate or ally). Specified as a float representing a percentage of normal damage. The cvar exists under the same name on both engine families: UZDoom declares it at `src/g_cvars.cpp:131` as a `CUSTOM_CVAR` of type `Float` defaulting to `0.f` with the `CVAR_SERVERINFO | CVAR_NOINITCALL` flags, and both engines copy it into a per-level `teamdamage` field (`FLevelLocals::teamdamage` on UZDoom, `level.teamdamage` on Zandronum) that a map's MAPINFO `teamdamage` option can override — so the value actually applied to damage can be map-specific, not just whatever the cvar currently reads.

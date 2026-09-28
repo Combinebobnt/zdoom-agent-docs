@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
-**Provenance:** ZDoom Wiki "Creating new projectiles" (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=Creating_new_projectiles&oldid=52213), cross-checked against the Zandronum source's `Projectile` property definition (`src/thingdef/thingdef_properties.cpp:1351-1357`), missile explosion logic (`src/p_mobj.cpp:1536-1562`), missile damage calculation (`src/p_mobj.cpp:3715-3733`), and action function implementations (`src/g_strife/a_spectral.cpp:101` for `A_Tracer2`; `src/g_doom/a_doomweaps.cpp:982` for `A_BFGSpray`).
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki "Creating new projectiles" (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=Creating_new_projectiles&oldid=52213), cross-checked against the Zandronum source's `Projectile` property definition (`src/thingdef/thingdef_properties.cpp:1351-1357`), missile explosion logic (`src/p_mobj.cpp:1536-1562`), missile damage calculation (`src/p_mobj.cpp:3715-3733`), and action function implementations (`src/g_strife/a_spectral.cpp:101` for `A_Tracer2`; `src/g_doom/a_doomweaps.cpp:982` for `A_BFGSpray`). Zandronum corrections re-read at 3.3-alpha @bdd0f7beb: flag meanings (`src/actor.h:184,187`), damage multipliers per impact kind (`src/p_map.cpp:1246,1278`) and expression damage (`src/thingdef/thingdef_properties.cpp:550-561`), seeker `tracer` assignment (`src/thingdef/thingdef_codeptr.cpp:391,1270,1454,1719`), and `P_AproxDistance` (`src/p_maputl.cpp:59-64`).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 This page covers the essential properties and state setup for creating a basic projectile (including homing variants), and the state selection logic when a projectile impacts its target. It does not cover action-function semantics in depth — see the `actions/` directory for those — or advanced behaviors like explosion trails or multi-damage-type handling.
@@ -19,8 +19,8 @@ The `Projectile` property is a shorthand that configures all the necessary actor
 - `MF_MISSILE` — marks the actor as a projectile for engine lookups and special handling.
 
 **`flags2` (second word, via line 1355):**
-- `MF2_IMPACT` — reserved for impact behavior (implementation-specific).
-- `MF2_PCROSS` — the projectile can cross lines flagged `ML_BLOCKMONSTERS`.
+- `MF2_IMPACT` — the missile can activate line specials whose activation type is projectile impact (`SPAC_IMPACT`).
+- `MF2_PCROSS` — the missile can activate line specials whose activation type is projectile cross (`SPAC_PCROSS`).
 - `MF2_NOTELEPORT` — the projectile cannot be teleported.
 
 **`flags5` (fifth word, conditional on Raven-game gametype, via line 1356):**
@@ -50,11 +50,13 @@ A `Spawn:` state without a loop keyword is sometimes used deliberately to create
 
 When a projectile impacts an actor, wall, floor, or ceiling, the engine selects a death state based on what was hit, following this cascade:
 
-1. **If the projectile hits an actor with `SHOOTABLE` and `NOBLOOD` flags:** the engine looks for a `Crash:` state. This state is reserved for hitting corpses and other non-bloody solid objects.
+Here a "damageable target" is an actor that is `SHOOTABLE`, a corpse (`CORPSE`), or already killed (`MF6_KILLED`). Zandronum also counts any player, as a workaround for a killed player losing `SHOOTABLE`.
 
-2. **If no `Crash:` state exists, or the target has `SHOOTABLE` but not `NOBLOOD`:** the engine looks for `XDeath:` (or equivalently, the dotted-label form `Death.Extreme`, per the fallback rules in `state-machine.md`).
+1. **If the projectile hits a damageable target with the `NOBLOOD` flag:** the engine looks for a `Crash:` state. This state is for hitting non-bleeding targets.
 
-3. **If no `XDeath:`/`Death.Extreme:` state exists, or the projectile hits a wall/floor/non-`SHOOTABLE` object:** the engine uses the standard `Death:` state.
+2. **If no `Crash:` state exists, or the damageable target lacks `NOBLOOD`:** the engine looks for `XDeath:` (or equivalently, the dotted-label form `Death.Extreme`, per the fallback rules in `state-machine.md`).
+
+3. **If no `XDeath:`/`Death.Extreme:` state exists, or the projectile hits a wall, floor, or an actor that is not a damageable target:** the engine uses the standard `Death:` state.
 
 If none of these states are defined, the projectile is removed with no visible animation.
 
@@ -75,14 +77,16 @@ where `random()` is a pseudo-random value 0–255. This means a projectile with 
 
 Strife-format weapons set the `MF4_STRIFEDAMAGE` flag, which changes the multiplier range to `(random() & 3) + 1` instead, yielding 1–4x damage.
 
+Two exceptions. A parenthesized damage expression (`Damage (5)`) is evaluated and used as-is, with no random multiplier, and `Damage 0` deals 0. A ripper (`RIPPER`) passing through an actor uses `(random() & 3) + 2`, a 2-5x multiplier.
+
 ## Homing projectiles (seekermissiles)
 
 To create a projectile that tracks a target:
 
-1. Set the `SEEKERMISSILE` flag (optional but conventional for other engine features; not strictly required by `A_Tracer2`).
-2. Call `A_Tracer2` (or a similar seeking action function) in the projectile's `Spawn:` state. The function adjusts the projectile's angle and velocity each tic to home in on its `tracer` field.
+1. Set the `SEEKERMISSILE` flag. This is what makes the standard fire functions fill in the projectile's `tracer` field (see below).
+2. Call `A_Tracer2` or `A_SeekerMissile` in the projectile's `Spawn:` state. The function adjusts the projectile's angle and velocity each tic to home in on its `tracer` field.
 
-The engine does **not** automatically set the `tracer` field when a projectile spawns — it must be set by the spawning code (e.g., an action function that fires the projectile). Seeking action functions only work if a valid `tracer` target is already assigned.
+Seeking functions steer toward `tracer` and do nothing while it is empty. The generic DECORATE fire functions assign it only when the spawned missile has `SEEKERMISSILE`. `A_CustomMissile`, `A_CustomComboAttack`, `A_MissileAttack`, `A_ComboAttack` and `A_BasicAttack` set it to the shooter's `target`. `A_FireCustomMissile` sets it to the actor its autoaim found, if any. Without the flag these functions leave `tracer` empty, so the missile flies straight. `A_SeekerMissile` with `SMF_LOOK` can also acquire a `tracer` itself when none is set.
 
 ## Complex projectiles
 
@@ -142,7 +146,7 @@ actor GenericTracker
 }
 ```
 
-This example uses `A_Tracer2`, which is a Zandronum-specific seeking function. UZDoom projects should replace the action function call with `A_SeekerMissile` with appropriate flags (see "Engine-family divergence" above for details).
+This example uses `A_Tracer2`, Strife's fixed-turn seeking function, which both engines provide. `A_SeekerMissile` is the more configurable alternative (see "Engine-family divergence" below).
 
 ## Limited-lifespan projectile example (generic)
 
@@ -173,13 +177,13 @@ In this example, the `Spawn:` state lasts 100 tics with no loop statement. When 
 
 ## Engine-family divergence: seeking behavior
 
-**A_Tracer2 and seeking action functions differ between engines.**
+**Seeking action functions.**
 
-Zandronum provides `A_Tracer2`, a Strife-specific seeking action function that has no direct equivalent in UZDoom. The homing projectile example above (using `A_Tracer2`) is Zandronum-only. UZDoom projects should use `A_SeekerMissile` instead, which both engines support and which offers additional flags (precise seeking, target lookup, speed options) not available in Zandronum's `A_Tracer2`. Both engines support the `SEEKERMISSILE` flag and the `tracer` field that seeking functions require.
+Both engines provide `A_Tracer2`, the Strife seeking action function, so the homing example above runs on either. Zandronum's version takes no parameters and turns by a fixed angle per call. UZDoom's takes an optional turn-angle parameter. `A_SeekerMissile` exists on both and offers flags (precise seeking, target lookup, speed options) that `A_Tracer2` lacks. Both engines support the `SEEKERMISSILE` flag and the `tracer` field that seeking functions require.
 
 **Seeking missile trajectory math differs in non-precise mode.**
 
-When calculating vertical velocity for a seeking missile (to adjust pitch toward a target above or below), Zandronum's non-precise seeking mode uses the octagonal-distance approximation function `P_AproxDistance`, which uses max(dx, dy, (dx+dy)>>1) and can produce less-accurate aim in diagonal directions. UZDoom uses true Euclidean distance (`Distance2D`, based on sqrt(dx² + dy²)) for the same calculation. Both engines offer precise-mode seeking (enabled by the `SMF_PRECISE` flag in `A_SeekerMissile`) which uses proper Euclidean distance on both. For gameplay purposes, this divergence is minor — the difference is most visible in extreme diagonal ranges — but mods targeting both engines should be aware that non-precise seeking slightly favors axis-aligned directions in Zandronum.
+When calculating vertical velocity for a seeking missile (to adjust pitch toward a target above or below), Zandronum's non-precise seeking mode uses the octagonal-distance approximation function `P_AproxDistance`, which returns max(|dx|, |dy|) + min(|dx|, |dy|)/2 (overestimating diagonal distances) and can produce less-accurate aim in diagonal directions. UZDoom uses true Euclidean distance (`Distance2D`, based on sqrt(dx² + dy²)) for the same calculation. Both engines offer precise-mode seeking (enabled by the `SMF_PRECISE` flag in `A_SeekerMissile`) which uses proper Euclidean distance on both. For gameplay purposes, this divergence is minor — the difference is most visible in extreme diagonal ranges — but mods targeting both engines should be aware that non-precise seeking slightly favors axis-aligned directions in Zandronum.
 
 ## See also
 

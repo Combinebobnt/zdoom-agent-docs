@@ -6,10 +6,10 @@ a compiler keyword/expression, not a callable, see Bucket below), but all four o
 to (`PCD_STRCPYTOMAPCHRANGE`/`PCD_STRCPYTOWORLDCHRANGE`/`PCD_STRCPYTOGLOBALCHRANGE`/
 `PCD_STRCPYTOSCRIPTCHRANGE`) are confirmed present on both engines (`tools/engine_matrix.py`, bin
 `both` for each), so the keyword is fully portable
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** `StrCpy - ZDoom Wiki.html`
 (`https://zdoom.org/w/index.php?title=StrCpy&oldid=37279`), verified against
-the Zandronum source's `src/p_acs.cpp` (`PCD_STRCPYTO*CHRANGE`, lines 12893-12980) and
+the Zandronum source's `src/p_acs.cpp` (`PCD_STRCPYTO*CHRANGE`, lines 12893-12987) and
 the zt-bcc source's `src` on 2026-07-29. The wiki's signature and top-level return-value description
 are accurate for Zandronum, but it omits several storage-class-dependent edge cases only visible
 in the interpreter source — see below.
@@ -54,7 +54,7 @@ Compiles to one of four opcodes chosen by the destination's storage class — `P
 (map-scope `static` arrays), `PCD_STRCPYTOWORLDCHRANGE`, `PCD_STRCPYTOGLOBALCHRANGE`, or
 `PCD_STRCPYTOSCRIPTCHRANGE` (local/function-scope arrays, the `default` case in
 `visit_strcpy`, `zt-bcc/src/codegen/expr.c:2454-2500`). All four share one handler in
-`p_acs.cpp:12893-12980`:
+`p_acs.cpp:12893-12987`:
 
 - **Negative `array_offset` or negative `source_offset`** → returns `false` immediately, writes
   nothing. This matches the wiki's "false ... if a negative source_index was given", but the
@@ -69,17 +69,25 @@ Compiles to one of four opcodes chosen by the destination's storage class — `P
   an out-of-range positive one silently succeeds at copying nothing. The wiki's phrasing implies
   only negative values are special-cased, which is correct, but doesn't call out that an
   overrun is a silent no-op/success rather than an error.
-- **Normal copy:** characters are copied one at a time up to `array_length` (or until the source's
-  terminating `0` is reached, which is never itself written). Return is `true` only if the loop
-  stopped because it *reached* the terminator within budget; if `array_length` characters are
-  copied and the source still has more (the "next" character isn't `0`), it returns `false` — the
-  wiki's "false if the copy ran out of room" is accurate.
+- **Normal copy:** characters are copied one at a time up to `array_length`. Each character is
+  written before it is tested, so the source's terminating `0` is itself written whenever budget
+  remains for it. Return is `true` if the terminator was written, and also `true` if the budget
+  ran out with only the terminator left unwritten (the array then holds no terminating `0`). It
+  is `false` only when the budget ran out with a non-zero character still pending. So the
+  wiki's "false if the copy ran out of room" holds, but an exact fit with no room for the `0`
+  still reports success.
 - **Destination bounds differ by storage class — not documented on the wiki at all:**
   - **Map-scope arrays** (`PCD_STRCPYTOMAPCHRANGE` → `FBehavior::CopyStringToArray`,
-    `p_acs.cpp:3269-3283`) are the only variant that's fully self-consistent: `array_length` is
+    `p_acs.cpp:3269-3286`) are the only variant that's fully self-consistent: `array_length` is
     silently clamped down to `declared_size - array_offset` if the requested length would
-    overrun the array, and an invalid array id or negative offset returns `false`. The reported
-    return value always accurately reflects what was actually written.
+    overrun the array, and a negative write index or an out-of-range array number (the value
+    read from the map-variable slot) returns `false`. Once the copy runs, the return value
+    accurately reflects what was written. One exception comes first: the handler only calls
+    `CopyStringToArray` when the map-variable slot operand is above 0, below `NUM_MAPVARS` and
+    resolved (`p_acs.cpp:12948-12957`). Otherwise nothing is written and the result is whatever
+    the base-index operand held, so a plain array reads `false` but a subscripted
+    multi-dimensional destination can read as a nonzero "success". Slot 0 is always rejected,
+    so a map array the compiler placed in map-variable slot 0 is never written by `strcpy`.
   - **Local/function-scope arrays** (`PCD_STRCPYTOSCRIPTCHRANGE`) go through
     `ACSLocalArrays::Set()` (`p_acs.h:243-250`), which silently no-ops any write whose
     `arrayentry` falls outside the array's declared size — **but the copy loop itself doesn't
@@ -94,7 +102,9 @@ Compiles to one of four opcodes chosen by the destination's storage class — `P
     (`FWorldGlobalArray`, `p_acs.h:69`), not fixed-size buffers — there is no declared capacity
     to overrun, so every index within `array_length` genuinely gets written and the return value
     is as reliable as the map-array case. Only the array *number* `a` is bounds-checked (against
-    `NUM_WORLDVARS`/`NUM_GLOBALVARS` via `BoundsCheckingArray`), not the element index.
+    `NUM_WORLDVARS`/`NUM_GLOBALVARS` via `BoundsCheckingArray`), not the element index. An
+    out-of-range number is not a `false` return: it aborts with the fatal "Out of bounds memory
+    access in ACS VM" error (`p_acs.h:75-83`).
 
 ## Bytecode shape
 
@@ -121,7 +131,9 @@ Net stack effect: pops all six, pushes the `bool` result — the interpreter imp
 Three things worth knowing that aren't visible from the source syntax:
 
 - **The two destination operands are just added together.** The interpreter computes the write
-  index as `STACK(4) + STACK(6)`, with no other use for either. The split exists only because
+  index as `STACK(4) + STACK(6)`. The only other uses are that a negative `STACK(4)` alone fails
+  early, and that `STACK(6)` is left as the result when the map-array slot check rejects the
+  call (see above). The split exists only because
   the *compiler* has two places to put an index: subscripting a multi-dimensional destination
   (`a:(arr[i], 3, 8)` where `arr` is `[n][width]`) puts the flattened `i * width` in the base
   operand and leaves `array_offset` at 3, while indexing a flat array
@@ -135,7 +147,8 @@ Three things worth knowing that aren't visible from the source syntax:
   (`object.index` / `sym->info.array.index`), so a non-constant value in that slot means the
   opcode wasn't produced by a real `strcpy` lowering.
 - **The array number's *namespace* differs per opcode**, matching the storage class:
-  `PCD_STRCPYTOMAPCHRANGE` indexes the module's own map-array table,
+  `PCD_STRCPYTOMAPCHRANGE` indexes the module's map-variable table, and the slot's value is the
+  array number (an imported library array resolves through that value too),
   `WORLD`/`GLOBAL` index the engine-global `ACS_WorldArrays`/`ACS_GlobalArrays`, and
   `SCRIPT` indexes the enclosing script/function's **local** array table — a separate
   per-entry namespace whose sizes live in the object's `SARY`/`FARY` chunks (read by

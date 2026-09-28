@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
 **Provenance:** ZDoom Wiki `A_Pain` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_Pain&oldid=47251) + verified against Zandronum source's `src/p_enemy.cpp:3567` and UZDoom source's `src/playsim/p_enemy.cpp:3178`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** action function defined on `AActor` (callable from any actor's state table).
@@ -40,8 +40,9 @@ Monsters play the `PainSound` property — a single, statically-assigned sound p
 
 - **Channel**: `CHAN_VOICE` (interrupts any other voice-channel sound on the same actor, such as active sounds).
 - **Volume**: 1.0 (full volume).
-- **Attenuation**: `ATTN_NORM` (standard Doom distance falloff; audible beyond a certain range).
-- **Client-side behavior**: Unlike several other combat actions, **A_Pain runs on both client and server with no early-return guard**. The function executes the same way in single-player, on the server in multiplayer, and on clients in multiplayer — with no special replication call to synchronize the sound across the network.
+- **Attenuation**: `ATTN_NORM` (standard Doom distance falloff; the sound fades out with distance).
+- **Client-side behavior**: Unlike several other combat actions, **A_Pain runs on both client and server with no early-return guard**. The function executes the same way in single-player, on the server in multiplayer, and on clients in multiplayer, with no special replication call to synchronize the sound across the network.
+- **Zandronum clients and damage-type variants**: clients hear the sound because they run `A_Pain` themselves when the server's `SetThingFrame` puts the actor in its pain state (`src/p_interaction.cpp:1797-1801`, `1819-1823`). The protocol never sends `player->LastDamageType`, though. `DamagePlayerWithType` only sets `DamageTypeReceived`, a different field (`src/cl_main.cpp:4171-4177`). A client can therefore pick a different player pain sound than the server did when damage-type variants exist.
 
 ## Engine-family divergence
 
@@ -54,5 +55,5 @@ Additionally, **UZDoom calls `PlayerHurtMakeRumble()` as a virtual function for 
 
 ## See also
 
-- [`PainSound`](../notes/painsound.md) — the actor property that defines a monster's pain sound (not used for players, only for non-player actors or morphed players without `NOMORPHLIMITATIONS`).
+- [`PainSound`](../inventory/actor-properties.md) — the actor property that defines a monster's pain sound (not used for players, only for non-player actors or morphed players without `NOMORPHLIMITATIONS`).
 - [Creating monsters](../concepts/creating-monsters.md) — monster-specific properties and state setup, including the `Pain:` reserved state called when an actor takes damage (in which `A_Pain` is typically invoked).

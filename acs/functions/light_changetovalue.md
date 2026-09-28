@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `Light_ChangeToValue - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
 `https://zdoom.org/w/index.php?title=Light_ChangeToValue&oldid=44599`) + source-verified (`p_lnspec.cpp:1945-1950`, `p_lights.cpp:503-548`,
 `P_FindSectorFromTag` in `p_spec.cpp:270-277`). The ZDoom wiki page is **incomplete, not wrong** —
@@ -25,13 +25,16 @@ index 112 in `zcommon.bcs`'s `special` table), semantics in the Zandronum source
   dependency at all — see below.
 - `value` — light level to assign to each tagged sector. **Clamped to `[SHRT_MIN, SHRT_MAX]`**
   (`-32768` to `32767`, verified via `SetLightLevel → ClampLight`), though valid visual light
-  levels are `[0, 255]`. **If `value < 0`, instead of setting all sectors to a negative level, the
-  function searches for the maximum light level among each sector's *adjacent* (line-connected)
-  neighbors and sets that sector to that max** — i.e., `Light_ChangeToValue(tag, -1)` is a
-  hidden "set each sector to its brightest neighbor's level" operation (a sibling special
-  `Light_MaxNeighbor`, action special 234, deliberately uses `value == -1`). The per-sector
-  independent-vs-cumulative scope is controlled by the `COMPATF_LIGHT` flag, which is only
-  meaningful when `value < 0` — in normal use (`value >= 0`), the flag is a no-op.
+  levels are `[0, 255]`. **If `value < 0`, the function searches for the maximum light level
+  among each sector's *adjacent* (line-connected) neighbors and sets that sector to that max**.
+  So `Light_ChangeToValue(tag, -1)` is a hidden "set each sector to its brightest neighbor's
+  level" operation (a sibling special `Light_MaxNeighbor`, action special 234, deliberately uses
+  `value == -1`). The search starts from `value` itself, so a sector with no two-sided lines (or
+  whose neighbors are all darker than `value`) really is set to the negative `value`. The
+  `COMPATF_LIGHT` flag is only meaningful when `value < 0`. Without it, each tagged sector
+  searches its own neighbors independently. With it, the first tagged sector's result replaces
+  `value` for the rest; if that result is `>= 0`, every later tagged sector skips the search and
+  gets that same level. In normal use (`value >= 0`), the flag is a no-op.
 
 **Return:** `int`, always `true`/`1` unconditionally, regardless of whether any sector matched `tag`.
 This is not a success signal; it is identical to the "always returns true" pattern documented for

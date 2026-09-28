@@ -2,10 +2,10 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_SetUserArray` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_SetUserArray&oldid=42563) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:5168-5194` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_SetUserArray)`).
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_SetUserArray` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_SetUserArray&oldid=42563) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:5176-5202` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_SetUserArray)`).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
-**Bucket:** `src/thingdef/thingdef_codeptr.cpp:5168` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_SetUserArray)`).
+**Bucket:** `src/thingdef/thingdef_codeptr.cpp:5176` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_SetUserArray)`).
 
 Sets an element of an integer array user variable on the calling actor to a specified value. Like `A_SetUserVar`, this function is part of the mechanism for storing actor-specific custom data via user variables.
 

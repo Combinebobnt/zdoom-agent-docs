@@ -2,14 +2,14 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
-**Provenance:** wiki page `SetPlayerClass - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=SetPlayerClass&oldid=1669`) + source-verified (`p_acs.cpp:7594-7676`, `p_interaction.cpp:3006-3023`, `team.cpp:1526-1538`, `network.cpp:1552-1555`, `d_netinfo.cpp:708-719`, `gi.h:147`, `gi.cpp:388`). The wiki's signature, parameter meanings, and general pass/fail framing hold; the missing true-spectator check (wiki says spectators are rejected, they aren't), the client-mode guard, the same-class-always-fails case, and the random-path's team-check bypass are this doc's source-verified additions/corrections, not from the wiki.
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** wiki page `SetPlayerClass - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=SetPlayerClass&oldid=1669`) + source-verified (`p_acs.cpp:7594-7672`, `p_interaction.cpp:3006-3023`, `team.cpp:1526-1538`, `network.cpp:1552-1555`, `d_netinfo.cpp:708-719`, `gi.h:147`, `gi.cpp:388`). The wiki's signature, parameter meanings, and general pass/fail framing hold; the missing true-spectator check (wiki says spectators are rejected, they aren't), the client-mode guard, the same-class-always-fails case, and the random-path's team-check bypass are this doc's source-verified additions/corrections, not from the wiki.
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
 Changes the player class a player is using. Extension function (`ACSF_SetPlayerClass`, index
--135 in `zcommon.bcs:1768`), implementation at the Zandronum source's `src/p_acs.cpp:7594-7676`
+-135 in `zcommon.bcs:1768`), implementation at the Zandronum source's `src/p_acs.cpp:7594-7672`
 (case body itself is 7594-7644; the read of interest ends there, the remainder handles the
 respawn-with-new-class side effects).
 

@@ -2,8 +2,8 @@
 
 **Tier:** B
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
-**Provenance:** ZDoom Wiki "Creating new player classes" (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=Creating_new_player_classes&oldid=52200), verified against the Zandronum source's DECORATE actor definition examples (`wadsrc/static/actors/doom/doomplayer.txt`), `Player.*` property definitions (`src/thingdef/thingdef_properties.cpp:2254-2836`), MAPINFO parser (`src/gi.cpp:330-331`), KEYCONF command definitions (`src/p_user.cpp:233-241`), and multiplayer player-class selection mechanism (`src/d_netinfo.cpp`, `src/menu/multiplayermenu.cpp`, `src/menu/menudef.cpp:1164-1257`).
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki "Creating new player classes" (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=Creating_new_player_classes&oldid=52200), verified against the Zandronum source's DECORATE actor definition examples (`wadsrc/static/actors/doom/doomplayer.txt`), `Player.*` property definitions (`src/thingdef/thingdef_properties.cpp:2254-2836`; `Player.SpawnClass` at `:2457-2483`, `Player.CrouchSprite` at `:2602-2617`), class spawn filtering (`src/p_user.cpp:677-681`, `src/p_mobj.cpp:6009-6039`), crouch gating (`src/g_level.cpp:2142-2149`), max-health default (`src/p_user.cpp:1502-1505`), MAPINFO parser (`src/gi.cpp:330-331`), KEYCONF command definitions (`src/p_user.cpp:233-241`), and multiplayer player-class selection mechanism (`src/d_netinfo.cpp`, `src/menu/multiplayermenu.cpp:999-1008,1106-1123`, `src/menu/menudef.cpp:1164-1257`).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 Player classes allow a game to define multiple player character variants (different sprites, stats, weapon sets, appearance) selectable by the player, either at new-game startup (single-player) or when joining a game (multiplayer). This page covers the DECORATE/ZScript-side mechanisms — actor definition and property configuration — shared across both UZDoom and Zandronum, with special attention to the multiplayer workflow that the wiki's single-player focus omits.
@@ -45,13 +45,13 @@ Beyond the basic actor properties (`Health`, `Radius`, `Height`, `Speed`, etc.),
 - **`Player.StartItem "<itemtype>"` or `Player.StartItem "<itemtype>", <amount>`** — Adds an item (weapon, ammo, powerup) to the player's initial inventory on spawn. Can be repeated; multiple `Player.StartItem` lines stack. Example: `Player.StartItem "Pistol"` starts with a pistol; `Player.StartItem "Clip", 50` starts with 50 bullets.
 - **`Player.WeaponSlot <slot>, <weapon1>, <weapon2>, ...`** — Assigns weapons to inventory slots (0–9) for quick access. Example: `Player.WeaponSlot 1, Fist, Chainsaw` puts the Fist and Chainsaw in slot 1.
 - **`Player.ViewHeight <units>`** — The camera height when standing. Defaults to 41 units; humanoid players typically use 41–56.
-- **`Player.MaxHealth <hitpoints>`** — The maximum health the player can reach with powerups (not the `Health` property, which is the initial health). If not set, defaults to 100 (or a compatibility-mode dependent value in DEHACKED compatibility mode).
+- **`Player.MaxHealth <hitpoints>`** — The health cap for ordinary health pickups that set no `MaxAmount` of their own (not the `Health` property, which is the initial health). If not set, it falls back to DEHACKED's Max Health value (100 unless a patch changes it), or to a flat 100 when the `COMPATF_DEHHEALTH` compatibility flag is on.
 - **`Player.JumpZ <units>`** — Jump force; higher values allow higher jumps (only used if jumping is enabled via server flags or MAPINFO).
 
 **Audio and miscellaneous:**
 - **`Player.SoundClass "<classname>"`** — The sound class used for player damage sounds, footsteps, etc. (e.g., `"marine"`, `"baby"`). Must match one of the sound classes defined in `SNDINFO` lump. Not directly visible to the player but affects audio playback.
-- **`Player.CrouchSprite "<spriteletter>"`** — The sprite prefix to use while crouching (e.g., `"PLYC"` for the crouching Doom player). Only relevant if the `+CROUCHING` actor flag is enabled.
-- **`Player.SpawnClass "<className>"`** — If set, causes this player to spawn a morphing spawner of the specified actor type instead of the player itself at level start. Rarely used.
+- **`Player.CrouchSprite "<spritename>"`** — The 4-character sprite name to use while crouching (e.g., `"PLYC"` for the crouching Doom player); any other length is a fatal error. There is no actor flag that enables crouching. Whether players can crouch is decided by the `DF_NO_CROUCH`/`DF_YES_CROUCH` dmflags and otherwise by the map's MAPINFO crouch setting.
+- **`Player.SpawnClass <Fighter|Cleric|Mage|Any>` or `Player.SpawnClass <number>`** — Sets the class spawn mask used to filter map things by their Hexen-style class flags: a map thing restricted to other classes does not spawn for this class. A number sets the 1-based class bit; `Any` clears the mask so every thing spawns. On Zandronum the filter only runs in a single-player (non-network) game, so class-filtered things always spawn in network games. Rarely needed outside Hexen-style class setups.
 
 For the complete list of `Player.*` properties, see the Zandronum source `src/thingdef/thingdef_properties.cpp:2254-2836`.
 
@@ -89,7 +89,7 @@ actor HiddenClass : DoomPlayer
 }
 ```
 
-When `+NOMENU` is set, the class is technically available but does not appear in any player-class selection menu. It can only be assigned via console commands (e.g., `set playerclass <classname>`) or programmatically. This is useful for special modes, debug classes, or classes that should only be selectable in specific game configurations.
+When `+NOMENU` is set, the class is technically available but does not appear in any player-class selection menu. It can only be assigned via console commands (e.g., `set playerclass <name>`; on Zandronum the value is matched against each class's `Player.DisplayName`, not its actor class name, `src/d_netinfo.cpp:315-334`) or programmatically. This is useful for special modes, debug classes, or classes that should only be selectable in specific game configurations.
 
 The shipped code checks this flag and applies the `PCF_NOMENU` per-class flag when setting up the player-class list (`src/p_user.cpp:224-226`).
 
@@ -103,7 +103,7 @@ addplayerclass DoomPlayer
 addplayerclass MyCustomPlayer
 ```
 
-These commands (`clearplayerclasses`, `addplayerclass`) are still supported in Zandronum for backward compatibility and work only when parsing KEYCONF (`src/p_user.cpp:233-262`). **The MAPINFO approach is preferred** and is the method all shipped game definitions use; the KEYCONF method is deprecated in the sense that no new projects should rely on it, though it is not removed from the engine.
+These commands (`clearplayerclasses`, `addplayerclass`) are still supported in Zandronum for backward compatibility and work only when parsing KEYCONF (`src/p_user.cpp:233-262`). On Zandronum, `addplayerclass <class> nomenu` also marks the class `PCF_NOMENU` (`src/p_user.cpp:257-259`). **The MAPINFO approach is preferred** and is the method all shipped game definitions use; the KEYCONF method is deprecated in the sense that no new projects should rely on it, though it is not removed from the engine.
 
 ## Single-player vs. multiplayer player-class selection
 
@@ -119,7 +119,7 @@ Both UZDoom and Zandronum implement player-class selection differently in single
 - Player class is stored as a **`playerclass` userinfo cvar** — a network-synchronized player property like `name`, `skin`, or `color`, not selected during a new-game flow. On Zandronum, this is registered at `src/d_netinfo.cpp:90`; on UZDoom, at `src/d_netinfo.cpp:60`.
 - The player class takes effect **at spawn/respawn time**: when the player joins the server or respawns, the server looks up the player's `CurrentPlayerClass` from userinfo and spawns the corresponding `PlayerPawn` actor.
 - The class **remains in effect for the duration of the game or until explicitly changed** via the player-setup menu, console command, or explicit userinfo update. **Mid-game class switching is possible** if the player changes their `playerclass` userinfo during play; the change takes effect at the next respawn (though the exact code path from menu selection or console command to the spawn-side consumer remains incompletely traced in both engines).
-- A **multiplayer "join game" menu** offers a class selector when the player is about to join, allowing class selection as part of the join process.
+- A **multiplayer "join game" menu** offers a class selector when the player is about to join, allowing class selection as part of the join process. On Zandronum, joining from the menu opens `ZA_SelectClassMenu` when more than one class exists, and `menu_joingamewithclass` sets `playerclass` to the chosen class's display name (or `Random`) before joining (`src/menu/multiplayermenu.cpp:999-1008,1106-1123`).
 
 This design allows multiplayer servers to enforce player-class restrictions, track which classes are in use, and handle dynamic class changes as part of the player-state synchronization protocol.
 

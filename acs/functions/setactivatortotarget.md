@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** ZDoom Wiki, "SetActivatorToTarget" (`https://zdoom.org/w/index.php?title=SetActivatorToTarget&oldid=35899`), processed 2026-07-29.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
@@ -15,8 +15,8 @@ the Zandronum source's `src/p_acs.cpp:5963-5982`.
 ## Resolution logic
 
 - `tid` — TID of the actor whose "target" becomes the new activator. **`0` means "the current
-  activator"** (`SingleActorFromTID`, `p_acs.cpp:4445`: `if (tid == 0) return defactor;`, where
-  `defactor` is passed in as the activator) — same zero-means-activator convention as other
+  activator"** (`SingleActorFromTID`, `p_acs.cpp:4445`, returns its default-actor argument for a
+  zero TID, and this call passes the activator as that default) — same zero-means-activator convention as other
   actor-targeting builtins in this engine.
 - Actual switch case (`p_acs.cpp:5963-5982`):
   1. Resolve `actor` from `tid` (or the current activator if `tid == 0`). **If no actor is found
@@ -24,7 +24,7 @@ the Zandronum source's `src/p_acs.cpp:5963-5982`.
   2. If `actor` is a **live player** (`actor->player != NULL && actor->player->playerstate ==
      PST_LIVE`), overwrite `actor` with the result of `P_BulletSlope(actor, &actor)`
      (`p_pspr.cpp:1290-1324`) — i.e. whatever the player's autoaim cone hits within `16*64` map
-     units, or `NULL` if the aim aiming at nothing/nothing in range.
+     units, or `NULL` if the aim finds nothing in range.
   3. Otherwise (monster, corpse, projectile, non-live player, any other actor), overwrite `actor`
      with `actor->target`.
   4. If the resulting `actor` is non-`NULL`, the activator is set to it and the function returns
@@ -37,9 +37,10 @@ the Zandronum source's `src/p_acs.cpp:5963-5982`.
   - **Missile/projectile:** the shooter, set when the projectile spawns (standard Doom-engine
     missile convention — projectiles use `target` to mean "owner", not "what I'm chasing").
   - **An actor that has died:** `target` gets overwritten to its **killer** in `AActor::Die`
-    (`p_interaction.cpp:496-500`: `// [RH] Set the target to the thing that killed it. Strife
-    apparently does this. if (source != NULL) target = source;`) — so reading a corpse's `target`
-    after death gives you the killer, not whatever it was fighting when it died.
+    (`p_interaction.cpp:496-500`) — so reading a corpse's `target` after death gives you the
+    killer, not whatever it was fighting when it died. This only happens when the death has a
+    source. Sourceless damage (e.g. crushers) leaves `target` as it was. A missile that dies
+    explodes and returns earlier in `Die` (`p_interaction.cpp:491-495`), so it keeps its shooter.
 
 ## Engine-family divergence: Zandronum added a wider live-player autoaim cone
 
@@ -67,7 +68,8 @@ finds a target for a live-player activator at an oblique angle:
   This has no practical effect on maps that don't use linked line portals.
 - **Netcode lag compensation.** Zandronum's autoaim helper wraps its aim check in client-position
   reconciliation ("unlagged") bookkeeping so a live-player autoaim result accounts for network
-  latency in multiplayer; UZDoom's equivalent helper has no analogous mechanism, consistent with
+  latency in multiplayer. It only takes effect on a server with unlagged enabled, for a non-bot
+  player who has it on (`unlagged.cpp:129-137`). UZDoom's equivalent helper has no analogous mechanism, consistent with
   it being coop/single-player-focused rather than a competitive-multiplayer-oriented fork.
 
 None of this affects the non-player branch (step 3, reading `->target` directly) or the

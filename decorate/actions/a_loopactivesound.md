@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_LoopActiveSound` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_LoopActiveSound&oldid=49051) + verified against the Zandronum source's `src/g_strife/a_strifestuff.cpp:639-645`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** ZDoom Wiki `A_LoopActiveSound` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_LoopActiveSound&oldid=49051) + verified against the Zandronum source's `src/g_strife/a_strifestuff.cpp:639-645`; multiplayer section from `src/s_sound.cpp:893-895` (server plays no sounds), `src/s_sound.cpp:1285-1294` (`S_Sound` only messages clients when `bSoundOnClient` is set) and `src/sv_main.cpp:4437-4465` (`SERVER_UpdateLoopingChannels`, called from the sound actions in `src/thingdef/thingdef_codeptr.cpp:470-622`).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_LoopActiveSound)` — callable from any actor's state table.
 
@@ -14,23 +14,25 @@ Plays the actor's `ActiveSound` property, if defined, as a looped sound that run
 When called, the function:
 
 1. Checks whether the actor has an `ActiveSound` defined (not zero).
-2. Checks whether any sound is already playing on the `CHAN_VOICE` channel for this actor. If a sound is already playing — **any sound**, not just the `ActiveSound` — the function returns without starting the loop.
+2. Checks whether any sound is already playing on the `CHAN_VOICE` channel for this actor. If a sound is already playing — **any sound**, not just the `ActiveSound` — the function returns without starting the loop. On Zandronum, with `compat_soundslots` (`COMPATF_MAGICSILENCE`) on, the check covers every channel of the actor, not only `CHAN_VOICE` (`src/s_sound.cpp:1875-1893`).
 3. If both conditions are met, plays the `ActiveSound` on `CHAN_VOICE` with the `CHAN_LOOP` flag set, causing it to restart seamlessly when it finishes.
 
 Because of the second check, an `ActiveSound` loop will not restart if another sound (such as a pain sound, death sound, or a manually-triggered sound via `A_PlaySound`) is playing on that channel. This means the loop can be interrupted by other game events but will not double-up or conflict.
 
 ## Stopping the loop
 
-The looped sound can be stopped by calling `A_StopSound()` with no parameters (defaults to stopping `CHAN_VOICE`). Alternatively, any other sound triggered on `CHAN_VOICE` will implicitly displace the loop.
+The looped sound can be stopped by calling `A_StopSound` with no arguments (defaults to stopping `CHAN_VOICE`). On Zandronum write it bare, as `A_StopSound`: empty parentheses on an action that takes parameters are a parse error there (`src/thingdef/thingdef_states.cpp:347-360`). UZDoom accepts `A_StopSound()`. Alternatively, any other sound triggered on `CHAN_VOICE` will implicitly displace the loop.
 
 ## Relation to other functions
 
-- **`A_FLoopActiveSound`** — a separate, distinct function (not a variant) that plays the `ActiveSound` every 8 tics without the `CHAN_LOOP` flag; creates a repeating effect rather than a seamless loop. This is useful for periodic activation sounds rather than continuous ambient ones.
+- **`A_FLoopActiveSound`** — a separate, distinct function (not a variant) that plays the `ActiveSound` without the `CHAN_LOOP` flag, and only when called on a tic where the level time is a multiple of 8 (so it has to be called every tic to sound every 8 tics); creates a repeating effect rather than a seamless loop. This is useful for periodic activation sounds rather than continuous ambient ones.
 - **`A_PlaySound`** — a general-purpose alternative for looping arbitrary sounds (not just `ActiveSound`) with explicit volume/attenuation control; recommended for new code when more flexibility is needed.
 
 ## Zandronum-specific: multiplayer loop replication
 
-In multiplayer, looping sounds are replicated via the server's internal looping-channels list (`g_LoopingChannelList`), allowing late-joining clients to inherit active loops from actors already on the map.
+`A_LoopActiveSound` is not replicated by the server. It calls `S_Sound` without the `bSoundOnClient` flag, and a server plays no sounds at all, so nothing is sent to clients. Each client hears the loop only because its own copy of the actor runs the same state and calls the action locally.
+
+It also never registers with the server's looping-channels list (`g_LoopingChannelList`), which is added to only by `A_PlaySound`, `A_PlaySoundEx`, `A_StopSound`, `A_StopSoundEx` and the ACS sound functions. A client joining later is therefore not sent the loop on connect. It hears it only once its copy of the actor calls `A_LoopActiveSound` again, which a `Loop`ed state (as in Strife's `ElectricBolt`) does on its next pass but a one-shot call never does.
 
 ## Engine-family divergence: A_StartSound availability
 

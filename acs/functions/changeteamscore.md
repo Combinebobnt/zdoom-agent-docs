@@ -2,10 +2,10 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `ChangeTeamScore - Zandronum Wiki.html` (`_intake/`, retrieved
 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=ChangeTeamScore&oldid=2242`) + source-verified against the Zandronum source
-(`p_acs.cpp:8071-8125`, `team.cpp:868-891,1155-1240`, `team.h:115,143,146,149`) and
+(`p_acs.cpp:8072-8127`, `team.cpp:868-917,1155-1246`, `team.h:115,143,146,149`) and
 `zt-bcc/lib/zcommon.bcs:1228-1238,1784`. The wiki's parameter list, enum values 0-3, and return
 convention all hold, but its first-parameter name (`player`), the frags-only negative-value
 carve-out, the no-op-returns-0 ambiguity, the per-type announce gating, and the wider 9-member
@@ -18,43 +18,67 @@ commit) — it predates the 3.2.1 target and is safe to verify against it.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
 Sets one of a team's four score counters. Extension function (`ACSF_ChangeTeamScore`, index -154
-in `zcommon.bcs`), implementation at the Zandronum source's `src/p_acs.cpp:8071-8125`, dispatching to
+in `zcommon.bcs`), implementation at the Zandronum source's `src/p_acs.cpp:8072-8127`, dispatching to
 `TEAM_SetFragCount`/`TEAM_SetPointCount`/`TEAM_SetWinCount`/`TEAM_SetDeathCount` in
 the Zandronum source's `src/team.cpp`.
 
 ```cpp
 case ACSF_ChangeTeamScore:
-{
-	const ULONG ulTeam = static_cast<ULONG>( args[0] );
-	const bool bAnnounce = argCount > 3 ? !!args[3] : true;
-
-	// [AK] With the exception of frags, the new score must not be a negative value.
-	const LONG lScore = ( args[1] == SCORE_FRAGS || args[2] >= 0 ) ? args[2] : 0;
-
-	if ( TEAM_CheckIfValid( ulTeam ) )
 	{
-		switch ( args[1] )
+		const ULONG ulTeam = static_cast<ULONG>( args[0] );
+		const bool bAnnounce = argCount > 3 ? !!args[3] : true;
+
+		// [AK] With the exception of frags, the new score must not be a negative value.
+		const LONG lScore = ( args[1] == SCORE_FRAGS || args[2] >= 0 ) ? args[2] : 0;
+
+		if ( TEAM_CheckIfValid( ulTeam ) )
 		{
-			case SCORE_FRAGS:
-				if ( teams[ulTeam].lFragCount == lScore ) return 0;
-				TEAM_SetFragCount( ulTeam, lScore, bAnnounce );
-				return 1;
-			case SCORE_POINTS:
-				if ( teams[ulTeam].lPointCount == lScore ) return 0;
-				TEAM_SetPointCount( ulTeam, lScore, bAnnounce );
-				return 1;
-			case SCORE_WINS:
-				if ( teams[ulTeam].lWinCount == lScore ) return 0;
-				TEAM_SetWinCount( ulTeam, lScore, bAnnounce );
-				return 1;
-			case SCORE_DEATHS:
-				if ( teams[ulTeam].lDeathCount == lScore ) return 0;
-				TEAM_SetDeathCount( ulTeam, lScore );
-				return 1;
+			switch ( args[1] )
+			{
+				case SCORE_FRAGS:
+				{
+					// [AK] Don't do anything if the frag count won't change.
+					if ( teams[ulTeam].lFragCount == lScore )
+						return 0;
+
+					TEAM_SetFragCount( ulTeam, lScore, bAnnounce );
+					return 1;
+				}
+
+				case SCORE_POINTS:
+				{
+					// [AK] Don't do anything if the point count won't change.
+					if ( teams[ulTeam].lPointCount == lScore )
+						return 0;
+
+					TEAM_SetPointCount( ulTeam, lScore, bAnnounce );
+					return 1;
+				}
+
+				case SCORE_WINS:
+				{
+					// [AK] Don't do anything if the win count won't change.
+					if ( teams[ulTeam].lWinCount == lScore )
+						return 0;
+
+					TEAM_SetWinCount( ulTeam, lScore, bAnnounce );
+					return 1;
+				}
+
+				case SCORE_DEATHS:
+				{
+					// [AK] Don't do anything if the death count won't change.
+					if ( teams[ulTeam].lDeathCount == lScore )
+						return 0;
+
+					TEAM_SetDeathCount( ulTeam, lScore );
+					return 1;
+				}
+			}
 		}
+
+		return 0;
 	}
-	return 0;
-}
 ```
 
 - **Wiki's first parameter name is wrong.** The wiki prose calls parameter 1 `player` ("The
@@ -91,11 +115,17 @@ case ACSF_ChangeTeamScore:
   `TEAM_SetFragCount` gates its announcer sounds on `GAMEMODE_GetCurrentFlags() &
   GMF_PLAYERSEARNFRAGS` in addition to `bAnnounce` — in a non-frag gamemode the sound never plays
   regardless of the flag. None of this conditionality is documented on the wiki.
-- **Server-authoritative side effects beyond the return value.** All four `TEAM_Set*` helpers also
-  call `SERVERCOMMANDS_SetTeamScore(...)` and `SERVERCONSOLE_UpdateScoreboard()` when
-  `NETWORK_GetState() == NETSTATE_SERVER`, replicating the change to clients and refreshing the
-  server console scoreboard — real Zandronum netcode behavior with no ZDoom-wiki equivalent (the
-  wiki doesn't mention networking at all, consistent with this being a Zandronum-only feature).
+- **Network side effects: frags, points and wins replicate, deaths don't.** The frags, points and
+  wins helpers call `SERVERCOMMANDS_SetTeamScore(...)` and `SERVERCONSOLE_UpdateScoreboard()` when
+  `NETWORK_GetState() == NETSTATE_SERVER`. Each client's `client_SetTeamScore` then re-runs the
+  matching `TEAM_Set*` with the forwarded announce bit, so the announcer gating above is evaluated
+  on each client (forced off while the client is still receiving the level snapshot).
+  `TEAM_SetDeathCount` (`team.cpp:1194-1201`) only assigns the counter. It sends nothing, and
+  neither `SERVERCOMMANDS_SetTeamScore` nor the client handler has a deaths case, so a
+  `SCORE_DEATHS` change made on a server is never seen by clients.
+- **Setting points can end the game.** Outside client mode, `TEAM_SetPointCount` checks
+  `pointlimit` (`team.cpp:898-916`): if it is positive and the new count reaches it, the team is
+  announced as the winner, the win sequence runs, and the level ends 5 seconds later.
 
 **Returns:** `int`/bool-like — `1` if the target counter was changed, `0` if `team` is invalid,
 `type` isn't one of `SCORE_FRAGS`/`SCORE_POINTS`/`SCORE_WINS`/`SCORE_DEATHS`, or the requested

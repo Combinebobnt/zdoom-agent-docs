@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** wiki page `ChangeFloor - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
 `https://zdoom.org/w/index.php?title=ChangeFloor&oldid=36010`) + source-verified against the Zandronum source (`p_acs.cpp:3990-4013,10565-10568`,
 `textures/texturemanager.cpp:308-328`, `sv_commands.cpp:3125-3135`) and
@@ -24,19 +24,19 @@ the Zandronum source's `src/p_acs.cpp` (`case PCD_CHANGEFLOOR:`, line 10565, cal
   match.
 - `flatname` — looked up with `TexMan.GetTexture(flatname, FTexture::TEX_Flat,
   TEXMAN_Overridable)` (`p_acs.cpp:3999`). The call site itself only passes `TEXMAN_Overridable`;
-  `FTextureManager::GetTexture` (`textures/texturemanager.cpp:308-311`) unconditionally ORs in
+  `FTextureManager::GetTexture` (`textures/texturemanager.cpp:316-318`) unconditionally ORs in
   `TEXMAN_TryAny` before delegating to `CheckForTexture`, regardless of what the caller passed —
   that's the actual source of the wiki's "you may also use any texture, pname, sprite, or internal
   graphic (e.g. TITLEPIC)" claim holding true in the Zandronum engine fork too; the lookup isn't restricted to the
   flat namespace no matter which caller-supplied flags omit `TryAny`.
 - **Unknown/unresolvable name does not silently no-op and does not abort the script** — if
   `flatname` is a non-empty string that doesn't resolve to any texture at all, `GetTexture`
-  (`textures/texturemanager.cpp:317-322`) logs `Unknown texture: "<name>"` to console and
+  (`textures/texturemanager.cpp:321-325`) logs `Unknown texture: "<name>"` to console and
   substitutes the engine's built-in default texture, which then gets applied to every matching
   sector's floor. So a typo'd flat name is visible as a console message plus a visibly wrong floor
   texture, not a thrown error and not a no-op.
 - **A resolved empty string is a distinct, more dangerous case, undocumented by the wiki.**
-  `GetTexture` special-cases `name[0] == 0` (`texturemanager.cpp:308-311`) and returns
+  `GetTexture` special-cases `name[0] == 0` (`texturemanager.cpp:312-314`) and returns
   `FTextureID(0)` directly — the engine's reserved "no texture" sentinel — *before* the
   unknown-name path runs, so there's no console warning at all. `ChangeFloor(tag, "")` silently
   repaints every matching sector's floor with the "no texture" dummy (same failure mode

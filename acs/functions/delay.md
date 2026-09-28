@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** `Delay - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=Delay&oldid=35788`),
 verified against the Zandronum source's `src/p_acs.cpp` on 2026-07-28. The wiki page itself is thin —
 signature, one line of usage, and two examples — and everything below the "Units" bullet is *not*
@@ -35,7 +35,12 @@ Suspends the calling script for the given number of tics, then resumes it.
   from a variable that can be zero) will still runaway-terminate; `Delay` gives no protection in
   that case despite superficially "being called every iteration."
   See `p_acs.cpp:9228-9233` for the runaway-script counter (`runaway > 2000000` per
-  `RunScript()` call) this interacts with.
+  `RunScript()` call) this interacts with. That counter itself gained an exemption after the
+  3.2.1 stamp: Zandronum commit `1291d585c` (2025-10-16, refined the same day by `f52c24dc4`)
+  added the `busy` script flag (`SCRIPTF_Busy`, `p_acs.h:360`), and a script declared `busy` skips
+  the counter entirely (`p_acs.cpp:9228`, `ptr && !(ptr->Flags & SCRIPTF_Busy)`). A `busy` script
+  that computes `Delay(0)` in a tight loop will not runaway-terminate. A 3.2.1 client has no
+  `busy` flag at all, so every script there is still subject to the runaway check described above.
 - **Legacy Hexen-format quirk (not relevant when compiling with `bcc`/`zt-bcc`, noted for
   completeness):** on the original Hexen ACS bytecode format (`fmt == ACS_Old`) running under
   `GAME_Hexen`, `PCD_DELAY` silently adds one extra tic to the delay (`p_acs.cpp:10475`, `+ (fmt

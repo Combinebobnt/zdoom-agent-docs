@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-16); Zandronum 3.2.1 @28f736fb3 (2026-08-02)
-**Provenance:** Zandronum Wiki `Console commands` (https://wiki.zandronum.com/w/index.php?title=Console_commands&oldid=2437, saved 2026-08-02); verified against `src/g_level.cpp`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-16); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** Zandronum Wiki `Console commands` (https://wiki.zandronum.com/w/index.php?title=Console_commands&oldid=2437, saved 2026-08-02); verified against `src/g_level.cpp:188-240`.
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 
 Changes the current map without displaying an intermission screen. Syntax: `map <map-lump-name>`
@@ -12,7 +12,7 @@ Changes the current map without displaying an intermission screen. Syntax: `map 
 
 **On server:** All clients are forced to reconnect immediately, bypassing any intermission or countdown. The map change is instant.
 
-**On client:** Cannot be used to change maps during a networked game (client quits the network and starts a new single-player game on the specified map instead). See `Send_Password` and RCon for remote server commands if you need a client to control the server.
+**On client:** Cannot be used to change maps during a networked game (client quits the network and starts a new single-player game on the specified map instead). A client currently logged in to RCON is refused instead: it gets a message telling it to `rcon_logout` first, and nothing changes. See `Send_Password` and RCon for remote server commands if you need a client to control the server.
 
 ## Map name format
 

@@ -10,7 +10,7 @@ whole "declared-but-unimplemented extension functions" section is inverted (Zand
 implements every function it lists, no exceptions, including the `ZDoom_*` math trio), and the
 CLIENTSIDE ordering hazard has no UZDoom counterpart. See "Engine-family divergence" below for the
 per-entry map, and check each linked file's own `Applies to:` field before acting on an entry.
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** Cross-referenced from this repo's own verified `functions/`/`families/` docs (compiled 2026-07-29) — not a wiki-intake page, no new source reading beyond what's cited in each linked file.
 
 A running, checklist-style index of **verified, recurring** crash/bug-causing patterns in the
@@ -37,7 +37,7 @@ know what to look for in a diff; read the linked file before acting on a hit, si
 ## Confirmed crash-causing patterns (verified against the Zandronum source)
 
 1. **NULL actor pointer dereferenced with no guard.** `PlayActorSound(tid=0, ...)` called from a
-   script with no activator (`OPEN`/`ENTER`/`RESPAWN`/`DISCONNECT`, etc.) crashes the engine: the
+   script with no activator (`OPEN`, a Zandronum `DISCONNECT`, etc.; `ENTER`/`RESPAWN` have the player as activator) crashes the engine: the
    shared `PlaySound`/`PlayActorSound` case sets `spot = activator` with no NULL check
    (`p_acs.cpp:6501-6505`), and `PlayActorSound`'s extra `GetActorSound(spot, ...)` call
    dereferences it unconditionally (`p_acs.cpp:5332-5348`) — no equivalent to `PlaySound`'s later
@@ -64,10 +64,12 @@ know what to look for in a diff; read the linked file before acting on a hit, si
 
 4. **Unvalidated index passed straight into an engine array/lookup.** `LumpGetInfo` with
    `infoType` `SIZE`/`NAMESPACE`/`WAD` passes `lumpNum` directly into
-   `Wads.LumpLength`/`GetLumpNamespace`/`GetWadnumFromLumpnum` with no range check
-   (`p_acs.cpp:8489-8517`) — only the `NAME` branch bounds-checks first. An out-of-range lump
-   number can crash the game; this corroborates (doesn't just repeat) the wiki's own warning. See
-   [Lump I/O family](../families/lump-io.md).
+   `Wads.LumpLength`/`GetLumpNamespace`/`GetWadnumFromLumpnum` with no ACS-side range check
+   (`p_acs.cpp:8504-8519`), but those lookups check it themselves. An out-of-range `SIZE` query
+   aborts the game with `I_Error("W_LumpLength: ...")`, the wiki's crash; `NAMESPACE` returns 0
+   and `WAD` returns -1. The `NAME` branch's own bounds check was added after 3.2.1
+   (`1fb043a9a`); before it, an out-of-range `NAME` is a null-dereference crash. `NAMESPACE`/`WAD`
+   did not exist yet at 3.2.1 (`ba928315f`). See [Lump I/O family](../families/lump-io.md).
 
 5. **A raw int result misused as a string-table index.** `GetActorSectorLocation(tid, point=true)`
    returns a bare `unsigned int`/`-1` index — it never registers anything in
@@ -163,8 +165,8 @@ Flagging these during review is a false positive — useful to know so review ti
 categories above instead.
 
 - **A `tid=0`/no-activator call is not automatically unsafe.** `ActivatorSound`,
-  `LocalAmbientSound`, `SoundSequenceOnActor`, `SoundSequence`, `PlaySound`, and `StopSound` all
-  either explicitly guard `activator == NULL` in the engine source, or their entire downstream
+  `LocalAmbientSound`, `SoundSequenceOnActor`, `SoundSequence`, `PlaySound`, `StopSound`, and
+  `SetActorProperty` all either explicitly guard `activator == NULL` in the engine source, or their entire downstream
   call chain only does pointer-identity comparisons that never dereference. Only
   `PlayActorSound` (pattern 1 above) actually crashes on this input — **don't pattern-match
   "sibling function, same `tid=0` convention" into an assumed guard or an assumed crash; check the
@@ -172,7 +174,7 @@ categories above instead.
   [LocalAmbientSound](../functions/localambientsound.md),
   [SoundSequenceOnActor](../functions/soundsequenceonactor.md),
   [SoundSequence](../functions/soundsequence.md), [PlaySound](../functions/playsound.md),
-  [StopSound](../functions/stopsound.md).
+  [StopSound](../functions/stopsound.md), [SetActorProperty](../functions/setactorproperty.md).
 - **Divide-by-zero / modulus-by-zero terminate the script, not the engine.** Both print a console
   message and remove only that script instance (`SCRIPT_PleaseRemove`) — no engine crash, no
   corrupted state. See [Operators](operators.md), [Integer arithmetic](integer-arithmetic.md),
@@ -295,6 +297,33 @@ call — easy to miss in testing if the tested case happens to be one where it w
    mods pumping `ACS_NamedExecuteWithResult` at `CLIENTSIDE` "syncer" scripts in loops. See the
    "run in REVERSE order" section of [Client-side scripting](clientside-scripting.md) for the
    verified mechanism and the version-stamp / reorder-queue / resync-on-open fixes.
+2. **A `CLIENTSIDE` script that opens by clearing state its same-typed server-side sibling pushes
+   down wipes that state, not stale leftovers.** In one `StartTypedScripts` pass the server sends
+   the `CLIENTSIDE` script's start command immediately but only *queues* the server-side one
+   (`runNow` defaults to `false`), and the client then applies the whole batch newest-first — so
+   the pushed writes land before the `CLIENTSIDE` body's first statement. Grep for an
+   `ENTER`/`RESPAWN CLIENTSIDE` script whose first loop zeroes a map array the server fills via
+   repeated clientside-script executions. The clear is never needed: map storage is already zero
+   at level load on both machines, and every mid-level re-invocation of that script is holding
+   live state. See the "sibling runs its first statement AFTER" section of
+   [Client-side scripting](clientside-scripting.md).
+
+## Same-machine tic-ordering hazards (no crash — an intermittent-looking bug that is actually deterministic)
+
+1. **A `delay(N > 1)` loop watching for a one-tic condition samples it at fixed parity, not at
+   random.** A TID freed by one script and re-claimed by a spawned actor's own Spawn-state ACS
+   callback is observably absent for exactly **one** tic (the reclaim lands on the following tic,
+   and within that tic the Spawn-state callback runs before the ordinary ACS pass). A watcher
+   polling every 2 tics therefore either always catches that window or always misses it, decided
+   purely by the tic offset between the two events — producing a bug that reproduces ~50% of the
+   time across casual attempts, "fixes itself" on retry, and looks like a race while being fully
+   deterministic per offset. Grep for `delay(` inside a `while` loop whose condition is
+   `ThingCount(...) == 0` or any other transient actor-existence test. **Fix by guarding on a
+   level-persistent counter bumped by the freeing script, not on the actor's existence**; dropping
+   the poll to `delay(1)` only narrows the window and does not remove the parity dependence. See
+   [Spawn-callback tic offset](spawn-callback-tic-offset.md) — which also records that the
+   source-order derivation of *why* the offset exists is contradicted by measurement and remains
+   open, so do not re-derive it from `statnums.h`/`dthinker.cpp` reading order.
 
 ## Engine-family divergence
 
@@ -374,7 +403,7 @@ rest is unchecked"):
   general "an actor died, stop scripts it activated" path. The `IsPointerEqual(AAPTR_DEFAULT,
   AAPTR_NULL, 0, 0)` guard is verified on UZDoom too.
 - Every entry in "Patterns that look risky but are verified NOT to crash": the sound siblings'
-  guards, divide/modulus-by-zero terminating only the offending script instance via the same
+  and `SetActorProperty`'s guards, divide/modulus-by-zero terminating only the offending script instance via the same
   console-message-then-remove path, invalid string handles degrading safely (UZDoom carries the
   same "don't crash on invalid strings" substitution), and the 4096-word VM stack's bounds check
   ahead of a user-function call.

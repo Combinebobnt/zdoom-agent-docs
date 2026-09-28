@@ -173,7 +173,8 @@ Two adjacent facts the `SPTR`/`SFLG` bullets above are best read against — bot
 the two engines, i.e. corrections to those bullets rather than divergences:
 
 - The flag word has a third bit past the two listed: `0x0004`, `SCRIPTF_Busy`, exempting the
-  script from the runaway-instruction limit. Present in both engines' enums.
+  script from the runaway-instruction limit. Present in both engines' enums, but not in
+  Zandronum 3.2.1, which ignores the bit (see [restart](../functions/restart.md)).
 - `SPTR`'s 8-byte entry shape applies only to the `ACS\0`-plus-trailer object shape. In a "bare"
   enhanced object — byte 3 literally `'E'` or `'e'`, the first case under "Header and
   chunk-directory trailer" above — both loaders instead read **12-byte** entries, and not merely

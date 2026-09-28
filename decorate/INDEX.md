@@ -34,12 +34,11 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   multiplayer, not through the wiki's single-player new-game menu flow.
 - [Inheritance](concepts/inheritance.md) — tier A. How property/flag defaults are copied
   (not looked up) at class-creation time so a multi-level chain resolves correctly, `SKIP_SUPER`'s
-  reset-to-`AActor`-defaults behavior and its three caveats (ordering, inventory exception, state
-  labels untouched), automatic species determination by walking `MF3_ISMONSTER` ancestors, and
-  `replaces`/doomednum as two independent, non-inherited mechanisms. **Key fork divergence**:
-  same-species monsters do **not** automatically avoid hurting each other with projectiles in
-  Zandronum — that requires the explicit `MF6_DONTHARMSPECIES` flag, contrary to the wiki's
-  "automatic" framing. Cross-references `state-machine.md` for state-label inheritance rather
+  reset-to-`AActor`-defaults behavior and its other caveats (ordering, inventory exception,
+  state-label table and `DropItem` list reset), automatic species determination by walking `MF3_ISMONSTER` ancestors, and
+  `replaces`/doomednum as two independent, non-inherited mechanisms. Same-species projectile
+  immunity is automatic in Zandronum (`+DOHARMSPECIES` opts out); `+DONTHARMSPECIES` covers
+  splash damage instead. Cross-references `state-machine.md` for state-label inheritance rather
   than duplicating it.
 - [Creating weapons](concepts/creating-weapons.md) — tier A. Weapon-specific reserved states
   (`Ready`/`Select`/`Deselect`/`Fire`/`Hold`/`AltFire`/`AltHold`/`Flash`/`AltFlash`) and their
@@ -115,20 +114,50 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   escape hatch, why `DamageFactor "Falling", 0` works as a mitigation but `+INVULNERABLE` does not,
   and a netcode caveat around `P_DamageMobj` running on both server and client while `Die()` stays
   server-only.
+- [Skulltag legacy actor classes](concepts/skulltag-legacy-classes.md) — tier A. Which of the
+  wiki's "Classes:Skulltag" list still exist (all but 3 misspellings) and **where**: 211 ship in
+  the always-loaded `zandronum.pk3` (invasion spots, spheres, flags/skulls, zones), 80 only in the
+  never-autoloaded `skulltag_actors.pk3` (new monsters, BFG10K/Minigun/Railgun/GrenadeLauncher,
+  runes, props, statues). Covers what breaks without that pk3 (instagib `I_Error`, unresolved
+  inheritance/doomednums, `Rune.Type` fatal error) and the separate `skulltag_data.pk3` sprite
+  dependency, plus the classes the wiki list omits (`Rune*` powers, `FloatyIcon`). Zandronum-only;
+  none exist in UZDoom.
+- [Zandronum weapon still-bob, sway and pitch offset](concepts/zandronum-weapon-sway.md) — tier B.
+  Shared mechanics of the eight Zandronum-only `Weapon.StillBob*`/`*SwaySpeed`/`SwayStyle`/
+  `ViewPitch*` properties: where `P_BobWeapon` applies them, zero defaults, the three
+  `cl_usecustom*` client overrides that replace them wholesale, and the unsaved static sway state
+  shared across weapons. Includes the UZDoom ZScript porting hooks.
 
 ## Families
 
 - [A_FaceTarget / A_FaceTracer / A_FaceMaster](families/face-pointer.md) — tier A. Shared
   implementation — all three wrap one `A_Face()` helper. Adjust actor angle/pitch to face
   target/tracer/master pointer; **Zandronum 2-parameter form only** (not the extended 6-parameter
-  UZDoom/GZDoom variant with `FAF_*` flags and offsets); pitch is not replicated in multiplayer;
+  UZDoom/GZDoom variant with `FAF_*` flags and offsets); on Zandronum only the angle is sent (16-bit, actors with a net ID), pitch reaches clients only in a joining client's full update;
   **null pointer safe**.
 - [A_Light0 / A_Light1 / A_Light2 / A_Light / A_LightInverse](families/weapon-light.md) — tier A.
   Shared implementation — four thin `AInventory`-class wrappers around the player's `extralight`
   field (16x-scaled, additive, persists until reset); grouped with `A_LightInverse` per the wiki's
-  own pairing, but that member is a distinct `AActor`-class action (compiles in any state table,
-  including monsters) that repurposes the same field via an `INT_MIN` sentinel to trigger an
+  own pairing; all five are declared on `Inventory` (not callable from monsters), and `A_LightInverse`
+  repurposes the same field via an `INT_MIN` sentinel to trigger an
   inverted-colormap render effect rather than a brightness offset.
+- [Base/Custom Monster/Pickup/WeaponInvasionSpot](families/invasion-spots.md) — tier B. Shared
+  implementation. Zandronum-only Invasion spawn spots driven per wave: map-thing `args[]` meanings
+  differ by spot kind (intervals are **seconds**, delay 255 = boss); `Custom*` picks uniformly from
+  `DropItem` (probability/amount ignored, empty list is fatal); inheriting a `Base*` class directly
+  is fatal at spawn; any spot on a map force-enables Invasion. Absent in UZDoom.
+- [PowerDrain / PowerRegeneration / PowerHighJump / PowerDoubleFiringSpeed / PowerReflection /
+  PowerSpread / PowerProsperity / PowerTerminatorArtifact / PowerPossessionArtifact /
+  PowerRespawnInvulnerable / ReturningPowerupGiver / RandomPowerup](families/skulltag-powers.md) —
+  tier B. Shared implementation. Skulltag-lineage native powers with their real numbers
+  (**Reflection is 75% on Zandronum**, Prosperity replaces caps with 250 but only for
+  `MaxAmount 0` health items); seven members are Zandronum-only, the other five work differently
+  on UZDoom (per-class divergence table).
+- [TeamItem / Flag / WhiteFlag / Skull / ReturnZone](families/team-items.md) — tier B. Shared
+  implementation. Zandronum-only CTF/one-flag/Skulltag items: simple-vs-scripted mode gating,
+  exact-class TEAMINFO `FlagItem`/`SkullItem` matching (custom items must be named there),
+  `SCOREPILLAR` pillar scoring and `Tag<Team>Skull` states, drop/auto-return, `ReturnZone`'s
+  spawn-time-only check, carrier icon from the `Carry` state.
 
 ## Classes
 
@@ -138,6 +167,10 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   rollback if a later state in the same chain fails. Also covers the `+INVENTORY.ALWAYSPICKUP`
   backstop in `AInventory::CallTryPickup` — a second, independent mechanism above the chain's own
   OR result that can force pickup success even when `Pickup:` returns false.
+- [FloatyIcon](classes/floatyicon.md) — tier B. Zandronum-only engine-owned icon above a player's
+  head (chat/console/menu/voice/lag/ally/enemy, carried team items, medals): state-label trigger
+  map, priority, fade, visibility cvars, and why `replaces FloatyIcon` restyles status icons but not
+  medals (MEDALDEF's class does). Short `SpringPadZone` and `PathNode` asides.
 - [Health](classes/health.md) — tier A. Built-in base class for health-restoring pickup items;
   controls health restoration via `Inventory.Amount`/`MaxAmount`, pickup message conditions via
   `Health.LowMessage`, and `TryPickup` behavior (items fail if the actor is at max health without
@@ -158,6 +191,11 @@ AUTHORING.md` for tiers/engine-scope/licensing.
 - [MapSpot](classes/mapspot.md) — tier A. Invisible, non-physical, DECORATE-only anchor actor (no
   native C++ backing) referenced by TID for teleport destinations, ACS position lookups, and
   patrol points; covers the `MapSpotGravity` and `FS_Mapspot` subclasses.
+- [MaxHealth](classes/maxhealth.md) — tier B. `Health` subclass that raises the player's max-health
+  bonus and heals in one pickup. Zandronum takes the heal ceiling from the item's `Health` (default
+  1000, so set `Health 0`), grants the bonus even on a refused pickup, and resets it on death and
+  DM map change; UZDoom stores it on the pawn, defaults to an inert `MaxAmount 0`, and caps at
+  `MaxAmount` + bonus.
 - [PlayerPawn](classes/playerpawn.md) — tier A. Engine-native base class for all player
   characters; class hierarchy and PlayerPawn-specific actor flags, and **voodoo doll mechanics**
   (inventory forwarding, shared `PlayerInfo` state). See [Creating player
@@ -166,11 +204,11 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   from Zandronum.
 - [PowerProtection](classes/powerprotection.md) — tier B. `Powerup` subclass that reduces incoming
   damage via the engine's passive damage-modifier mechanism (`ModifyDamage`); works on **any**
-  actor with an inventory, not just players. **Empty-`DamageFactors`-table trap:** zero declared
-  `DamageFactor` entries silently grants a blanket 25%-damage effect against every damage type,
+  actor with an inventory, not just players. **Empty-`DamageFactors`-table trap:** an empty per-type table (a bare untyped `DamageFactor <n>`
+  doesn't count, inherited entries do) silently grants a blanket 25%-damage effect against every damage type,
   while declaring some entries switches to a mode where an uncovered type gets no protection at
-  all — the two behaviors don't blend. Not magnitude-gated (applies at `TELEFRAG_DAMAGE`
-  magnitude too); stacks multiplicatively with other inventory-held damage modifiers.
+  all — the two behaviors don't blend. On Zandronum not magnitude-gated (applies at `TELEFRAG_DAMAGE`
+  magnitude too; UZDoom differs by default); stacks multiplicatively with other inventory-held damage modifiers.
 - [Powerup](classes/powerup.md) — tier A. Timed-effect inventory class; covers the
   `Powerup`/`PowerupGiver` split, the `CreateCopy`/`InitEffect`/`DoEffect`/`EndEffect` activation
   lifecycle, several Zandronum-vs-wiki divergences (no `MaxEffectTics` field, non-virtual
@@ -179,11 +217,17 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   death/level-change destruction paths, and why `PowerStrength`'s permanence is a `Tick()`
   override, not a `Powerup.Duration 1` special case.
 - [RandomSpawner](classes/randomspawner.md) — tier A. Built-in actor class that spawns one
-  randomly-selected actor from a weighted `DropItem` list; **boss-death tracking** only activates
-  when the spawner's own class declares `replaces <BossClass>` (verified against `A_BossDeath`'s
-  species-resolution mechanism); item-respawn interaction (a rolled Inventory item's identity is
+  randomly-selected actor from a weighted `DropItem` list; **boss-death tracking** activates when
+  the spawned actor has `+BOSSDEATH` or `+BOSS`, or the class the spawner `replaces` has either
+  flag; item-respawn interaction (a rolled Inventory item's identity is
   fixed at spawn time and never re-rolled on respawn); a Zandronum-only infinite-loop bug on a
   `DropItem "None"` entry.
+- [RuneGiver](classes/runegiver.md) — tier B. Zandronum-only `PowerupGiver` for Skulltag runes:
+  forced infinite duration (`Powerup.Duration` ignored), one rune at a time, lost on death.
+  `Rune.Type` prepends `Rune` and needs that class already declared (fatal without
+  `skulltag_actors.pk3`; `Powerup.Type` is order-independent only for a class named `Power...`); **`Rune.Color` does
+  not exist**. Trap: `ALWAYSPICKUP`/`ADDITIVETIME` on the giver makes a same-type re-pickup destroy
+  the held rune.
 - [SwitchableDecoration](classes/switchabledecoration.md) — tier A. Built-in actor class for
   toggling between `Active`/`Inactive` state sequences via `Thing_Activate`/`Thing_Deactivate`;
   a missing target state destroys/hides the actor rather than leaving it unchanged; covers the
@@ -218,8 +262,8 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   acquisition, melee/missile attack decisions, and pathing (and the thin `A_FastChase`/
   `A_VileChase`/`A_ExtChase` wrappers around it); **only 5 of the wiki's 11 `CHF_*` flags exist in
   Zandronum** (`CHF_NORANDOMTURN`, `CHF_NODIRECTIONTURN`, `CHF_NOPOSTATTACKTURN`,
-  `CHF_STOPIFBLOCKED`, `CHF_DONTIDLE`, `CHF_DONTTURN` are wiki/GZDoom-only and compile as inert
-  integers).
+  `CHF_STOPIFBLOCKED`, `CHF_DONTIDLE`, `CHF_DONTTURN` are wiki/GZDoom-only; naming one is an
+  unknown-identifier load error); bare `A_Chase` uses Melee/Missile and ignores `flags`.
 - [A_CheckBlock](actions/a_checkblock.md) — tier A. Checks if an actor pointer would be blocked
   at a specified position relative to the caller's angle/position; jumps to a target state if
   blocked. **UZDoom/GZDoom-family only** — does not exist in Zandronum.
@@ -237,17 +281,22 @@ AUTHORING.md` for tiers/engine-scope/licensing.
 - [A_CheckLOF](actions/a_checklof.md) — tier A. Line-of-fire hitscan test; jump on target
   reachability or intercepting actors. **Zandronum-specific caveat:** missing 10th parameter
   `offsetforward` and flags `CLOFF_SETTARGET`/`CLOFF_SETMASTER`/`CLOFF_SETTRACER` from ZDoom wiki.
+- [A_CheckRailReload](actions/a_checkrailreload.md) — tier B. **Zandronum only.** Skulltag
+  railgun's 4-shot reload skip: bumps a per-player shot counter and, on the exact class `Railgun`
+  only, jumps to `Fire + 8` on 3 shots of 4; a no-op for any other weapon; its "out of ammo" check
+  does nothing; no `ReadyWeapon` null check.
 - [A_CheckRange](actions/a_checkrange.md) — tier A. Jumps if out of distance range of all
-  players; distance measured in 3D from player eye position; **no optional 2d_check or offset
-  parameters in Zandronum** (wiki describes unsupported variants).
+  players; distance measured in 3D from player eye position; **no optional 2d_check parameter in
+  Zandronum** (the state parameter still takes an integer offset); the jump is never sent to
+  clients.
 - [A_CheckReload](actions/a_checkreload.md) — tier A. Checks the ready weapon's ammunition
   sufficiency and switches weapons if out of ammo; automatically adapts to primary or alternate
   fire mode; server-replicated ammo-switch with client-mode contingencies; unguarded
   `ReadyWeapon` NULL dereference in non-weapon inventory contexts flagged as open question.
 - [A_CheckSight](actions/a_checksight.md) — tier A. Jumps to a target state if no player can see
-  the calling actor; checks all active (non-spectating) players' line of sight including cameras
-  and co-op spy; server-authoritative for non-CLIENTSIDEONLY actors (client-side sight check
-  disabled, result received via server broadcast).
+  the calling actor; the server checks each non-spectating player's body and any non-player
+  camera they view from; on clients only `CLIENTSIDEONLY` actors run it (against the console
+  player's camera); a server-side jump from the actor's own state sends clients a frame update.
 - [A_CheckSightOrRange](actions/a_checksightorrange.md) — tier A. Jumps if actor is beyond range
   and out of sight of all players; **Zandronum has only 2 parameters (no 2d_check), runs on both
   client and server (unlike A_Look), and measures distance to eye height and actor bounds, not
@@ -258,8 +307,13 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   as the ZScript standard library action is UZDoom/GZDoom-family only.
 - [A_ClearTarget](actions/a_cleartarget.md) — tier A. Clears the actor's target, sound target,
   and last target pointers; used to make monsters "give up" pursuit and return to idle searching.
+- [A_ClientsideACSExecute](actions/a_clientsideacsexecute.md) — tier B. **Zandronum only.** Runs
+  a named `CLIENTSIDE` script locally with the actor as activator; skipped on servers and never
+  forwarded; silent no-op for an unknown or non-clientside script; result from `SetResultValue`,
+  default true.
 - [A_Countdown](actions/a_countdown.md) — tier A. Decrements ReactionTime until it reaches 0,
-  then destroys the actor; **intended for missile-type actors only**.
+  then explodes it like a missile (enters its `Death` state; removed only if it has none);
+  **intended for missile-type actors only**.
 - [A_CountdownArg](actions/a_countdownarg.md) — tier A. Decrements one of an actor's argument
   counters and destroys or state-changes the actor when countdown reaches zero; **countdown takes
   N+1 calls for arg of N** (post-decrement semantic); **`state` parameter is silently ignored for
@@ -290,22 +344,24 @@ AUTHORING.md` for tiers/engine-scope/licensing.
 - [A_CustomRailgun](actions/a_customrailgun.md) — tier A. Customizable rail beam attack for
   monsters; **fork divergence: Zandronum's 16-parameter version lacks the `spiraloffset`,
   `limit`, and `veleffect` parameters; spiral always starts at 270°, pierce limit is binary (all
-  or first-only), and velocity lead is hardcoded to 3.0**; aim parameter (`0`=look direction,
-  `1`=aim with velocity leading, `2`=direct leading aim); five `RGF_*` flags (SILENT, NOPIERCING,
-  EXPLICITANGLE, FULLBRIGHT, CENTERZ); **player color override: when `color1==0` and
-  `color2==0`, engine substitutes player's team/individual railgun color, not random blue/gray
-  shades**; unlagged client-side rail drawing supported.
+  or first-only), and the velocity-trailing multiplier is hardcoded to 3.0**; aim parameter
+  (`0`=facing direction, `1`=aim at target trailing its velocity, parallel beam, `2`=same but
+  converging beam); five `RGF_*` flags (SILENT, NOPIERCING, EXPLICITANGLE, FULLBRIGHT, CENTERZ);
+  color `""` is random blue/gray, `"none"` is invisible; **player color override: when both
+  colors are `""`, engine substitutes player's team/individual railgun color, not random
+  blue/gray shades**; unlagged client-side rail drawing for player shooters only.
 - [A_DamageChildren](actions/a_damagechildren.md) — tier A. Damages all child actors (those with
   `master == self`) by a specified amount; **Zandronum 2-parameter version only** (drastically
   simplified vs. GZDoom/UZDoom's 7-parameter variant with flags and filters); negative amounts
-  heal instead — **but a loop bug means only the first healed child actually heals; every
-  subsequent child in the same call is damaged instead**, since `amount` is negated in place and
+  heal instead — **but a loop bug means only the first matching child (even a dead one) gets the
+  heal; every subsequent child in the same call is damaged instead**, since `amount` is negated in place and
   the sign flip persists across iterations.
 - [A_DamageMaster](actions/a_damagemaster.md) — tier A. Damages the calling actor's master by a
   specified amount; negative amounts heal instead. **Zandronum's 2-parameter version is
   drastically simplified compared to GZDoom/UZDoom**, which support flags (`DMSS_*`) and
   actor/species filters; damage factors apply (unlike `A_KillMaster`), armor is bypassed,
-  invulnerability blocks the damage, and 1,000,000+ damage forces a kill via `TELEFRAG_DAMAGE`.
+  invulnerability blocks the damage unless `amount` is 1,000,000+ (`TELEFRAG_DAMAGE`), which skips
+  the invulnerability check but on Zandronum is still reduced by damage factors and protection.
 - [A_DamageSelf](actions/a_damageself.md) — tier A. Damages the calling actor by a specified
   amount; negative amounts heal. **UZDoom/GZDoom-family only, does not exist in Zandronum** —
   supports flags, actor/species filters, and configurable damage source/inflictor pointers;
@@ -329,42 +385,53 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   asymmetric cleanup semantics: frees the queue slot while leaving the actor alive, unlike
   overflow eviction which destroys the actor; used in raise/resurrection states to prevent
   queued corpses from being destroyed.
-- [A_Die](actions/a_die.md) — tier A. Kills the calling actor if it is not already dead, setting
-  its health to 0 and transitioning to its Death state; has an effect only if the actor has the
-  SHOOTABLE or VULNERABLE flag set; server-side only in multiplayer (a `+CLIENTSIDEONLY` actor
-  calling `A_Die` will never actually die).
+- [A_Die](actions/a_die.md) — tier A. Deals forced lethal damage to the calling actor (a frozen
+  corpse shatters; a buddha player keeps 1 health; on Zandronum a `+SPECTRAL` actor never dies);
+  has an effect only if the actor has the SHOOTABLE or VULNERABLE flag set; server-side only
+  online (a `+CLIENTSIDEONLY` actor on an online client never dies; offline it dies normally).
 - [A_Explode](actions/a_explode.md) — tier A. Radius attack (explosion) with optional nail
   hitscan attacks; **fork divergence: returns nothing** (ZDoom-wiki describes return value),
   supports only two flags (`XF_HURTSOURCE`, `XF_NOTMISSILE`) vs. the wiki's seven, and uses the
   actor's DamageType property.
+- [A_FaceConsolePlayer](actions/a_faceconsoleplayer.md) — tier B. Turns toward the local
+  machine's own player, snapping or capped per call; **unsynced, so each client sees the actor face
+  itself**; UZDoom keeps it as an empty deprecated stub that does nothing.
 - [A_FadeIn](actions/a_fadein.md) — tier A. Increases an actor's alpha by a specified amount each
   tic; **wiki describes optional `FTF_*` flags (FTF_REMOVE, FTF_CLAMP) that do not exist in
   Zandronum** — only `increase_amount` parameter is supported; second parameter causes parse
   error; alpha is not clamped by the function.
 - [A_FadeOut](actions/a_fadeout.md) — tier A. Decreases an actor's alpha by a specified amount
-  each tic; **Zandronum uses a boolean `remove` parameter, not the wiki's `FTF_*` flags** —
+  per call; **Zandronum uses a boolean `remove` parameter, not the wiki's `FTF_*` flags** —
   `FTF_CLAMP` does not exist (no alpha-clamping support), and `FTF_REMOVE` is the default
   behavior.
 - [A_FadeTo](actions/a_fadeto.md) — tier A. Gradually adjusts an actor's alpha toward a target
   value; **Zandronum uses a boolean `remove` parameter (default `false`), not the wiki's `FTF_*`
   flags** — `remove` defaults to `false` (wiki says `true`); `FTF_CLAMP` does not exist.
 - [A_Fire](actions/a_fire.md) — tier A. Repositions the calling actor around its `tracer` at 24
-  units forward with optional height offset; **Zandronum's server-side-only implementation with
-  mandatory line-of-sight checks differs from the ZDoom-wiki ZScript version, which has no
-  netcode**.
+  units forward (following the victim's facing) with optional height offset; the line-of-sight
+  check between the Arch-Vile (`target`) and victim is on both engines; **Zandronum runs it
+  server-side only** (returns on every client).
 - [A_FireBullets](actions/a_firebullets.md) — tier A. Custom hitscan weapon attack with optional
   spread and impact puff; **Zandronum's 7-parameter version differs significantly from the wiki's
   ZScript 10-parameter one** (no missile spawning; missing `FBF_PUFFTARGET`/`FBF_PUFFMASTER`/
   `FBF_PUFFTRACER` flags; `numbullets == -1` behavior and spread math divergence).
 - [A_FireCustomMissile](actions/a_firecustommissile.md) — tier A. Fires a projectile from a
   player weapon; **Zandronum parameter 5 is a single `aimatangle` bool instead of the wiki's
-  `FPF_*` flags** (which do not exist and produce silent behavioral errors if passed as
-  integers); function is player-only; deprecation warning is GZDoom-family only and does not
+  `FPF_*` flags** (naming one is an unknown-identifier error that aborts startup; a raw
+  integer is read as the bool); function is player-only; deprecation warning is GZDoom-family only and does not
   apply to Zandronum.
+- [A_FireRailgun](actions/a_firerailgun.md) — tier B. Fixed-damage player rail (plus
+  `Left`/`Right` at ±10 offset); **Zandronum: 200 co-op, 75 DM/team, 999 per hit under instagib (any mode), always the
+  player/team rail colour, client early return unless unlagged, puff-only signature; UZDoom: 150/100,
+  extra `offset_xy` parameter, random-grey rail, no network split**.
 - [A_GiveInventory](actions/a_giveinventory.md) — tier A. Gives inventory items to an actor;
   **special Health item handling** (amount multiplied by item's own `Amount` value);
   **Zandronum-specific early-return on non-client-handled actors** with no explicit result-slot
   update.
+- [A_GivePlayerMedal](actions/a_giveplayermedal.md) — tier B. **Zandronum only.** Awards a
+  MEDALDEF medal to the player behind an `AAPTR_*` pointer; DECORATE twin of ACS
+  `GivePlayerMedal`; result true only on a real award; refused on clients, in countdowns, under
+  `ZADF_NO_MEDALS`, or by a `GAMEEVENT_MEDALS` veto.
 - [A_GiveToTarget](actions/a_givetotarget.md) — tier A. Gives inventory items to the calling
   actor's current target; **special Health item handling** (amount multiplied by item's own
   `Amount` value); **third parameter uses target as context** (e.g., `AAPTR_MASTER` refers to
@@ -383,15 +450,16 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   limitation affects multi-frame offset jumps on a single state line.
 - [A_JumpIf](actions/a_jumpif.md) — tier A. Conditional state jump on a DECORATE expression;
   **network caveat**: unlike A_Jump, the expression is evaluated *before* the client-mode check, so
-  an RNG-bearing condition can desync a non-clientside actor between server and client.
+  a `random()` condition advances the client's RNG too (the protocol carries no RNG state); on
+  Zandronum the jump offset must be a non-negative integer literal.
 - [A_JumpIfArmorType](actions/a_jumpifarmortype.md) — tier A. Checks if equipped armor matches a
   specified type; jumps if the type and minimum amount threshold (default 1 point) are met.
   **Wiki divergence:** default `amount` value not documented in wiki.
 - [A_JumpIfCloser](actions/a_jumpifcloser.md) — tier A. Jumps to a state if the calling actor's
   target is closer than a specified distance; **Zandronum divergence: the optional `noz`
   parameter from the ZDoom wiki does not exist and causes a parse error**; vertical distance
-  checking is always performed; **network-aware**: clients receive position sync updates after
-  jumps.
+  checking is always performed; **network-aware**: a server-side jump from the actor's own state
+  sends clients a position/frame update (weapon states send a state jump only).
 - [A_JumpIfHealthLower](actions/a_jumpifhealthlower.md) — tier A. Jumps to a state if the calling
   actor's health is lower than a specified value; **pointer parameter described in the wiki does
   not exist in Zandronum 3.2.1**.
@@ -399,42 +467,43 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   actor's target for a specific inventory item and conditionally jumps to a state if a certain
   amount is present; equivalent to `A_JumpIfInventory` with `AAPTR_TARGET` but more concise.
 - [A_JumpIfInTargetLOS](actions/a_jumpifintargetlos.md) — tier A. Jumps if the calling actor is
-  in the target's field of view and line of sight; **wiki divergence: FOV cone is centered on the
-  target's facing direction, not the caller's** — this function tests whether the target sees the
-  caller, not the reverse. Only 7 of 12 defined `JLOSF_*` flags are functional in this function; 5
+  in the target's field of view and line of sight; the FOV cone is centered on the target's
+  facing direction on both engines — this function tests whether the target sees the caller,
+  not the reverse. Only 7 of 12 defined `JLOSF_*` flags are functional in this function; 5
   additional flags compile but are inert (`JLOSF_TARGETLOS`, `JLOSF_FLIPFOV`, `JLOSF_ALLYNOJUMP`,
   `JLOSF_COMBATANTONLY`, `JLOSF_NOAUTOAIM`). Server-authoritative in multiplayer (client-side
-  returns immediately without evaluation).
+  returns immediately unless the client handles the actor itself).
 - [A_JumpIfInventory](actions/a_jumpifinventory.md) — tier A. Checks an actor's inventory and
   conditionally jumps to a state if a certain amount of an item is present; supports both
   positive-amount thresholds and zero/negative "at max capacity" checks; can check another
   actor's inventory via actor pointers; **network caveat**: only executes on client in
-  weapon/flash states or for `+CLIENTSIDEONLY` actors; silently no-ops on unresolvable class
-  names or NULL actor pointers.
+  weapon/flash states, for `+CLIENTSIDEONLY` actors, or on the console player's own body; an
+  unresolvable class name warns at load and never jumps; a NULL actor pointer never jumps.
 - [A_JumpIfMasterCloser](actions/a_jumpifmastercloser.md) — tier A. Jumps to a state if the
   calling actor's master is closer than a specified distance; **Zandronum divergence: the
   optional `noz` parameter from the ZDoom wiki does not exist and causes a parse error**;
   vertical distance checking is always performed; **critical network caveat: unlike
   A_JumpIfCloser, there is no client-mode guard, so clients evaluate the jump using their own
-  (unreliably replicated) master pointer**, creating potential server/client desync on
+  master pointer, which the protocol never sends**, creating potential server/client desync on
   non-clientside actors.
 - [A_JumpIfNoAmmo](actions/a_jumpifnoammo.md) — tier A. Jumps if the player's ready weapon lacks
   sufficient ammunition for the current firing mode; **never jumps if infinite-ammo flags or
   cheats are active**; **weapon with +WEAPON.AMMO_OPTIONAL flag will still report empty ammo**,
-  overriding that flag's normal behavior; executes on both server and client with client-ammo-
-  information synchronization (exception to the typical server-authoritative `A_JumpIf*` pattern).
+  overriding that flag's normal behavior (it jumps when ammo is below the fire mode's AmmoUse);
+  server and client each evaluate it on their own ammo copy, and the jump sends clients no update.
 - [A_JumpIfTargetInLOS](actions/a_jumpiftargetinlos.md) — tier A. Jumps if the calling actor can
   see its target, optionally subject to FOV cones and distance checks; behavior differs between
   monsters and weapons/inventory items. **Wiki divergence: `JLOSF_CHECKTRACER` flag is not
-  supported in Zandronum** (not in the constants table, will compile but have no effect).
+  supported in Zandronum** (not in the constants table, so naming it is an unknown-identifier
+  error that aborts startup).
   **Network synchronization differs from A_JumpIfInTargetLOS** — this function sends position
   updates for non-player callers; A_JumpIfInTargetLOS is server-authoritative. Parameter
   encodings are `ANGLE` (not float) for FOV and `FIXED` (not float) for distances.
 - [A_JumpIfTargetInsideMeleeRange](actions/a_jumpiftargetinsidemeleerange.md) — tier A. Jumps if
   the calling actor's target is within melee range, including line-of-sight check and vertical
-  constraints. Melee range includes the target's radius and uses octagonal approximation. **Wiki
-  divergence: note about anonymous functions does not apply to Zandronum** (anonymous action
-  blocks are a ZScript feature not available in DECORATE).
+  constraints. Melee range includes the target's radius and uses Zandronum's `P_AproxDistance`
+  (`max + min/2`, never under-estimates). **Wiki divergence: note about anonymous functions does
+  not apply to Zandronum**, which has no anonymous action blocks (UZDoom's DECORATE does).
 - [A_JumpIfTargetOutsideMeleeRange](actions/a_jumpiftargetoutsidemeleerange.md) — tier A. Jumps to
   a state if the calling actor's target is outside melee range; **also jumps if target is null,
   friendly, or not in line of sight**; melee range measured as `meleerange + target.radius`;
@@ -469,13 +538,12 @@ AUTHORING.md` for tiers/engine-scope/licensing.
 - [A_Look](actions/a_look.md) — tier A. Default `Spawn`-state target-acquisition action;
   **server-authoritative in Zandronum** (early-returns in client mode except for one stealth-
   monster `visdir` update that runs on both sides); early-outs on `MF5_INCONVERSATION` and
-  `CF_NOTARGET`; `MF_AMBUSH` requires line-of-sight before entering `See` state; consumes
-  `Thing_SetGoal` map special on first call; friendly monsters use `P_LookForPlayers` before
-  falling back to `A_Wander`; extended by `A_LookEx` and `A_Look2`.
+  `CF_NOTARGET` (heard target only); `MF_AMBUSH` gates only the heard target, falling through to
+  the sight search; consumes `Thing_SetGoal` map special on first call (as `A_LookEx` also
+  does); related Strife variant `A_Look2` is separate code.
 - [A_Look2](actions/a_look2.md) — tier A. Sound-based target-acquisition action for Strife actors;
-  wakes on sound but falls back to visual search for friendly targets; **Zandronum-specific RNG
-  frame desync** on server broadcast vs. local state (visual-only issue, untraced whether two
-  state-actions fire per tic).
+  wakes on sound but falls back to visual search for friendly targets; clients return early;
+  both `SetState` calls run their state's action, ending in the `+3` state.
 - [A_LookEx](actions/a_lookex.md) — tier A. Customizable target-acquisition action for monsters;
   parameterizes sight/sound range, minimum sight distance, field-of-view angle, and target state,
   with all six `LOF_*` flags available (`LOF_NOSIGHTCHECK`, `LOF_NOSOUNDCHECK`,
@@ -483,7 +551,8 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   (early-returns in client mode except for stealth-monster `visdir` update).
 - [A_LoopActiveSound](actions/a_loopactivesound.md) — tier A. Plays the actor's ActiveSound as a
   seamless loop on the voice channel, restarting when finished; does not work as expected on
-  weapons due to self-pointer semantics in weapon states; can be stopped with `A_StopSound()`.
+  weapons due to self-pointer semantics in weapon states; stopped with bare `A_StopSound` (empty
+  parentheses are a parse error on Zandronum); the server sends clients nothing.
 - [A_Lower](actions/a_lower.md) — tier A. Lowers weapon off-screen during deselect; **critical
   fork divergence: ZDoom wiki describes optional `lowerspeed` parameter, but Zandronum function
   takes no arguments** — use multiple calls or fewer state tics to lower faster; null-pointer
@@ -494,9 +563,10 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   ally, target dead, or out of sight**; **server-side only in multiplayer**, client update sent on
   jump.
 - [A_NoBlocking / A_Fall](actions/a_noblocking.md) — tier A. Actor unblocking and dialogue/drop-
-  item spawning; **multiplayer caveat: in Zandronum, the solid-flag clear is server-side only**
-  until the server replicates it to clients via `SERVERCOMMANDS_SetThingFlags`, so actors remain
-  locally solid until synchronization arrives.
+  item spawning; **multiplayer caveat: in Zandronum the whole action is server-side only** (clients
+  skip the solid clear, conversation clear and drops, and get the flag change via
+  `SERVERCOMMANDS_SetThingFlags`); an online client's `+CLIENTSIDEONLY` actor stays solid and
+  drops nothing.
 - [A_Overlay](actions/a_overlay.md) — tier A. Creates a new weapon/player sprite layer and sends
   it to a state sequence; **does not exist in Zandronum at all** — Zandronum's layer system is
   fixed to five hardcoded sprites (`ps_weapon`, `ps_flash`, `ps_targetcenter`, `ps_targetleft`,
@@ -512,8 +582,8 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   and `pitch` parameters the GZDoom-family version added**; two looping paths (parameter vs. flag)
   with different re-entry guards; server-replicated in multiplayer.
 - [A_PlaySoundEx](actions/a_playsoundex.md) — tier A. Plays a sound from an actor on a named
-  channel; **not deprecated in Zandronum** (deprecation is upstream-only; `A_StartSound` does not
-  exist in Zandronum); no volume parameter (hardcoded 1.0); older interface, use `A_PlaySound`
+  channel; **no deprecation warning in Zandronum**, though its source comment calls it
+  deprecated in favor of `A_PlaySound` (`A_StartSound` does not exist in Zandronum); no volume parameter (hardcoded 1.0); older interface, use `A_PlaySound`
   for new code.
 - [A_PlayWeaponSound](actions/a_playweaponsound.md) — tier A. **Deprecated.** Plays a sound on
   the weapon sound channel with hardcoded volume and attenuation; use `A_PlaySound` for new code.
@@ -563,8 +633,8 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   not perform all actions of A_ClearTarget**.
 - [A_Recoil](actions/a_recoil.md) — tier A. Pushes the calling actor opposite to its facing
   direction with horizontal recoil; **pitch-unaware** (wiki's pitch-adjustment workaround is
-  viable via `cos(pitch)` in expressions); **network split: players apply locally, non-player
-  actors receive server resync**.
+  viable via `cos(pitch)` in expressions); **network split: players apply it on server and
+  client with no update sent, non-player actors get a server position/velocity update**.
 - [A_ReFire](actions/a_refire.md) — tier A. Checks whether the fire button is held after an
   attack; jumps to a follow-up state (`Hold`/`AltHold` by default) if held, otherwise resets
   refire counter and performs ammo-check weapon-switch. **Engine-family divergence: ZDoom 4.14.2+
@@ -581,13 +651,13 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   version with flags/filter/species parameters that do not exist in Zandronum** and cause parse
   errors if attempted.
 - [A_RemoveMaster](actions/a_removemaster.md) — tier A. Removes the calling actor's master;
-  **critical fork divergence: Zandronum has no parameters (unconditional removal) vs. the ZDoom
+  **critical fork divergence: Zandronum has no parameters (never removes a live player) vs. the ZDoom
   wiki's advanced version with flags/filter/species parameters that do not exist in Zandronum**.
 - [A_RemoveSiblings](actions/a_removesiblings.md) — tier A. Removes sibling actors; **critical
   fork divergence: Zandronum has only 1 parameter (removeall bool) vs. the ZDoom wiki's advanced
   version with flags/filter/species parameters that do not exist in Zandronum** and cause parse
-  errors if attempted. **Unlike A_KillSiblings, A_RemoveSiblings has no explicit server-side-only
-  network gate** — netcode handling is implicit in P_RemoveThing.
+  errors if attempted. **Unlike A_KillSiblings, A_RemoveSiblings has no client-mode gate**; `P_RemoveThing` only makes
+  the removal broadcast server-only, and `master` is never sent to clients.
 - [A_RemoveTarget](actions/a_removetarget.md) — tier A. Removes the calling actor's target
   pointer from the map. **UZDoom/GZDoom-family only** — does not exist in Zandronum.
 - [A_RemoveTracer](actions/a_removetracer.md) — tier A. Removes the actor in the calling actor's
@@ -611,12 +681,13 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   3-parameter form with `ptr`** — no actor pointer support; `SPF_INTERPOLATE` flag (value 2)
   smooths player view rotation.
 - [A_SetArg](actions/a_setarg.md) — tier A. Changes an actor's argument counter at a specified
-  index to a value; **no network replication — values set on client vs. server diverge in
-  multiplayer**; out-of-range indices silently no-op.
+  index to a value; **no per-call network replication** (only a client's join-time full update
+  carries args), so client and server values can diverge; out-of-range indices silently no-op.
 - [A_SetBlend](actions/a_setblend.md) — tier A. Screen tint/blend effect that fades over tics;
   **engine-family divergence: Zandronum always fades to fully transparent (no `alpha2`
-  parameter), while UZDoom/GZDoom allow persistent tints via `alpha2`**; only active when called
-  on PlayerPawn-based actors.
+  parameter), while UZDoom/GZDoom fade toward `alpha2`** (the blend still clears when the fade
+  ends); Zandronum fades RGB toward `color2` (defaults to `color1`); only acts when the caller
+  has an attached player.
 - [A_SetPitch](actions/a_setpitch.md) — tier A. Sets actor pitch (vertical angle) with optional
   interpolation; **Zandronum has 2 parameters only (no `ptr` like the wiki describes), and pitch
   clamping for players uses `player->MinPitch`/`MaxPitch` (typ. −32° to +56°), not fixed
@@ -641,8 +712,8 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   deals melee damage and transitions to the See/Idle state; server-side only (will desync if
   used on a `+CLIENTSIDEONLY` actor).
 - [A_SpawnDebris](actions/a_spawndebris.md) — tier A. Spawns debris actors around the calling
-  actor; **multiplayer caveat: debris velocity is never replicated to clients** (server-correct
-  trajectories vs. zero-velocity falls on clients).
+  actor; **multiplayer caveat: debris velocity is never replicated to clients** (frame and
+  translation are; a `+CLIENTSIDEONLY` caller spawns its own debris locally).
 - [A_SpawnItem](actions/a_spawnitem.md) — tier A. Simple angular-distance spawner with optional
   ammo consumption and master/minion relationship; **wiki describes two return values (bool +
   Actor pointer) but Zandronum only returns a boolean**.
@@ -662,8 +733,9 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   calling actor's current target; includes `TIF_NOTAKEINFINITE` flag to prevent taking infinite
   ammo.
 - [A_TakeInventory](actions/a_takeinventory.md) — tier A. Removes inventory items from an actor;
-  **critical crash on non-player actors when `TIF_NOTAKEINFINITE` flag is set and map's
-  `DF_INFINITE_AMMO` is off** (unguarded `receiver->player` NULL dereference); returns true if
+  **critical crash on non-player receivers when `TIF_NOTAKEINFINITE` is set and the
+  `DF_INFINITE_AMMO` dmflag is off** (unguarded `receiver->player` NULL dereference, for any
+  item type); returns true if
   item existed with non-zero amount before removal, regardless of whether removal was suppressed;
   server-authoritative inventory change in multiplayer.
 - [A_Teleport](actions/a_teleport.md) — tier A. Actor teleportation to SpecialSpot-derived
@@ -672,8 +744,9 @@ AUTHORING.md` for tiers/engine-scope/licensing.
 - [A_Tracer](actions/a_tracer.md) — tier A. Aggressive homing function for Revenant missiles;
   **time-gated to every 4th tic**, creating spawn-phase-dependent behavior depending on call
   interval (odd calls always home; even non-multiple-of-4 calls home only on matching spawn
-  parity; multiples of 4 home only on 4-tic-aligned spawns); spawns trailing smoke and puff;
-  requires `SEEKERMISSILE` flag.
+  parity; multiples of 4 home only on 4-tic-aligned spawns; `+RANDOMIZE` randomizes the phase);
+  spawns trailing smoke everywhere and a puff on the server only; homes on whatever `tracer`
+  holds, no `SEEKERMISSILE` check.
 - [A_Tracer2](actions/a_tracer2.md) — tier A. Strife homing missile action; **fork divergence:
   SEEKERMISSILE flag not required** (it's the convention that *populates* the tracer field, not a
   precondition the function checks); runs on every call (no gametic gate like A_Tracer), doesn't
@@ -684,7 +757,7 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   divergences**: `recipientfield` can be `AAPTR_DEFAULT` (writes to same field as sourcefield),
   and `PTROP_NOSAFEGUARDS` = 3 (not 4); self-reference check is unconditional.
 - [A_TurretLook](actions/a_turretlook.md) — tier A. Sound-detection action for Strife actors;
-  **does not exist in UZDoom/GZDoom-family**; **runs on both server and client in multiplayer
+  exists on both engines; **runs on both server and client in multiplayer
   without netcode guards** (unlike `A_Look`/`A_Look2`), and **does not perform random state
   animation** (unlike `A_Look2`).
 - [A_Wander](actions/a_wander.md) — tier A. Makes an actor wander aimlessly without attacking or
@@ -706,8 +779,8 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   units; XY is collision-checked via `P_TryMove` but Z is a direct write, the phase index advances
   even when the XY move is blocked, and there is no client-mode guard.
 - [A_XScream](actions/a_xscream.md) — tier A. Plays a hardcoded gibbed sound (`*gibbed` for
-  players, `misc/gibbed` otherwise) on the voice channel; multiplayer-aware with body-queue
-  player restoration.
+  players, `misc/gibbed` otherwise) on the voice channel; body-queue player restoration applies
+  in multiplayer and on single-player respawn maps.
 - [A_ZoomFactor](actions/a_zoomfactor.md) — tier A. Per-weapon field-of-view adjustment for zoom
   effects; FOV is **divided by `scale`, not multiplied** (so `scale=2` zooms in 2×); silently
   clamped to `[0.1, 50]`; `ZOOM_NOSCALETURNING` implemented via a negative-value sentinel to
@@ -716,7 +789,7 @@ AUTHORING.md` for tiers/engine-scope/licensing.
 
 ### Signature-only
 
-Unlike ACS's flat bulleted tier-C list (one line per name, no other columns), the ~596 DECORATE
+Unlike ACS's flat bulleted tier-C list (one line per name, no other columns), the ~598 DECORATE
 action functions are numerous enough, and varied enough in what's worth recording per one (owning
 class, whether it takes DECORATE arguments, per-engine presence), that they're tracked as a
 generated table instead — see [Actor actions](inventory/actor-actions.md) below. Every row
@@ -745,17 +818,70 @@ promotes it out.
   effect with no compiler warning.
 - [+POWERSPEED.NOTRAIL](notes/powerspeed-notrail-flag.md) — a flag, not a property (a natural but
   wrong guess). `APowerSpeed::DoEffect` never reads `Speed`, so even a `Speed 1.0` no-op subclass
-  spawns trails and can hijack another `PowerSpeed`'s trail-arbitration slot without this flag. No
+  spawns trails without this flag, even when no genuine speed powerup is held. No
   `cl_speedtrails`-style cvar exists as an alternative.
 - [NOAUTOFIRE](notes/noautofire.md) — weapon flag. Suppresses **continuous** firing while fire is
   held through consecutive tics in which the weapon is already ready, but does **not** suppress a
   single shot fired the instant the weapon transitions into its ready state with fire already
   down. `P_CheckWeaponFire` is its sole consumer.
+- [+WEAPON.ALLOW_WITH_RESPAWN_INVUL](notes/allow_with_respawn_invul.md) — Zandronum: finishing an
+  `A_Raise` on a weapon without it ends spawn protection, including the raise right after
+  spawning, so a replacement starting weapon needs it. A parsed no-op on UZDoom.
 - [damagefactor](notes/damagefactor.md) — `P_DamageMobj` applies `DamageFactor`/`DamageFactors`
-  unconditionally, with no floor on the incoming damage value — including `TELEFRAG_DAMAGE`. A
+  (unless `DMG_FORCED` or `DMG_NO_FACTOR`) with no floor on the incoming damage value — including `TELEFRAG_DAMAGE`. A
   `DamageFactor "<type>", 0` entry genuinely blocks a telefrag-magnitude hit of that type, unlike
   `+INVULNERABLE`, whose own check is explicitly gated on `damage < TELEFRAG_DAMAGE`.
 - [maxdropoffheight](notes/maxdropoffheight.md) — only gates `P_Move`'s deliberate AI-stepping
   call into `P_TryMove`; `P_XYMovement` (ordinary momentum-driven movement — knockback, thrust,
   explosions) calls `P_TryMove` with a hardcoded `dropoff=true`, which skips the check entirely
   regardless of the property's configured value.
+- [dropitem](notes/dropitem.md) — one list, read differently per consumer: death drops roll
+  `probability`, `RandomSpawner` and the boss-brain cube use `amount` as a weight, and Zandronum's
+  `Custom*InvasionSpot` ignores both (uniform pick). Stored in reverse declaration order.
+- [+CLIENTSIDEONLY](notes/clientsideonly.md) — Zandronum network flag. Server never keeps a copy;
+  map things and `A_SpawnItem`-family spawns are client-only, while ACS `Spawn`/`summon` spawn
+  server-side, broadcast, then destroy. Inert dummy on UZDoom.
+- [+SERVERSIDEONLY](notes/serversideonly.md) — Zandronum network flag. No net ID, and every
+  spawn/missile/inventory message to clients is dropped; does not make the actor invisible or
+  non-solid. Inert dummy on UZDoom.
+- [+ALLOWCLIENTSPAWN](notes/allowclientspawn.md) — Zandronum network flag. Clients spawn the map
+  thing themselves, unlinked from the server's copy; skipped in join updates, so late joiners never
+  get mid-game spawns. Inert dummy on UZDoom.
+- [+NONETID](notes/nonetid.md) — Zandronum network flag. Spawn is still sent ID-less but nothing
+  after it is; clients run the copy locally. Drives client-predicted puffs (`cl_clientsidepuffs`).
+  Inert dummy on UZDoom.
+- [LimitedToTeam](notes/limitedtoteam.md) — Zandronum-only. Restricts a player class to one team
+  (never assigns a team); index 0 is Blue, stored +1, `255` does not mean unrestricted. Unknown
+  property on UZDoom.
+- [VisibleToTeam](notes/visibletoteam.md) — rendering-only per-team visibility, index 0 = Blue,
+  stored +1. Zandronum checks the camera player's team and shows to teamless players; UZDoom gates
+  on `teamplay` and the console player's team.
+- [VisibleToPlayerClass](notes/visibletoplayerclass.md) — rendering-only per-class visibility; up
+  to 20 names, matches subclasses, unknown or non-`PlayerPawn` names are fatal on Zandronum (UZDoom
+  accepts any actor class).
+- [+BUMPSPECIAL](notes/bumpspecial.md) — runs the actor's special on collision. Standing on top
+  works the same on both engines; a sideways bump on Zandronum keeps Skulltag's form (both actors
+  solid, any solid bumper, no cooldown, `activationtype` ignored).
+- [+SCOREPILLAR](notes/scorepillar.md) — Zandronum-only Skulltag score pillar; needs `+SOLID
+  +BUMPSPECIAL` too, and the special still runs. Inert dummy on UZDoom despite the inventory's
+  `UZD: yes`.
+- [rune.type](notes/rune.type.md) — Zandronum-only pointer to [RuneGiver](classes/runegiver.md).
+  Fatal if `Rune<name>` isn't parsed yet (the stock ones need `skulltag_actors.pk3`); prefer
+  `Powerup.Type`.
+- [Weapon.StillBobRange](notes/stillbobrange.md) — Zandronum-only standing-still weapon bob
+  amplitude in pixels; fades out as movement bob grows, pauses while firing.
+- [Weapon.StillBobSpeed](notes/stillbobspeed.md) — Zandronum-only still-bob speed; one bounce
+  about every `32 / speed` tics, needs a non-zero range.
+- [Weapon.ViewSwaySpeed](notes/viewswayspeed.md) — Zandronum-only weapon lag when turning or
+  looking up and down, about `0.71 * speed` px per degree per tic.
+- [Weapon.MotionSwaySpeed](notes/motionswayspeed.md) — Zandronum-only vertical sway from height
+  changes and a steady crouch offset. Negative values hit an inverted clamp and become a constant
+  offset.
+- [Weapon.JumpSwaySpeed](notes/jumpswayspeed.md) — Zandronum-only vertical sway from `velz` after
+  a jump; overrides motion sway on those tics, skipped for spring-pad jumps.
+- [Weapon.SwayStyle](notes/swaystyle.md) — Zandronum-only filter on vertical sway (`Normal`,
+  `DownOnly`, `UpOnly`, `HorizontalOnly`); integer order differs from `ViewPitchStyle`.
+- [Weapon.ViewPitchStyle](notes/viewpitchstyle.md) — Zandronum-only pitch-to-offset mapping
+  (`Full`, `UpOnly`, `DownOnly`, `DownAndUp`, `Centered`).
+- [Weapon.ViewPitchOffset](notes/viewpitchoffset.md) — Zandronum-only pitch-driven vertical weapon
+  offset in pixels; a negative value also lowers the rest position.

@@ -2,19 +2,19 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_TakeInventory` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_TakeInventory&oldid=53732) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:2244-2333` and the native action declaration in `wadsrc/static/actors/actor.txt:218`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** ZDoom Wiki `A_TakeInventory` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_TakeInventory&oldid=53732) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:2244-2333` and the native action declaration in `wadsrc/static/actors/actor.txt:218`; result-slot, class-name, infinite-ammo and client-mode corrections from Zandronum's `src/thingdef/thingdef_codeptr.cpp:143-150`, `src/thingdef/thingdef_parse.cpp:88`, `src/g_shared/a_artifacts.cpp:2455-2482`, `src/d_main.cpp:465` and `src/network.cpp:1552-1555`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `src/thingdef/thingdef_codeptr.cpp:2330-2333` (`DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_TakeInventory)`, dispatched via a thin wrapper that passes `self` to the shared `DoTakeInventory` helper at lines 2253–2328).
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
 Removes items of a specified type from the calling actor's inventory. The function operates on the item's existing amount and enforces a minimum of zero — attempting to remove more items than the actor possesses simply reduces the amount to zero without creating a deficit.
 
-**Warning:** Using this function in weapon states to manually consume ammo should be avoided, as it bypasses engine-side ammo-consumption mechanics (infinite ammo cheats, item effects, etc.). Use the weapon's built-in `AmmoUse` property or the `DepleteAmmo` action instead.
+**Warning:** Using this function in weapon states to manually consume ammo should be avoided, as it bypasses engine-side ammo-consumption mechanics (infinite ammo cheats, item effects, etc.). Use the weapon's built-in `AmmoUse` property instead. On UZDoom, ZScript code can also call the weapon's `DepleteAmmo` method. Zandronum has no `DepleteAmmo` DECORATE action; its `DepleteAmmo` is internal C++ reached only through attack functions (e.g. their `useammo` argument).
 
 ## Parameters
 
-- **`itemtype`** — the inventory item class to remove. This must be a valid class derived from `Inventory`. If the item doesn't exist in the actor's inventory, the function returns `false` without side effects.
+- **`itemtype`** — the inventory item class to remove. This must be a valid class derived from `Inventory`. If the item doesn't exist in the actor's inventory, the function returns `false` without side effects. On Zandronum the name is only type-checked against `Actor` at load time (`src/thingdef/thingdef_parse.cpp:88`): a non-`Inventory` actor class loads fine and is simply never found, and an unknown class name prints a load-time warning, after which the call returns early (`src/thingdef/thingdef_codeptr.cpp:2279`) without taking anything or setting a result.
 - **`amount`** — the number of samples to remove. Default is `0`. If this value is `0` or is greater than or equal to the current amount of the item, the item is fully depleted: it is destroyed entirely *unless* the item has the `INVENTORY.KEEPDEPLETED` flag set, in which case its amount is set to zero instead. For values between zero and the current amount (exclusive), the amount is reduced by that value.
 - **`flags`** — control flags for the removal. Default is `0`. Currently only one flag is defined: `TIF_NOTAKEINFINITE` (value `1`). See "Infinite ammo interaction" below.
 - **`giveto`** — an actor pointer selector determining which actor the item is taken from. Default is `AAPTR_DEFAULT`, which corresponds to the calling actor itself. See [Actor pointer selectors](../../acs/concepts/actor-pointers.md) for the full selector set (includes `AAPTR_TARGET`, `AAPTR_MASTER`, `AAPTR_TRACER`, etc.).
@@ -23,7 +23,7 @@ Removes items of a specified type from the calling actor's inventory. The functi
 
 The function returns `true` if the inventory item existed and had a non-zero amount **before** the removal attempt, or `false` otherwise. **Crucially, this return value does not indicate whether the item was actually taken** — a removal suppressed by `TIF_NOTAKEINFINITE` (see below) still returns `true` if the item existed and had non-zero amount. The function will also return `false` if the item is a `HexenArmor` class (engine-specific exclusion; the wiki omits this), since `HexenArmor` inventory is immune to removal via this action.
 
-The result slot is always updated with this true/false value unless the `giveto` actor pointer resolves to NULL, in which case the function returns early before `ACTION_SET_RESULT` is called and the result slot retains its prior value.
+On Zandronum the result is only consumed by `CustomInventory` state chains (e.g. `Pickup`/`Use`), where `CallStateChain` resets the slot to `true` before each state's action (`src/thingdef/thingdef_codeptr.cpp:143-150`). Zandronum DECORATE has no `if` to branch on it. The function writes its true/false result except on its early returns: an unknown item class (line 2279), a `giveto` pointer that resolves to NULL (line 2280), or the client-mode return described below. Those leave the slot at its `true` default, so in a `CustomInventory` chain they count as success.
 
 ## Zandronum-specific: HexenArmor immune to removal
 
@@ -31,11 +31,11 @@ On UZDoom, `HexenArmor` has no such exclusion. The ZScript methods backing `A_Ta
 
 ## Engine-family divergence: giveto pointer resolving to NULL
 
-UZDoom does not reproduce the "result slot retains its prior value" behavior described above for a `giveto` pointer that resolves to NULL. `DoTakeInventory` (`wadsrc/static/zscript/actors/inventory_util.zs`) explicitly returns `false` on every code path, including the one reached when the actor-pointer selector fails to resolve a receiver — there is no path that leaves the call without an explicit result. Calling `A_TakeInventory` with an unresolvable `giveto` on UZDoom therefore always yields `false`, not whatever a previous action in the same state left behind.
+UZDoom does not reproduce the Zandronum "early return leaves the `true` default" behavior described above for a `giveto` pointer that resolves to NULL. `DoTakeInventory` (`wadsrc/static/zscript/actors/inventory_util.zs`) explicitly returns `false` on every code path, including the one reached when the actor-pointer selector fails to resolve a receiver — there is no path that leaves the call without an explicit result. Calling `A_TakeInventory` with an unresolvable `giveto` on UZDoom therefore always yields `false`.
 
 ## Infinite ammo interaction
 
-If the `TIF_NOTAKEINFINITE` flag is set (`flags = 1` or `flags |= TIF_NOTAKEINFINITE`), the function will **not** remove ammunition if the target actor benefits from infinite ammo — either via the `DF_INFINITE_AMMO` map flag or a player's `CF_INFINITEAMMO` cheat. In this case, the item is left entirely untouched, the removal is skipped silently, and the function still returns `true` if the ammo existed with non-zero amount.
+If the `TIF_NOTAKEINFINITE` flag is set (`flags = 1` or `flags |= TIF_NOTAKEINFINITE`), the function will **not** remove ammunition if the target actor benefits from infinite ammo — either via the `DF_INFINITE_AMMO` dmflags bit (the `sv_infiniteammo` cvar, `src/d_main.cpp:465`) or the player's `CF_INFINITEAMMO` cheats bit. On Zandronum that bit is set while a `PowerInfiniteAmmo` powerup is active (`src/g_shared/a_artifacts.cpp:2455-2482`), not by a console cheat. The skip applies only to items derived from `Ammo`. In this case, the item is left entirely untouched, the removal is skipped silently, and the function still returns `true` if the ammo existed with non-zero amount.
 
 ## Engine-family divergence: infinite ammo mechanism
 
@@ -55,9 +55,9 @@ if (flags & TIF_NOTAKEINFINITE &&
     inv->IsKindOf(RUNTIME_CLASS(AAmmo)))
 ```
 
-The `&&` operator short-circuits left-to-right: if `DF_INFINITE_AMMO` is off (the first `||` operand is false), the code evaluates `receiver->player->cheats`. However, `receiver` can be any actor type (including monsters, projectiles, and non-player objects), and `AActor::player` is a pointer field that is only populated for player pawns. Dereferencing `receiver->player->cheats` on a non-player actor produces a NULL pointer dereference and crashes the engine.
+`||` evaluates its right operand only when the left one is false: if `DF_INFINITE_AMMO` is off, the code evaluates `receiver->player->cheats`. However, `receiver` can be any actor type (including monsters, projectiles, and non-player objects), and `AActor::player` is a pointer field that is only populated for player pawns. Dereferencing `receiver->player->cheats` on a non-player actor produces a NULL pointer dereference and crashes the engine.
 
-**Trigger:** Call `A_TakeInventory` with the `TIF_NOTAKEINFINITE` flag set (`flags = 1`) on an actor that is **not** a player (e.g., a monster, projectile, or decoration), while the map's `DF_INFINITE_AMMO` flag is off.
+**Trigger:** Call `A_TakeInventory` with the `TIF_NOTAKEINFINITE` flag set (`flags = 1`) on an actor that is **not** a player (e.g., a monster, projectile, or decoration), while the `DF_INFINITE_AMMO` dmflag is off. The receiver must currently hold the item: the check sits inside `if (inv && !inv->IsKindOf(RUNTIME_CLASS(AHexenArmor)))` (`src/thingdef/thingdef_codeptr.cpp:2286`), so a missing item or `HexenArmor` never reaches it. The item does not have to be ammo, since the `AAmmo` test comes after the dereference.
 
 **Example crash scenario:**
 ```text
@@ -66,8 +66,8 @@ ACTOR SomeMonster : DoomImp
   States
   {
   Death:
-    TNT1 A 0 A_TakeInventory("Clip", 1, TIF_NOTAKEINFINITE)  // Crashes if map doesn't have DF_INFINITE_AMMO
-    ...
+    TNT1 A 0 A_TakeInventory("Clip", 1, TIF_NOTAKEINFINITE)  // Crashes if the imp holds a Clip and DF_INFINITE_AMMO is off
+    Goto Super::Death
   }
 }
 ```
@@ -76,11 +76,12 @@ ACTOR SomeMonster : DoomImp
 
 ## Zandronum-specific: client/server behavior
 
-**This is server-authoritative.** On clients:
+**This is server-authoritative** (`src/thingdef/thingdef_codeptr.cpp:2262-2276`). On a client (an online client or client-side demo playback, per `NETWORK_InClientMode`):
 
-- **For client-handled actors** (where the calling actor has `MF6_CLIENTSIDE` or similar engine-recognized flag), the function runs to completion and returns the actual result (true/false).
-- **For weapon/flash states** (player weapon firing), the function runs to completion on the client and returns the actual result. This is an exception to the general server-authoritative rule.
-- **For all other actors**, the function **returns immediately without removing items or setting an explicit result**. The state-code result slot is not modified in this case (any prior value persists), so a DECORATE `if` branch off the return value will use that prior value, not the actual outcome. The server separately syncs inventory changes to clients via `SERVERCOMMANDS_TakeInventory`. This matches the general server-authoritative pattern for action functions in Zandronum's netcode.
+- **For weapon/flash states** (the calling actor is a player and the calling state is its current weapon or flash psprite state), the function runs to completion on the client. This is the only exception to the server-authoritative rule. There is no exception for client-side-only actors.
+- **For every other call**, the function **returns immediately without removing items or setting a result**, so in a `CustomInventory` chain the slot keeps its `true` default.
+
+On the server, a change is sent to clients with `SERVERCOMMANDS_TakeInventory` (the new amount, or 0 on depletion) only when the item's owner is a player and the call did not come from the caller's weapon/flash state, since clients run those themselves. Taking from a non-player actor sends nothing, and neither does the `TIF_NOTAKEINFINITE` skip.
 
 ## Item behavior on depletion
 

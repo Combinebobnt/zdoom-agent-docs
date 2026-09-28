@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-06)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** ZDoom Wiki `ClassifyActor` (retrieved 2026-08-06, https://zdoom.org/w/index.php?title=ClassifyActor&oldid=35678) + verified against the Zandronum source's `src/p_acs.cpp:5250-5316`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin (dispatched as `PCD_CLASSIFYACTOR`).
@@ -26,7 +26,7 @@ An `int` bitfield where each bit corresponds to a named classification constant 
 - `ACTOR_ALIVE (0x20)` — The actor is currently alive.
 - `ACTOR_DEAD (0x40)` — The actor is currently dead.
 - `ACTOR_MISSILE (0x80)` — The actor is a missile in flight (has the `MF_MISSILE` flag).
-- `ACTOR_GENERIC (0x100)` — The actor is neither a missile nor a monster — typically a decoration, invisible marker, or other non-combat entity.
+- `ACTOR_GENERIC (0x100)` — The actor is not a player, a monster, or a missile. Typically a decoration, invisible marker, or other non-combat entity.
 
 The return value is a bitfield. Check individual bits using bitwise-AND (`&`):
 
@@ -43,7 +43,7 @@ Classification is mutually exclusive in its primary category:
 - Else if the actor is a missile, the result includes `ACTOR_MISSILE`.
 - Else the result includes `ACTOR_GENERIC`.
 
-Players and monsters are also classified as either `ACTOR_ALIVE` or `ACTOR_DEAD`, but never both. Missiles and generic actors receive neither flag — the dead/alive distinction only applies to player/monster types.
+Players and monsters are also classified as either `ACTOR_ALIVE` or `ACTOR_DEAD`, but never both. For players the test is the player's `playerstate` being `PST_DEAD`, so a voodoo doll reports its owning player's state. For monsters it is `health <= 0`. Missiles and generic actors receive neither flag — the dead/alive distinction only applies to player/monster types.
 
 ## Notes on tid=0
 
@@ -54,4 +54,4 @@ When `tid == 0`, the function tests the script's **activator** (the actor that t
 
 ## Behavior on TID miss
 
-When `tid` is nonzero and no actor with that TID exists, returns `ACTOR_NONE` (plain `0`). This is indistinguishable from a literal zero-classification, but in practice is only used to detect a missing actor.
+When `tid` is nonzero and no actor with that TID exists, returns `ACTOR_NONE` (plain `0`). This is unambiguous: a found actor always gets one of `ACTOR_PLAYER`, `ACTOR_MONSTER`, `ACTOR_MISSILE` or `ACTOR_GENERIC`, so a nonzero `tid` returns `0` only on a miss. If several actors share the TID, only the first one the TID iterator finds is classified.

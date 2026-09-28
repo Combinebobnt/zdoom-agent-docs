@@ -2,12 +2,12 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** ZDoom Wiki `A_JumpIfInTargetLOS` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_JumpIfInTargetLOS&oldid=42406) + verified against Zandronum source `src/thingdef/thingdef_codeptr.cpp:4373-4448`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
-**Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_JumpIfInTargetLOS)` (`src/thingdef/thingdef_codeptr.cpp:4373`).
+**Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_JumpIfInTargetLOS)` (`src/thingdef/thingdef_codeptr.cpp:4373`).
 
-Jumps to a target state if the calling actor is visible and in the line of sight of its target, optionally subject to a field-of-view cone centered on the target.
+Jumps to a target state if the calling actor is in the line of sight of its target (the caller's own invisibility or translucency is ignored), optionally subject to a field-of-view cone centered on the target.
 
 ## Signatures
 
@@ -20,7 +20,7 @@ state A_JumpIfInTargetLOS(str "state"[, float fov[, int flags[, float dist_max[,
 
 **state / offset** — Target state (by name string or relative frame offset) to jump to if the condition is met.
 
-**fov** (optional, default 0) — Field of vision angle (degrees) defining the cone within which the calling actor must fall to pass the sight check. The cone is centered on the **target's** current facing direction, not the caller's — the target must be "looking at" the calling actor, not the reverse. A value of 0 disables the FOV check entirely (sight check only); values up to 360 are valid. **Wiki note:** The ZDoom Wiki describes FOV as "the center of which is the actor's current facing direction" referring to the *caller*'s facing, but this is inaccurate for Zandronum — the cone is centered on the **target's** facing. This was corrected in Zandronum to test whether the target can see the caller within its view cone, not whether the caller sees the target.
+**fov** (optional, default 0) — Field of vision angle (degrees) defining the cone within which the calling actor must fall to pass the sight check. The cone is centered on the **target's** current facing direction, not the caller's — the target must be "looking at" the calling actor, not the reverse. A value of 0 disables the FOV check entirely (sight check only); values up to 360 are valid. **Wiki note:** The ZDoom Wiki describes FOV as "the center of which is the actor's current facing direction" referring to the *caller*'s facing. Neither engine does that. Both Zandronum (`src/thingdef/thingdef_codeptr.cpp:4430-4442`) and UZDoom center the cone on the **target's** facing, testing whether the target can see the caller within its view cone.
 
 **flags** (optional, default 0) — Integer flags controlling sight and distance behavior. Flags can be combined with bitwise OR (`|`). Only the following flags have meaning in this function:
 
@@ -75,7 +75,7 @@ approximation error is largest.
 
 ## Network synchronization
 
-Unlike `A_JumpIf`, which evaluates its condition expression before checking client-side status (risking RNG desync), `A_JumpIfInTargetLOS` is **server-authoritative**. The check at the start (`NETWORK_InClientModeAndActorNotClientHandled(self)`) causes client-side callers in networked games to return immediately without evaluating any sight logic — the server synchronizes the jump outcome via `ACTION_JUMP(jump, CLIENTUPDATE_FRAME)`. No target pointer update (`CLIENTUPDATE_POSITION`) is sent, only the frame. This is simpler than `A_JumpIfTargetInLOS` (which adds position updates for non-players) because the target resolution here is asymmetric: if the caller is a non-player, the server must arbitrate what the target "sees."
+Unlike `A_JumpIf`, which evaluates its condition expression before checking client-side status (risking RNG desync), `A_JumpIfInTargetLOS` is **server-authoritative**. The check at the start (`NETWORK_InClientModeAndActorNotClientHandled(self)`) makes a client return immediately without evaluating any sight logic. The exception is an actor the client handles itself (`NETFL_CLIENTSIDEONLY`, or no network ID), which runs the full check locally. The server synchronizes the jump outcome via `ACTION_JUMP(jump, CLIENTUPDATE_FRAME)`. Only the frame is sent, with no position update (`CLIENTUPDATE_POSITION`). `A_JumpIfTargetInLOS` also sends a position update for non-player callers; its source comment gives the reason as the client locally ignoring the jump, so client-side movement prediction may have moved the monster. The source gives no reason for this function omitting it.
 
 See [`concepts/network-jump-synchronization.md`](../concepts/network-jump-synchronization.md) for a broader network synchronization model and risks of RNG-bearing conditions in state jumps.
 

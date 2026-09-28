@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-07)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** `GetInvasionState - Zandronum Wiki.html` (intake, `https://wiki.zandronum.com/w/index.php?title=GetInvasionState&oldid=1289`), verified against Zandronum source (`src/p_acs.cpp:11277–11283`, `src/invasion.h:60–70`, `src/invasion.cpp:1271–1274`) on 2026-08-07.
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 

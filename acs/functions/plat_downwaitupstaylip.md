@@ -2,12 +2,14 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `Plat_DownWaitUpStayLip - ZDoom Wiki.html` (retrieved from
 `https://zdoom.org/w/index.php?title=Plat_DownWaitUpStayLip&oldid=44647`, 2026-07-29) +
 source-verified against `p_lnspec.cpp:754–760`, `p_plats.cpp:412–538` (EV_DoPlat call path,
 specifically lines 527–538 for `platDownWaitUpStay`/`platDownWaitUpStayStone` behavior), and
-`doomdef.h:60` (TICRATE definition). The wiki's description is broadly accurate on the visible
+`doomdef.h:60` (TICRATE definition). Zandronum `p_plats.cpp:79–93` (sector sequence override),
+`p_plats.cpp:277–303` (`waiting` branch: `delay == 0` stall, "Platform" return sound), and the
+35 Hz tic timers in `src/win32/i_system.cpp:289–371` / `src/sdl/i_system.cpp:282–310` (no tic drift). The wiki's description is broadly accurate on the visible
 behavior; this doc adds the `lip` mandatory-argument divergence, the clamping clamp behavior
 (silent no-op on visual motion), the `PlaneMoving` guard's tag-dependent return semantics, the
 `sound` truthiness test over explicit value matching, the SNDSEQ sequence-name nature of sound
@@ -36,11 +38,12 @@ index 206 in `zcommon.bcs`'s `special` table), semantics in the Zandronum source
 - `delay` — **tics before the platform returns to its original height.** Passed through the
   `TICS(a)` macro (`p_lnspec.cpp:77`: `#define TICS(a) (((a)*TICRATE)/35)`). Since `TICRATE == 35`
   (per `doomdef.h:60`), this is an identity: `TICS(delay) = delay`. The wiki's example "Vanilla
-  Doom lifts waited for 3 seconds, or 105 tics" assumes 35 tics/second on a real Doom engine; the
-  caveat in `../concepts/units-and-encodings.md` applies — measured time will be ~0.98 seconds per 35
-  tics on the Zandronum engine fork due to truncating integer division, so 105 tics is ~2.94
-  seconds, not exactly 3. (That caveat's own divergence section notes UZDoom does not have this
-  drift — 35 tics there is a full real second.)
+  Doom lifts waited for 3 seconds, or 105 tics" holds on both engines: both run a true 35 Hz tic
+  clock, so 35 tics is one second and 105 tics is 3 seconds (see
+  `../concepts/units-and-encodings.md`). **`delay == 0` never returns the platform.** The
+  `waiting` state only counts down when its counter is positive (`p_plats.cpp:280`), so with a
+  zero delay the floor stays lowered and the thinker stays alive, which also makes later calls on
+  that sector fail the `PlaneMoving` check. UZDoom has the same test.
 - `lip` — **mandatory here, unlike the wiki's phrasing.** The compiled signature in `zcommon.bcs:1545`
   is `Plat_DownWaitUpStayLip(int,int,int,int;int)`, where the semicolon marks the last parameter
   optional — but the wiki's own `"Conversions from linedef types"` table shows 3-argument calls
@@ -59,7 +62,13 @@ index 206 in `zcommon.bcs`'s `special` table), semantics in the Zandronum source
   (`p_lnspec.cpp:758`, `p_plats.cpp:537`); zero/false selects `DPlat::platDownWaitUpStay` and
   plays the "Platform" sound sequence instead. These are SNDSEQ sequence names, overridable per
   map via its own `SNDSEQ` lump, so "Platform" and "Floor" are sequence identifiers, not direct
-  sound asset names.
+  sound asset names. Both names are only fallbacks: if the sector carries its own sound sequence
+  (a sequence number or name assigned to the sector), that one plays instead (`p_plats.cpp:79–93`).
+  **Return leg differs by engine.** On Zandronum the "Floor" choice applies only to the descent.
+  When the wait ends, the `waiting` branch always plays "Platform" for the rise
+  (`p_plats.cpp:301`), and the server mirrors that to clients as sound type 1 ("Platform").
+  On UZDoom both legs use the type's own sequence, so a nonzero `sound` plays "Floor" on the
+  rise too.
 
 ## Return value and behavior
 
@@ -78,33 +87,38 @@ semantics differ by `tag` value:**
 
 1. Lowers the platform to the lowest adjacent floor height plus `lip` map units (clamped not to
    go *above* the starting floor — silent no-op if the clamp activates).
-2. Waits for `delay` tics while the floor sits at its lowered height.
+2. Waits for `delay` tics while the floor sits at its lowered height (with `delay == 0` it never
+   leaves this step; see `delay` above).
 3. Returns the platform to its original height.
 4. Repeats only if triggered again — unlike `Plat_PerpetualRaiseLip`, this is not a loop.
 
 ## Zandronum netcode
 
-Server-side only: when `NETWORK_GetState() == NETSTATE_SERVER` (line 472–473 in `p_plats.cpp`),
-the engine allocates a unique platform ID (`P_GetFirstFreePlatID()`) for replication to clients.
-This platform's state changes are broadcast server→client via `SERVERCOMMANDS_*` calls (e.g.
-line 621, `SERVERCOMMANDS_PlayPlatSound`). This behavior is Zandronum-only and has no ZDoom
-equivalent.
+Offline and on the server the special runs locally as described above. Only on the server (`NETWORK_GetState() == NETSTATE_SERVER`) does it
+also allocate a platform network ID (`P_GetFirstFreePlatID()`, `p_plats.cpp:472–473`), tell
+clients to create the platform (`SERVERCOMMANDS_DoPlat`, line 614) and tell them to play the
+start sound (`SERVERCOMMANDS_PlayPlatSound`, lines 633–639: type 1 "Platform" or type 3
+"Floor"). Clients move the floor themselves, but in client mode `DPlat::Tick` stops after the
+move (lines 108, 187, 277). Every later status change, sound and destroy on a client comes from
+the server's `SERVERCOMMANDS_ChangePlatStatus`/`PlayPlatSound`/`DestroyPlat` broadcasts. This
+behavior is Zandronum-only and has no ZDoom equivalent.
 
 ## Engine-family divergence: fixed-point vs. floating-point internals
 
 All of the observable behavior above (return semantics, the `speed`/8 scaling, `lip` as a
-map-unit offset, the raise-clamp, the sound-truthiness test) is confirmed identical on UZDoom.
+map-unit offset, the raise-clamp, the sound-truthiness test, the `delay == 0` stall) is
+confirmed identical on UZDoom, except the return-leg sound noted under `sound`.
 The *internal representation* backing `speed` and `lip` is not:
 
-- **`SPEED(a)` is `(a) / 8.` on UZDoom** — a native double division — not the Zandronum engine
+- **UZDoom's `SPEED` macro is a floating-point division by 8**, not the Zandronum engine
   fork's `(a)*(FRACUNIT/8)` fixed-point multiply. UZDoom's platform thinker (`DPlat::m_Speed`,
   `m_Low`, `m_High` in the UZDoom source's `src/playsim/mapthinkers/a_plats.cpp`) and its sector
   floor-height plane (`sector_t::floorplane`) are native doubles throughout, not `FRACUNIT`
   fixed-point ints requiring conversion at the boundary.
 - **`lip` is added directly to a double**, not multiplied by `FRACUNIT`. UZDoom's
-  `EV_DoPlat` computes the lowered target as `FindLowestFloorSurrounding(sec, &spot) + lip`
-  (`FindLowestFloorSurrounding` returns `double` map units directly), with no fixed-point
-  conversion step — unlike the Zandronum engine fork's `lip*FRACUNIT`.
+  `EV_DoPlat` adds `lip` straight onto the lowest surrounding floor height, which
+  `FindLowestFloorSurrounding` already returns as `double` map units. There is no fixed-point
+  conversion step, unlike the Zandronum engine fork's `lip*FRACUNIT`.
 
 Net effect: the numeric scaling (divide `speed` by 8) and the semantic meaning of `lip` (a plain
 map-unit offset) are unchanged, so calls behave the same on both engines. Only the mechanism

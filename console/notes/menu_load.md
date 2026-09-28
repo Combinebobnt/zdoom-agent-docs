@@ -5,7 +5,7 @@
 structurally identical on both engines, but the actual load-on-slot-select step diverges because
 Zandronum has no ZScript; see the divergence section below.
 **Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15);
-Zandronum 3.2.1 @28f736fb3 (2026-08-17)
+Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** Verified against the UZDoom source's `src/menu/doommenu.cpp`.
 
 Bound to F3 by default (UZDoom's `wadsrc/static/engine/commonbinds.txt`; Zandronum's

@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_JumpIfInTargetInventory` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_JumpIfInTargetInventory&oldid=42399) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:973-976` and the shared `DoJumpIfInventory` logic at lines 913–966.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_JumpIfInTargetInventory` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_JumpIfInTargetInventory&oldid=42399) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:973-976` and the shared `DoJumpIfInventory` logic at lines 913–966; null-origin pointer resolution from `src/actorptrselect.cpp:43,78-91`; unknown class name handling from `src/thingdef/thingdef_expression.cpp:2555-2578`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_JumpIfInTargetInventory)` in `src/thingdef/thingdef_codeptr.cpp` — callable from any actor's state table.
 
@@ -22,16 +22,16 @@ The third parameter can be either an integer frame offset or a state label — D
 
 | Parameter | Type | Meaning |
 |-----------|------|---------|
-| `inventorytype` | `string` (resolves to class) | The name of the inventory item class to check — e.g. `"Clip"`, `"Shell"`, `"HealthPack"`. Must resolve to a valid `Inventory`-derived class; an unresolvable or misspelled name silently causes no jump without error. |
+| `inventorytype` | `string` (resolves to class) | The name of the inventory item class to check — e.g. `"Clip"`, `"Shell"`, `"HealthPack"`. Should name an `Inventory`-derived class. On UZDoom a non-`Inventory` class is a load-time error. Zandronum's parser only checks that the name is an actor class (`src/thingdef/thingdef_parse.cpp:88`), so a non-`Inventory` actor class loads without complaint and the call never jumps. An unresolvable or misspelled name is not silent: the parser prints an `Unknown class name` message at load (a warning on Zandronum), and at runtime the call never jumps. |
 | `amount` | `int` | The threshold to check: if positive, jump when the actor has *at least* that many. If zero or negative, jump when the actor is carrying the *maximum possible* amount of that item (determined by the item's own `MaxAmount` property). This zero-and-max logic is useful for checking whether a player has a full magazine or ammo reserve without the amount varying based on backpack pickups. |
 | `offset` / `label` | `int` or state label | The frame offset to jump (if integer) or the state label to jump to (if string). |
-| `pointer` | `int` (optional, defaults to `AAPTR_DEFAULT`) | An actor pointer constant (`AAPTR_DEFAULT`, `AAPTR_TARGET`, `AAPTR_MASTER`, `AAPTR_TRACER`) selecting which actor's pointer to forward from the target. If unspecified, defaults to `AAPTR_DEFAULT`, which refers to the target itself. If the resulting pointer resolves to `NULL`, no jump occurs. |
+| `pointer` | `int` (optional, defaults to `AAPTR_DEFAULT`) | An actor pointer constant (e.g. `AAPTR_DEFAULT`, `AAPTR_TARGET`, `AAPTR_MASTER`, `AAPTR_TRACER`; the `AAPTR_PLAYER_*` and static `AAPTR_PLAYER1`-`8` selectors are accepted too) selecting which actor's pointer to forward from the target. If unspecified, defaults to `AAPTR_DEFAULT`, which refers to the target itself. If the resulting pointer resolves to `NULL`, no jump occurs. |
 
 ## Behavior
 
 The function searches for the specified inventory item in the target's (or the target's pointed-to actor's) inventory:
 
-- If the actor has no target, no jump occurs.
+- If the actor has no target: on UZDoom, no jump occurs. On Zandronum, no jump occurs unless `pointer` is a static `AAPTR_PLAYER1`-`8` selector, which resolves to that player regardless of the missing target, so the check runs against that player's inventory.
 - If the item is **not found**, no jump occurs.
 - If the item **is found**:
   - **When `amount > 0`:** Jump if `item->Amount >= amount`. Note that if you request more items than the item's `MaxAmount`, the target can never accumulate that many, and the jump will never fire even if the target is carrying the maximum.
@@ -41,10 +41,11 @@ The function searches for the specified inventory item in the target's (or the t
 
 In network multiplayer (Zandronum):
 
-- **Weapon and flash states** (player's weapon (`ps_weapon`) and flash (`ps_flash`) psprites) execute the check on both server and client, and always jump synchronously.
-- **All other states** on server-authoritative actors return early in client mode without checking or jumping, unless one of these conditions holds:
-  - The target actor is flagged `+CLIENTSIDEONLY` (visuals-only; doesn't require server sync), **or**
-  - The target actor is the console player's own body.
+- **Weapon and flash states** (the calling player's weapon (`ps_weapon`) and flash (`ps_flash`) psprites) execute the check on both server and client. The server does not broadcast the resulting jump, so each side jumps locally based on its own view of the inventory.
+- **All other states** return early in client mode without checking or jumping, unless one of these conditions holds:
+  - The calling actor (not the target) is flagged `+CLIENTSIDEONLY` (visuals-only; doesn't require server sync), **or**
+  - The calling actor is the console player's own body.
+- When the server takes a jump from an actor's own state, it sends the new frame to clients (skipping the player's own client when the caller is a player, and also syncing position when it isn't).
 - **Inventory state chains in `CustomInventory` `Pickup` states** should not rely on the return value — `A_JumpIfInTargetInventory` explicitly sets the action result to `false` to avoid breaking inventory state flow.
 
 ## Engine-family divergence: no client/server split in UZDoom
@@ -68,11 +69,11 @@ convention rather than something UZDoom needs a replacement for.
 
 ## Shared implementation
 
-`A_JumpIfInTargetInventory` delegates to the same internal `DoJumpIfInventory` helper used by `A_JumpIfInventory`, with the calling actor's `target` field passed in place of the actor pointer parameter. The two functions are otherwise identical in behavior and restrictions.
+`A_JumpIfInTargetInventory` delegates to the same internal `DoJumpIfInventory` helper used by `A_JumpIfInventory`, with the calling actor's `target` field passed as the starting actor. The `pointer` parameter is then resolved from that target, just as `A_JumpIfInventory` resolves it from the caller. The two functions are otherwise identical in behavior and restrictions, including the client-mode checks, which still test the calling actor.
 
 ## Failure modes and edge cases
 
-- **No target:** Returns without jumping — the `COPY_AAPTR_NOT_NULL` guard in the source ensures this.
-- **Unresolvable class name:** Silently returns without jumping. No error is logged.
+- **No target:** Returns without jumping. On Zandronum this comes from the `COPY_AAPTR_NOT_NULL` guard, so a static `AAPTR_PLAYER1`-`8` pointer still resolves and can jump (see Behavior).
+- **Unresolvable class name:** Returns without jumping at runtime. It is not silent: an `Unknown class name` message is printed when DECORATE loads.
 - **NULL actor pointer:** Returns without jumping (when a `pointer` parameter forwards to a `NULL`).
 - **Missing inventory item:** Returns without jumping — having zero of an item is not the same as having the item at zero amount; the item object must exist in the inventory.

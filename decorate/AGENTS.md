@@ -6,9 +6,9 @@ kept, Zandronum instead — see `../shared/AUTHORING.md`'s "Engine scope". **Rea
 `../shared/AUTHORING.md` and `../shared/ARCHETYPES.md` first** — this file only covers what's
 specific to DECORATE.
 
-If the `zdoom-docs-lookup` subagent is registered, prefer delegating a lookup question to it
-instead of reading this tree by hand — see the root [`AGENTS.md`](../AGENTS.md)'s "Subagents"
-section.
+If your agent harness has the `zdoom-docs-lookup` subagent registered (adapters for several
+harnesses ship in `../agents/`), prefer delegating a lookup question to it instead of reading
+this tree by hand — see the root [`AGENTS.md`](../AGENTS.md)'s "Subagents" section.
 
 ## Layout
 
@@ -56,10 +56,12 @@ path wouldn't be accurate. See "UZDoom's ZScript source and the licensing guardr
 where that side actually lives (`wadsrc/static/zscript/**/*.zs`) and the extractor conventions for
 reading it.
 
-A `DEFINE_ACTION_FUNCTION`'s **class** argument matters for inheritance — a function defined on
-`AActor` is callable from any actor's state table; one defined on a narrower class (e.g.
-`APlayerPawn`, `AWeapon`) only compiles in a state table for that class or its subclasses. Record
-the class in the `Bucket:` field.
+Callability comes from where the action is **declared**, not from the C++ macro. On Zandronum, the
+`action native` line in `wadsrc/static/actors/` decides it: one declared in `actor.txt` is callable
+from any actor's state table; one declared in a narrower class's file (e.g.
+`shared/inventory.txt`, `shared/specialspot.txt`) only compiles in a state table for that class or its
+subclasses. A `DEFINE_ACTION_FUNCTION(AActor, ...)` can still be `Inventory`-only (e.g. the
+`A_Light*` family). Record both the macro class and the declaring class in the `Bucket:` field.
 
 ## Cross-engine divergence
 

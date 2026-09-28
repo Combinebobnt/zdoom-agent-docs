@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** `StrRight - ZDoom Wiki.html`
 (`https://zdoom.org/w/index.php?title=StrRight&oldid=37593`), verified against
 the Zandronum source's `src/p_acs.cpp:6640-6659` (`case ACSF_StrLeft: case ACSF_StrRight:`) on
@@ -62,14 +62,4 @@ accurate for both the Zandronum and UZDoom engine forks, which share this byte-f
 verified here about the shared clamp/negative-length/lookup behavior is mechanically true of
 `StrLeft` too, and vice versa. [`StrMid`](https://zdoom.org/wiki/StrMid) is a related but
 separately-implemented `case` block, not covered here. A future `families/*.md` consolidating
-`StrLeft`/`StrRight`/`StrMid`/`StrCpy`/`StrParam` would be reasonable — see this file's final
-report for that recommendation; no family file was created here per this batch's instructions.
-
-**Note for the coordinator:** `functions/strleft.md` (written by a sibling agent in this same
-batch) already documents `StrRight`'s behavior inline and states "`StrRight` — not written up
-separately". This file now exists anyway per this task's explicit instructions. The two files'
-descriptions of the shared `case` block are consistent with each other (same clamp/negative-length
-findings), but `strleft.md`'s closing note claiming StrRight has no separate writeup is now stale
-and should be reconciled (either drop that line from `strleft.md`, or fold both into a
-`families/string-slicing.md` and delete the redundant per-function detail) — left to whoever
-integrates `INDEX.md`.
+`StrLeft`/`StrRight`/`StrMid`/`StrCpy`/`StrParam` would be reasonable.

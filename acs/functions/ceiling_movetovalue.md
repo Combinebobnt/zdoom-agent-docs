@@ -2,10 +2,12 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `Ceiling_MoveToValue - ZDoom Wiki.html` (`_intake/`, retrieved
 2026-07-29, `https://zdoom.org/w/index.php?title=Ceiling_MoveToValue&oldid=31384`) + source-verified (`p_lnspec.cpp:610-615`, `p_ceiling.cpp:690-726`,
-`dsectoreffect.cpp:157-192`). The wiki page covers `tag`/`speed`/`height`/`neg` and the
+`dsectoreffect.cpp:157-192`, `dsectoreffect.cpp:274-283,340-346`, `p_map.cpp:6226`,
+`p_lnspec.cpp:3598-3856,3933-3937`, `p_acs.h` pcode enum, `p_acs.cpp:12991-12994`, zt-bcc
+`src/codegen/expr.c:1626-1637`). The wiki page covers `tag`/`speed`/`height`/`neg` and the
 `tag == 0` convention accurately but says nothing about the dead 5th argument, the `SPEED()` `/8`
 scaling, the hardcoded-off crushing, or the unimplemented `Ceiling_MoveToValueAndCrush` sibling
 — those are this doc's source-verified additions, not wiki-sourced.
@@ -40,14 +42,22 @@ into `EV_DoCeiling` (`p_ceiling.cpp:690`).
   ignored. Passing a 5th argument compiles and has **zero effect** on behavior. This isn't documented
   as deprecated anywhere; it's simply dead on the receiving end in the Zandronum engine fork.
 - **Crushing is hardcoded off**, unlike the sister function `Ceiling_MoveToValueAndCrush` (declared
-  as index 280 in `zcommon.bcs` but **not implemented in the Zandronum engine fork's `LineSpecials[]` table
-  at all** — lines 3647-3855 of `p_lnspec.cpp` enumerate indices 0-255, and the table stops at 255;
-  calling index 280 via ACS compiles fine and silently does nothing at runtime, same as the
-  `SpawnParticle`/`GetMaxInventory` pattern already documented in `families/spawning.md` and
-  `families/inventory.md`). `LS_Ceiling_MoveToValue` explicitly passes `crush=-1` to `EV_DoCeiling`
-  (line 613), which initializes a ceiling thinker's `m_Crush` field to "no crushing." This is
-  distinct from `Floor_MoveToValue`'s `crush=0`, but functionally equivalent—both prevent damage on
-  impact.
+  as index 280 in `zcommon.bcs` but **not implemented in the Zandronum engine fork at all**. The
+  `LineSpecials[256]` table (`p_lnspec.cpp:3598-3856`) stops at index 255, `actionspecials.h` has no
+  `AndCrush` row, and `P_ExecuteSpecial` returns 0 for any number above 255 (`p_lnspec.cpp:3933-3937`).
+  A zt-bcc call does not even reach that guard, though. zt-bcc emits any special numbered 256 or
+  higher as the `PCD_LSPEC5EX` pcode (`src/codegen/expr.c:1626-1637` in zt-bcc), which Zandronum's
+  interpreter does not implement. Its pcode number, 381, is Zandronum's own
+  `PCD_GETTEAMPLAYERCOUNT` (`p_acs.h` enum; handler at `p_acs.cpp:12991-12994`). So the script
+  runs the wrong instruction on its argument stack and then decodes the special number that follows
+  as bytecode. The exact result depends on those bytes, but it is corrupted script execution, not a
+  clean no-op. Don't call it on Zandronum.) `LS_Ceiling_MoveToValue` explicitly passes `crush=-1` to `EV_DoCeiling`
+  (line 613), which initializes a ceiling thinker's `m_Crush` field to "no crushing." On Zandronum,
+  `Floor_MoveToValue` passes `crush=0` instead, and the two are not equivalent. Neither deals damage,
+  since crush damage needs a value above 0 (`p_map.cpp:6226`). But with `crush=-1` a plane that hits
+  a blocking actor moves back to where it was that tic (`dsectoreffect.cpp:279-283`, `344-346`),
+  while with `crush=0` it keeps its new position and returns `crushed` (`dsectoreffect.cpp:274-278`,
+  `340-343`).
 
 ## Engine-family divergence: 5th argument and the `AndCrush` sibling
 
@@ -55,8 +65,8 @@ Two of the claims above, both source-verified against the Zandronum engine fork 
 on UZDoom:
 
 - **The 5th argument is not dead on UZDoom.** UZDoom's `LS_Ceiling_MoveToValue` (the UZDoom
-  source's `src/playsim/p_lnspec.cpp`) reads `arg4` through a `CHANGE(a)` macro
-  (`((a) >= 0 && (a)<=7) ? ChangeMap[a] : 0`) and passes the result straight into `EV_DoCeiling`'s
+  source's `src/playsim/p_lnspec.cpp`) reads `arg4` through a `CHANGE(a)` macro (values 0-7 index a
+  change-mode table; anything else means no change) and passes the result straight into `EV_DoCeiling`'s
   `change` parameter — the same generic "copy the new sector's texture and/or type" mechanism
   other ZDoom-family floor/ceiling specials expose via their own `change` argument. On UZDoom,
   passing a 5th argument to `Ceiling_MoveToValue` therefore has a real, observable effect, unlike
@@ -66,8 +76,8 @@ on UZDoom:
   table (the UZDoom source's `src/playsim/actionspecials.h` and dispatch table in
   `src/playsim/p_lnspec.cpp`) has a real `LS_Ceiling_MoveToValueAndCrush` at index 280, forwarding
   into the same `EV_DoCeiling` with a real (non-forced) crush value. This is the opposite of the
-  Zandronum engine fork, where index 280 falls off the end of a table that stops at 255 and calling
-  it silently no-ops.
+  Zandronum engine fork, which has no index 280 at all. There a zt-bcc call compiles to a pcode
+  Zandronum reads as a different instruction, so the script's execution is corrupted (see above).
 
 **Example — move sector tag 5's ceiling to height 256 at 1.0 map units/tic:**
 

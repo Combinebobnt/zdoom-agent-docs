@@ -213,9 +213,9 @@
 | cl_ticsperupdate | Int | plain | CVAR_USERINFO \| CVAR_ARCHIVE | yes | — | A | [notes](../notes/cl_ticsperupdate.md) |
 | cl_unlagged | Flag | plain | CLIENTFLAGS_UNLAGGED | yes | — | C |  |
 | cl_usealpha3countrycode | Bool | plain | CVAR_ARCHIVE | yes | — | C |  |
-| cl_usecustombob | Bool | plain | CVAR_ARCHIVE | yes | — | C |  |
-| cl_usecustompitch | Bool | plain | CVAR_ARCHIVE | yes | — | C |  |
-| cl_usecustomsway | Bool | plain | CVAR_ARCHIVE | yes | — | C |  |
+| cl_usecustombob | Bool | plain | CVAR_ARCHIVE | yes | — | B | [notes](../notes/cl_usecustombob.md) |
+| cl_usecustompitch | Bool | plain | CVAR_ARCHIVE | yes | — | B | [notes](../notes/cl_usecustompitch.md) |
+| cl_usecustomsway | Bool | plain | CVAR_ARCHIVE | yes | — | B | [notes](../notes/cl_usecustomsway.md) |
 | cl_useoriginalweaponorder | Bool | plain | CVAR_ARCHIVE | yes | — | C |  |
 | cl_usescoreboardscale | Bool | plain | CVAR_ARCHIVE | yes | — | C |  |
 | cl_usescoreboardscale_screenratio | Bool | plain | CVAR_ARCHIVE | yes | — | C |  |
@@ -331,8 +331,8 @@
 | disableautosave | Int | plain | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | yes | C |  |
 | displaynametags | Int | custom | CVAR_ARCHIVE | yes | yes | C |  |
 | dlg_musicvolume | Float | custom | CVAR_ARCHIVE | yes | yes | C |  |
-| dmflags | Int | custom | CVAR_SERVERINFO \| CVAR_CAMPAIGNLOCK \| CVAR_GAMEPLAYFLAGSET | yes | yes | A | [notes](concepts/dmflags.md) |
-| dmflags2 | Int | custom | CVAR_SERVERINFO \| CVAR_CAMPAIGNLOCK \| CVAR_GAMEPLAYFLAGSET | yes | yes | A | [notes](concepts/dmflags.md) |
+| dmflags | Int | custom | CVAR_SERVERINFO \| CVAR_CAMPAIGNLOCK \| CVAR_GAMEPLAYFLAGSET | yes | yes | A | [notes](../concepts/dmflags.md) |
+| dmflags2 | Int | custom | CVAR_SERVERINFO \| CVAR_CAMPAIGNLOCK \| CVAR_GAMEPLAYFLAGSET | yes | yes | A | [notes](../concepts/dmflags.md) |
 | domination | Bool | custom | CVAR_SERVERINFO \| CVAR_LATCH \| CVAR_CAMPAIGNLOCK | yes | — | C |  |
 | duel | Bool | custom | CVAR_SERVERINFO \| CVAR_LATCH \| CVAR_CAMPAIGNLOCK | yes | — | C |  |
 | duellimit | Int | custom | CVAR_CAMPAIGNLOCK \| CVAR_GAMEPLAYSETTING | yes | — | C |  |
@@ -760,7 +760,7 @@
 | spc_amp | Float | plain | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | — | C |  |
 | splashfactor | Float | custom | CVAR_SERVERINFO | yes | yes | C |  |
 | st_oldouch | Bool | plain | CVAR_ARCHIVE | yes | yes | C |  |
-| st_scale | Bool | custom | CVAR_ARCHIVE | yes | yes | C |  |
+| st_scale | Bool | custom | CVAR_ARCHIVE | yes | yes | B | [notes](../notes/st_scale.md) |
 | statfile | String | plain | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | yes | C |  |
 | stillbob | Float | plain | CVAR_USERINFO \| CVAR_UNSYNCED_USERINFO \| CVAR_ARCHIVE | yes | yes | C |  |
 | storesavepic | Bool | plain | CVAR_ARCHIVE\|CVAR_GLOBALCONFIG | yes | yes | C |  |
@@ -869,11 +869,11 @@
 | sv_maxfov | Float | custom | CVAR_ARCHIVE \| CVAR_SERVERINFO \| CVAR_GAMEPLAYSETTING | yes | — | C |  |
 | sv_maxlives | Int | custom | CVAR_SERVERINFO \| CVAR_LATCH \| CVAR_GAMEPLAYSETTING | yes | — | C |  |
 | sv_maxpacketsize | Int | custom | CVAR_ARCHIVE \| CVAR_SERVERINFO | yes | — | A | [notes](../notes/sv_maxpacketsize.md) |
-| sv_maxpacketspertick | Int | custom | CVAR_ARCHIVE | yes | — | A | [notes](notes/sv_maxpacketsize.md) |
-| sv_maxplayers | Int | custom | 32 | yes | — | A | [notes](notes/sv_maxclients.md) |
+| sv_maxpacketspertick | Int | custom | CVAR_ARCHIVE | yes | — | A | [notes](../notes/sv_maxpacketsize.md) |
+| sv_maxplayers | Int | custom | 32 | yes | — | A | [notes](../notes/sv_maxclients.md) |
 | sv_maxproximityrolloffdist | Float | custom | CVAR_NOSETBYACS \| CVAR_SERVERINFO | yes | — | C |  |
 | sv_maxteams | Int | custom | CVAR_SERVERINFO \| CVAR_CAMPAIGNLOCK \| CVAR_LATCH \| CVAR_GAMEPLAYSETTING | yes | — | C |  |
-| sv_measureoutboundtraffic | Bool | plain | 0 | yes | — | C |  |
+| sv_measureoutboundtraffic | Bool | plain | 0 | yes | — | A | [notes](../notes/sv_measureoutboundtraffic.md) |
 | sv_minfov | Float | custom | CVAR_ARCHIVE \| CVAR_SERVERINFO \| CVAR_GAMEPLAYSETTING | yes | — | C |  |
 | sv_minimizetosystray | Bool | plain | CVAR_ARCHIVE | yes | — | C |  |
 | sv_minproximityrolloffdist | Float | custom | CVAR_NOSETBYACS \| CVAR_SERVERINFO | yes | — | C |  |
@@ -1053,4 +1053,4 @@
 | winlimit | Int | custom | CVAR_SERVERINFO \| CVAR_CAMPAIGNLOCK \| CVAR_GAMEPLAYSETTING | yes | — | C |  |
 | wipetype | Int | plain | CVAR_ARCHIVE | yes | yes | C |  |
 | zacompatflags | Int | custom | CVAR_SERVERINFO \| CVAR_CAMPAIGNLOCK \| CVAR_GAMEPLAYFLAGSET | yes | — | C |  |
-| zadmflags | Int | custom | CVAR_SERVERINFO \| CVAR_CAMPAIGNLOCK \| CVAR_GAMEPLAYFLAGSET | yes | — | A | [notes](concepts/dmflags.md) |
+| zadmflags | Int | custom | CVAR_SERVERINFO \| CVAR_CAMPAIGNLOCK \| CVAR_GAMEPLAYFLAGSET | yes | — | A | [notes](../concepts/dmflags.md) |

@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** wiki page `Thing_Damage - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28, `https://zdoom.org/w/index.php?title=Thing_Damage&oldid=53478`) + source-verified against `p_lnspec.cpp:1373-1378`, `p_things.cpp:469-502`, `p_interaction.cpp:1152-1210` (P_DamageMobj entry), `MODtoDamageType` switch (`p_lnspec.cpp:97-119`), `zcommon.bcs:85-108` (MOD enum). Wiki/fork divergence recorded: `Thing_Damage2` (mentioned in wiki as an ACS function alternative for named damage types) does not exist in Zandronum (`zcommon.bcs` defines only `Thing_Damage` at index 119, and `zandronum/src` implements it in `p_lnspec.cpp` with no `Thing_Damage2` variant) — use the `MOD_*` int codes with `Thing_Damage` instead, accepting the enumerated-list limit (no custom damage-type names).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** action special.
@@ -11,7 +11,7 @@ Applies damage (or healing) to actor(s) selected by TID. Action special 119 (dis
 
 ## Parameters
 
-- `tid` — actor's thing ID. **`0` means "the activator"** — when TID is 0, only the script's own activator is targeted (no iteration). A NULL activator in a script with no activation context (`OPEN`/`ENTER`/`RESPAWN`/`DISCONNECT`, etc.) is a safe no-op — the function still executes but damages nothing.
+- `tid` — actor's thing ID. **`0` means "the activator"** — when TID is 0, only the script's own activator is targeted (no iteration). A NULL activator in a script with no activation context (`OPEN`, a Zandronum `DISCONNECT`, etc.; `ENTER`/`RESPAWN` have the player as activator) is a safe no-op — the function still executes but damages nothing.
 - `amount` — damage amount (positive to damage, negative or zero to heal).
   - **Positive `amount`:** damages actor(s) via the engine's `P_DamageMobj` (applies pain states, plays pain sounds, triggers death, respects invulnerability flags, applies knockback/thrust, etc.). The damage-type parameter `mod` is used for obituary/means-of-death selection.
   - **Zero or negative `amount`:** heals actor(s), but **only if their current health is less than their spawn health**. The heal is applied as `actor->health -= amount` (so a negative `amount` of e.g. `-20` adds 20 health), clamped to the actor's `SpawnHealth()` upper bound. This branch **bypasses `P_DamageMobj` entirely** — no pain states, no pain sounds, no knockback, and the `mod` parameter is ignored.
@@ -26,6 +26,28 @@ The ACS action special `Thing_Damage` **always returns `true` (1)** to the scrip
 ## Activator-as-source suicide caveat (wiki-asserted, mechanism verified)
 
 When `tid=0` (targeting the activator) **and the script's activator is also the damaged actor**, the call passes the same actor pointer as both target and source to `P_DamageMobj` (target, inflictor=NULL, source=activator) — `p_things.cpp:483`. The wiki states that this results in a suicide obituary message ("player killed self") rather than the damage type's intended obituary, regardless of the `mod` parameter. **The specific obituary-selection mechanism in `P_DamageMobj` was not traced**, only the parameter-passing path confirmed. **Workaround per wiki:** reassign the activator before calling `Thing_Damage` if the activator is the intended target and you want a non-suicide obituary message.
+
+## The activator is the damage source: coop player-on-player damage is scaled by `teamdamage`
+
+For **any** `tid`, not just `0`, the positive branch calls `P_DamageMobj(actor, NULL, activator, ...)`,
+so the script's activator is the damage **source**. When that activator is a player and the
+target is another player in a non-deathmatch game, `P_DamageMobj`'s "Avoid friendly fire" block
+treats them as teammates (`IsTeammate`: `!deathmatch && player && other->player`, same friendliness)
+and multiplies the damage by the level's `teamdamage` (cvar default `0`; MAPINFO `teamdamage` can
+override it). At `0` the damage becomes `0` and the call silently does nothing, while still
+returning `true`. The typical trigger is a script run from the console (`puke`/`pukename`), whose
+activator is the local player, aimed at another player's TID (a bot, say). Telefrag-sized damage
+(`>= TELEFRAG_DAMAGE`) is exempt from the scaling.
+
+**Workaround:** `SetActivator(0)` before the call makes the world the activator, so the source is
+`NULL`, the friendly-fire block is skipped, and the damage lands as a normal hit (death scripts
+and so on fire as usual). Restore the activator afterwards if the script still needs it.
+
+Verified in source: Zandronum @bdd0f7beb (2026-09-22) `p_lnspec.cpp:1373-1378`, `p_things.cpp:483`,
+`p_interaction.cpp:1478-1492`; UZDoom @98b16b78fc (2026-09-22) `p_things.cpp:401`,
+`p_interaction.cpp:1313-1325`, `AActor::IsTeammate` (`p_mobj.cpp:8211-8220`). Live-confirmed on
+Zandronum 2026-09-23: a puked `Thing_Damage(bot_tid, 100000, 0)` left a coop bot at full health,
+and the same call after `SetActivator(0)` killed it. Not run live on UZDoom.
 
 ## Detailed example
 

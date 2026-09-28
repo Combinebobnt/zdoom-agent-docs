@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** `AmbientSound - ZDoom Wiki.html` (zdoom.org, https://zdoom.org/w/index.php?title=AmbientSound&oldid=35962), verified against the Zandronum source on 2026-07-29.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
@@ -14,15 +14,16 @@ Compiler builtin (`PCD_AMBIENTSOUND`, `p_acs.cpp:11360`, the Zandronum source's 
 
 ## Behavior
 
-Plays `sound` as a non-positional "world" sound: `S_Sound(CHAN_AUTO, lookup, volume/127.f,
-ATTN_NONE)` with no sector/actor/point origin at all. `ATTN_NONE` means no distance falloff —
-the wiki's "all players can hear it at the same volume, regardless of how close to the activator
+Plays `sound` as a non-positional "world" sound: `S_Sound` on `CHAN_AUTO` at `volume / 127` with
+`ATTN_NONE`, and no sector/actor/point origin at all. `ATTN_NONE` means no distance falloff.
+The wiki's "all players can hear it at the same volume, regardless of how close to the activator
 they are" is accurate and confirmed by the attenuation constant, not just observed behavior.
-Server-side, the sound is broadcast to every client via a plain `SERVERCOMMANDS_Sound(...)` call
-with no target-player argument — this is a true global broadcast, unlike `LocalAmbientSound`
-(same file, `PCD_LOCALAMBIENTSOUND`, immediately below this case), which requires a non-NULL
-activator, checks `activator->CheckLocalView(consoleplayer)`, and replicates with
-`SVCF_ONLYTHISCLIENT` to just that one client. The two builtins are otherwise structurally
+On Zandronum, when the script runs on the server, the case also calls `SERVERCOMMANDS_Sound(...)`
+with no target-player argument, so every client plays it: a true global broadcast. Offline, or
+when a client runs it itself (e.g. from a `CLIENTSIDE` script), it only plays locally. Compare
+`LocalAmbientSound` (same file, `PCD_LOCALAMBIENTSOUND`, immediately below this case), which
+requires a non-NULL activator, checks `activator->CheckLocalView(consoleplayer)`, and (for a
+player activator) replicates with `SVCF_ONLYTHISCLIENT` to just that one client. The two builtins are otherwise structurally
 parallel but are genuinely separate cases with separate NULL-activator handling — `AmbientSound`
 never touches `activator` at all, so unlike `LocalAmbientSound` it works fine from scripts with
 no activator (e.g. `OPEN`).
@@ -34,15 +35,19 @@ no activator (e.g. `OPEN`).
   silent no-op: no sound plays, no error/log message, and no console warning. The stack is still
   popped normally (`sp -= 2`) either way, so this failure is not observable from ACS at all.
 - `volume` — integer, divided by `127.f` to produce the `float` volume `S_Sound` expects. The
-  wiki's stated `0..127` range (0 = muted, 127 = full) is correct for the intended use, but
-  **nothing in this case clamps the input** — passing `>127` yields a volume `>1.0`, and a
-  negative value passes a negative float straight into `S_Sound`; behavior in that out-of-range
-  case is whatever the underlying sound mixer does with it, not something this function guards
-  against.
+  wiki's stated `0..127` range (0 = muted, 127 = full) is correct. The case itself doesn't clamp,
+  but the sound start path does: a volume of 0 or below plays nothing, and after scaling by the
+  sound's SNDINFO volume the result is capped at 1.0 (Zandronum `src/s_sound.cpp:901`, `:954`;
+  UZDoom's `S_StartSound` does the same). So a value above 127 plays at full volume. It only
+  differs from 127 when it offsets a SNDINFO `$volume` below 1. On Zandronum, clients never get
+  that boost: the server clamps the float to `0..2` before packing it into the `Byte` volume
+  field (`src/sv_commands.cpp:3653`), and the client caps the received value at 127
+  (`src/cl_main.cpp:7212-7215`).
 
 ## Notes
 
 - Channel is always `CHAN_AUTO` (engine picks an available channel) — there's no way to target a
   specific channel or later stop this particular sound by channel.
 - No fork-specific divergence from the wiki was found beyond the above (the wiki doesn't mention
-  the invalid-string no-op or the missing volume clamp, but doesn't contradict anything either).
+  the invalid-string no-op or the out-of-range volume handling, but doesn't contradict anything
+  either).

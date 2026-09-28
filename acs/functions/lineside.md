@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** wiki page `LineSide - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
 `https://zdoom.org/w/index.php?title=LineSide&oldid=35823`) + source-verified against `p_acs.cpp:10652-10654,13074-13094,3412-3413,1733,1769,1832`,
 `p_map.cpp:1863,1871,1875,2190-2208,5448,5459`, `p_lnspec.cpp:1759,1790,1840`, `p_spec.cpp:324-327`,

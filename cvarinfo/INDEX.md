@@ -7,8 +7,8 @@ section differs from `../console/`), `../shared/AUTHORING.md` for tiers/engine-s
 
 - [Declaration syntax](concepts/declaration-syntax.md) — tier A. The `server`, `user`, and `local`
   CVAR scopes, the `noarchive` option, type system, naming rules, and duplicate-CVAR error
-  behavior; verified against Zandronum 3.2.1 source with fork-specific divergences noted (nosave,
-  cheat, latch, handlerclass do not exist in Zandronum).
+  behavior; verified against UZDoom 5.1.0-pre and Zandronum 3.3-alpha source with engine-family
+  divergences noted (nosave, cheat, latch, handlerclass do not exist in Zandronum).
 
 ## Inventory tables (generated)
 

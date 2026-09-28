@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** wiki page `Sector_SetPortal - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
 `https://zdoom.org/w/index.php?title=Sector_SetPortal&oldid=51874`) + source-verified against `p_lnspec.cpp:3657` (runtime `LS_NOP`), `p_spec.cpp:1320-1380`
 (`P_SpawnPortal`), `p_spec.cpp:1604-1802` (`P_SpawnSpecials`'s per-line scan, confirming this runs

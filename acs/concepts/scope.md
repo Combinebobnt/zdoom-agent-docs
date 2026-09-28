@@ -2,7 +2,7 @@
 
 **Tier:** A (engine limits and reset call sites traced directly to source; BCS extensions traced to `zt-bcc`'s own wiki, not inferred).
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** `_intake/Scope - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=Scope&oldid=40398`), verified against the Zandronum source's `src/p_acs.h` (`NUM_MAPVARS`/`NUM_WORLDVARS`/`NUM_GLOBALVARS`), `p_acs.cpp` (`P_ClearACSVars`, `ACS_WorldVars`/`ACS_GlobalVars` storage), `g_level.cpp`/`g_game.cpp` (hub/new-game clear call sites, including the Zandronum client-mode carve-out), and the zt-bcc wiki's `Declarations.md` (`static` locals, `let` block scoping, in-script `world`/`global` declarations) on 2026-07-29.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
@@ -38,8 +38,9 @@ exactly:
 
 - `g_level.cpp:1034`, inside the `FINISH_NextHub` branch of level completion: `P_ClearACSVars(false)`
   — **world vars reset on a hub transition, global vars are untouched.**
-- `g_level.cpp:583` (`G_InitNew`, a fresh game start) and `g_game.cpp:3271`: `P_ClearACSVars(true)`
-  — **both world and global vars reset on a new game.**
+- `g_level.cpp:583` (`G_InitNew`, a fresh game start): `P_ClearACSVars(true)`
+  — **both world and global vars reset on a new game**, subject to the client-mode gate described
+  below.
 
 **Zandronum-only divergence the wiki doesn't cover:** `g_level.cpp:579-583` gates the new-game
 clear behind `(NETWORK_InClientMode() == false) || (CLIENT_GetConnectionState() != CTS_ACTIVE)`,
@@ -52,6 +53,31 @@ single-player ZDoom and isn't mentioned on the wiki page at all; it matters if y
 reasoning about client-side script state immediately after a map change in a networked game (see
 [Client-side scripting](clientside-scripting.md) for the broader client/server variable-state
 split).
+
+**Version gate:** this client-mode gate itself postdates the 3.2.1 release. It was added by
+commit `eb00fdd09` ("Fixed: world and global ACS variables didn't persist on the client's end
+when the map changed in online games"), which is not an ancestor of the 3.2.1 version-bump
+commit `28f736fb3`. A real Zandronum 3.2.1 client has no such gate: it unconditionally runs
+`P_ClearACSVars(true)` here, the same way UZDoom's `G_InitNew` still does today (see the
+UZDoom-specific note below).
+
+**Map storage is reset by being rebuilt, not by `P_ClearACSVars`** (source-verified 2026-09-20,
+Zandronum). Each module allocates its arrays at load time and `memset`s them to zero (the
+Zandronum source's `src/p_acs.cpp:2547-2548`), and level setup unloads and reloads every module
+(`src/p_setup.cpp:3458,3745,4025,4087`), so a `#library`'s map vars and arrays start every map at
+zero — on a client exactly as on the server, with none of the client-mode gating above applying
+to them. Don't hand-clear map storage at level start "in case it carried over"; it can't.
+Zandronum adds a second reset point with no level change behind it: `GAME_ResetScripts`
+(`src/g_game.cpp:3267-3294`), called from the map-reset path (`src/g_game.cpp:3454,4275` — the
+round reset used by survival/LMS-style gametypes), unloads and reloads the behavior the same way
+**and** calls `StopAndDestroyAllScripts`. `GAME_ResetScripts` also runs its own conditional
+world/global-var clear, `P_ClearACSVars(true)` at `g_game.cpp:3271`, but only when the
+`ZACOMPATF_RESET_GLOBALVARS_ON_MAPRESET` compat flag is set (`compat_resetglobalvarsonmapreset`,
+off by default); with the flag off, a round reset leaves world and global vars alone and only
+rebuilds map storage as described above. So mid-level, every map var goes back to zero and every
+running script — persistent per-tic loops included — is destroyed with no chance to clean up. Only
+`OPEN` scripts restart automatically afterwards; `ENTER` scripts re-run for each in-game player
+only when that caller asks for it (`src/g_game.cpp:4277-4290`).
 
 **UZDoom-specific:** UZDoom's `g_level.cpp` unconditionally calls `P_ClearACSVars(true)` in its
 `G_InitNew` function (`src/g_level.cpp:626`) without the multiplayer client-mode check. This means

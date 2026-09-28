@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-18)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** Zandronum Wiki `InDemoMode` (retrieved 2026-08-18, https://wiki.zandronum.com/w/index.php?title=InDemoMode&oldid=1305) + source-verified against Zandronum's `src/p_acs.cpp:7513-7514` and `src/cl_demo.cpp:895-898`.
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function (index -140; dispatched as `ACSF_InDemoMode`).

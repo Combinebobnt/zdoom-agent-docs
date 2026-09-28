@@ -2,13 +2,13 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki Classes:Powerup (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=Classes%3APowerup&oldid=53729) + verified against Zandronum source `src/g_shared/a_artifacts.h:10` (native C++ class `APowerup : public AInventory`) and `src/g_shared/a_artifacts.cpp`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
+**Provenance:** ZDoom Wiki Classes:Powerup (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=Classes%3APowerup&oldid=53729) + verified against Zandronum source `src/g_shared/a_artifacts.h:10` (native C++ class `APowerup : public AInventory`), `src/g_shared/a_artifacts.cpp`, and `src/g_game.cpp:2032-2033` (level-change persistence condition, corrected 2026-09-25), `src/g_shared/a_pickups.cpp:1587-1667` (giver pickup failure), `src/g_shared/a_morph.cpp:685-715` (morph-time `EndEffect`/`InitEffect`), and `src/p_mobj.cpp:889-914` (inventory use).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** native C++ class in Zandronum (`src/g_shared/a_artifacts.h:10–37`; `APowerup : public AInventory`, implementation in `src/g_shared/a_artifacts.cpp`; see also `APowerupGiver` at `a_artifacts.h:40–56` for the related pickup-giver mechanism); ZScript class in UZDoom (`wadsrc/static/zscript/actors/inventory/powerups.zs:84-328`; `class Powerup : Inventory`, an ordinary scripted class with no native backing beyond what `Inventory` itself provides; `PowerupGiver` at `powerups.zs:20-82`).
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
 
-A built-in actor class representing a timed effect that is applied to a player's inventory. Powerups track how long they remain active via an `EffectTics` countdown, and each powerup subclass defines custom behavior when activated (`InitEffect()`), during each game tick (`DoEffect()`), and when expiring (`EndEffect()`). Powerups are always granted to the player through a separate `PowerupGiver` class or through ACS/BCS scripts — they cannot be placed as pickups in the world directly.
+A built-in actor class representing a timed effect that is applied to a player's inventory. Powerups track how long they remain active via an `EffectTics` countdown, and each powerup subclass defines custom behavior when activated (`InitEffect()`), during each game tick (`DoEffect()`), and when expiring (`EndEffect()`). Powerups are granted to the player through a separate `PowerupGiver` class or given directly (DECORATE `A_GiveInventory`, ACS/BCS `GiveInventory`, the console `give` command). They cannot work as world pickups: a powerup placed in the map destroys itself on its first tick, because `Tick()` destroys any powerup with no `Owner`.
 
 ## Activation and lifecycle
 
@@ -25,7 +25,7 @@ A powerup also expires immediately if its owner dies (the `OwnerDied()` method c
 
 ## Powerup vs. PowerupGiver
 
-A common point of confusion: the **powerup itself** is not a pickup. `PowerupGiver` (a separate class at `a_artifacts.h:40`) is the world item (like a radiation suit, soul sphere, or invulnerability sphere). When a player picks up a `PowerupGiver`, its `Use()` method is called, which:
+A common point of confusion: the **powerup itself** is not a pickup. `PowerupGiver` (a separate class at `a_artifacts.h:40`) is the world item (like a radiation suit, soul sphere, or invulnerability sphere). A giver with `+INVENTORY.AUTOACTIVATE` (as the Doom spheres have) runs its `Use()` method on pickup. The class defaults (`+INVENTORY.INVBAR`, `Inventory.DefMaxAmount`) do not include it, so a giver without that flag goes into the inventory and `Use()` runs when the player uses it (`AActor::UseInventory`, `src/p_mobj.cpp:889-914`). `Use()`:
 
 1. Spawns an instance of the powerup class named in `PowerupType`
 2. Optionally overrides the powerup's `EffectTics`, `BlendColor`, `Mode`, and `Strength` fields with values from the giver itself
@@ -39,7 +39,7 @@ In DECORATE, all fields and flags that affect a powerup's behavior (`Powerup.Dur
 
 Each powerup carries `EffectTics` (remaining duration in game tics, where 1 tic = 1/35 second by default), `BlendColor` (a color+alpha to blend onto the screen), and optional `Mode` and `Strength` fields for subclass-specific tuning.
 
-The base `DoEffect()` method (called each tick while the powerup is active) applies the colormap/blend effect from `BlendColor` to the player's view. If `EffectTics <= BLINKTHRESHOLD` (a hardcoded engine constant), the blend blinks on and off (toggled each 8 tics) to signal the powerup is about to expire — this is used to show invulnerability or invisibility blinking, for example. `EndEffect()` clears any applied colormap when the powerup expires.
+The base `DoEffect()` method (called each tick while the powerup is active) only handles a special colormap: when `BlendColor` names one (e.g. `InverseMap`), it sets the player's `fixedcolormap`. An ordinary screen tint is not applied there; the engine reads it from `GetBlend()`, which returns `BlendColor`. If `EffectTics <= BLINKTHRESHOLD` (a hardcoded engine constant, 128 tics), both the colormap and the tint blink on and off (toggled each 8 tics) to signal the powerup is about to expire, as invulnerability's inverse colormap does. `PowerInvisibility`'s wear-off blink is separate: its `AlterWeaponSprite()` open-codes the same threshold to flash the weapon sprite opaque. `EndEffect()` clears any applied colormap when the powerup expires.
 
 Subclasses override `InitEffect()` and/or `DoEffect()` to apply their own effects — `APowerInvulnerable` sets `MF2_INVULNERABLE`, `APowerInvisibility` modifies rendering, `APowerIronFeet` overrides damage absorption, etc.
 
@@ -47,12 +47,12 @@ Subclasses override `InitEffect()` and/or `DoEffect()` to apply their own effect
 
 **This section documents where Zandronum's native-C++ implementation differs from the ZScript-based implementation** — originally written up against the ZDoom wiki's ZScript description, and now independently re-verified against UZDoom's actual current source (`wadsrc/static/zscript/actors/inventory/powerups.zs`, UZDoom 5.0.0-pre @5a9b0ec511): every bullet below holds true for UZDoom's real `Powerup`/`PowerupGiver` classes, not just for the wiki's account of them.
 
-- **`Tick()` behavior:** Zandronum only checks `if (EffectTics > 0 && --EffectTics == 0) Destroy()`. A powerup with `EffectTics == 0` (permanent/indefinite duration) will **not** self-destroy on tick — the wiki's ZScript version adds `EffectTics == 0 ||` to that condition. This means Zandronum permanent powerups require explicit removal, not automatic timeout.
+- **`Tick()` behavior:** Zandronum only checks `if (EffectTics > 0 && --EffectTics == 0) Destroy()`. A powerup with `EffectTics == 0` (permanent/indefinite duration) will **not** self-destroy on tick — the wiki's ZScript version also destroys the powerup when `EffectTics == 0`. This means Zandronum permanent powerups require explicit removal, not automatic timeout.
 - **No `MaxEffectTics` field:** Zandronum's `APowerup` has only `EffectTics`, `BlendColor`, `Mode`, and `Strength` fields. The wiki mentions `MaxEffectTics` and uses it in `HandlePickup()` to track the maximum duration seen — this does not exist in Zandronum.
 - **Blink logic is not virtual:** Zandronum does not provide `isBlinking()`, `GetPowerupIcon()`, or `bNoScreenBlink` as virtual methods or flags. The wiki's entire "Methods" section describes ZScript-only features unavailable in Zandronum's DECORATE. The blink threshold is open-coded inline in `GetBlend()`, `DoEffect()`, and the HUD-icon drawing routine (`DrawPowerup()`).
 - **No overrides from DECORATE:** `InitEffect()`, `DoEffect()`, and `EndEffect()` are `protected` virtual methods in the C++ class, but they cannot be overridden from DECORATE — only C++ subclasses (like `APowerInvulnerable`) can override them. DECORATE definitions cannot customize these lifecycle hooks; customization happens only through subclassing in C++. See "Engine-family divergence: subclassing `Powerup`'s lifecycle hooks" below for how this same restriction, and its one escape hatch, plays out on UZDoom.
-- **`HandlePickup()` chains to parent:** Zandronum's implementation falls through to `Inventory->HandlePickup(item)` if no matching powerup instance is found in the inventory, whereas the wiki's version returns `false`. This affects how duplicate powerups interact with other inventory items.
-- **Teardown via `Destroy()`:** `EndEffect()` is only called from `Destroy()`, which is reached via three paths: `Tick()` timeout, `OwnerDied()` (player death), or explicit destruction. `EndEffect()` is not a separate entry point — understanding that the three paths all converge at `Destroy()` is critical for tracing cleanup logic.
+- **`HandlePickup()` chains to the next inventory item:** Zandronum's implementation falls through to `Inventory->HandlePickup(item)` (the next item in the owner's inventory list, not `Super`) if no matching powerup instance is found in the inventory, whereas the wiki's version returns `false`. This affects how duplicate powerups interact with other inventory items.
+- **Teardown via `Destroy()`:** final teardown goes through `Destroy()`, which calls `EndEffect()` and is reached via three paths: `Tick()` timeout, `OwnerDied()` (player death), or explicit destruction. `EndEffect()` has one other caller. Player morph and unmorph run `EndAllPowerupEffects()` on the old body's inventory, then `InitAllPowerupEffects()` re-runs `InitEffect()` on the new body (`src/g_shared/a_morph.cpp:685-715`), without destroying the powerups. UZDoom has the same pair in `player_morph.zs`.
 - **Zandronum-specific features:** `IsActiveRune()` checks if this powerup is the player's current rune (used by the Skulltag rune system); `APowerupGiver::PowerupGranted()` and `APowerupGiver::ModifyPowerup()` are extension hooks (empty by default) for giver subclasses; `DoEffect()` and `EndEffect()` also manage `Owner->FixedColormap` (the player body's colormap in addition to the view colormap). Confirmed absent from UZDoom's source: no `IsActiveRune`, `PowerupGranted`, `ModifyPowerup`, or separate actor-level `FixedColormap` field exists anywhere in the UZDoom tree — UZDoom's `DoEffect()`/`EndEffect()` only ever touch `Owner.player.fixedcolormap`.
 - **`PowerupGiver::Use()` flag propagation — clean agreement, with one UZDoom-only addition:** both engines copy `+INVENTORY.ALWAYSPICKUP`/`+INVENTORY.ADDITIVETIME` from the giver onto the freshly-spawned powerup before the pickup attempt (Zandronum: `power->ItemFlags |= ItemFlags & (IF_ALWAYSPICKUP|IF_ADDITIVETIME);`; UZDoom: an equivalent bitwise-OR of the giver's `bAlwaysPickup`/`bAdditiveTime` fields onto the spawned powerup's own fields) — so the "Trap" note under "Re-pickup and refresh semantics" below applies identically to a `PowerupGiver`-driven re-give on either engine. UZDoom additionally propagates a third flag, `+INVENTORY.NOTELEPORTFREEZE` (`bNoTeleportFreeze`, read back via `Powerup::GetNoTeleportFreeze()`), which suppresses `PlayerPawn::GetTeleportFreezeTime()`'s post-teleport input-freeze while the powerup is held — this mechanism (`TeleportFreezeTime`/`GetTeleportFreezeTime`/`GetNoTeleportFreeze`) does not exist anywhere in Zandronum's source at all, not just on `Powerup`.
 
@@ -86,17 +86,25 @@ instance:
 carries `+INVENTORY.ALWAYSPICKUP` or `+INVENTORY.ADDITIVETIME`. This surprises modders who expect
 "pick it up again" to always refresh to full duration.
 
-This `HandlePickup` failure does **not** propagate up to block a `CustomInventory`'s or
-`PowerupGiver`'s overall pickup succeeding — see [`CustomInventory`](custominventory.md)'s
-`CallStateChain` OR-aggregation section and its `+INVENTORY.ALWAYSPICKUP` backstop note for why a
-chain containing a discarded re-give still consumes the world item normally.
+Whether this failed give blocks the surrounding pickup depends on the wrapper:
+
+- **`PowerupGiver`:** `Use()` returns false. An `Inventory.MaxAmount 0` giver with
+  `+INVENTORY.AUTOACTIVATE` then fails its own pickup and stays in the world
+  (`AInventory::TryPickup`, `src/g_shared/a_pickups.cpp:1587-1667`). A giver with
+  `+INVENTORY.ALWAYSPICKUP` never hits this case, because `Use()` copies that flag onto the powerup.
+  A giver kept in the inventory is picked up normally, and using it from there is refused without
+  consuming it.
+- **`CustomInventory`:** `A_GiveInventory` sets its action result to false, but it only blocks the
+  pickup if no other action in the `Pickup` chain succeeded and the item lacks
+  `+INVENTORY.ALWAYSPICKUP`. See [`CustomInventory`](custominventory.md)'s `CallStateChain`
+  OR-aggregation section and its `+INVENTORY.ALWAYSPICKUP` backstop note.
 
 **Clean agreement on UZDoom.** `Powerup::HandlePickup` in `powerups.zs` implements the identical
 four-step logic (same `EffectTics == 0` no-op, same unbounded `bAdditiveTime` add, same
 `BLINKTHRESHOLD` discard-unless-`bAlwaysPickup` gate, same "only refresh if strictly greater"
 rule) — `BLINKTHRESHOLD` is `4*32 = 128` tics on UZDoom too. The only structural difference is
-bookkeeping: UZDoom additionally tracks `MaxEffectTics = Max(EffectTics, MaxEffectTics)` on the
-additive-time and refresh branches (see "No `MaxEffectTics` field" above), which records the
+bookkeeping: on the additive-time and refresh branches UZDoom additionally raises `MaxEffectTics`
+to the larger of itself and the new `EffectTics` (see "No `MaxEffectTics` field" above), which records the
 largest duration seen but does not change the "unbounded, no cap" or "never shortens" behavior
 described above. The Trap applies identically on both engines.
 
@@ -108,22 +116,21 @@ A `Powerup` cannot outlive the player session it was granted in:
   player holds (invoked from the inventory-notification loop in `AActor::Die`,
   `p_interaction.cpp`).
 - **Level change:** `G_PlayerFinishLevel` (`g_game.cpp`) destroys every `APowerup` in the
-  traveling inventory unless `(!deathmatch) && (mode == FINISH_SameHub) && (IF_HUBPOWER ||
-  IF_PERSISTENTPOWER)` — i.e. a powerup persists across a level transition only within the same
-  hub, in non-deathmatch, and only if it explicitly opts in with `+INVENTORY.HUBPOWER` or
-  `+INVENTORY.PERSISTENTPOWER`.
+  traveling inventory unless `!deathmatch && ((mode == FINISH_SameHub && IF_HUBPOWER) ||
+  IF_PERSISTENTPOWER)`. In non-deathmatch games, `+INVENTORY.PERSISTENTPOWER` alone survives any
+  level transition, hub or not; `+INVENTORY.HUBPOWER` alone only survives a same-hub transition.
   - **UZDoom:** the equivalent check lives in `PlayerPawn::PlayerFinishLevel`
     (`wadsrc/static/zscript/actors/player/player.zs:2187-2225`, itself headed by a comment
-    crediting it as the `G_PlayerFinishLevel` counterpart) and reads `deathmatch ||
-    ((mode != FINISH_SameHub || !item.bHUBPOWER) && !item.bPERSISTENTPOWER)` — the same
-    expression Zandronum's `src/g_game.cpp:2032-2033` actually contains. Worked out as a plain
+    crediting it as the `G_PlayerFinishLevel` counterpart) and tests the same destroy condition
+    as Zandronum's `src/g_game.cpp:2032-2033`: always in deathmatch, otherwise unless the item is
+    persistent or is a hub power on a same-hub transition. Worked out as a plain
     boolean, a powerup survives iff `!deathmatch && (bPERSISTENTPOWER || (bHUBPOWER && mode ==
     FINISH_SameHub))` — `+INVENTORY.PERSISTENTPOWER` alone survives *any* non-deathmatch level
     transition, hub or not, while `+INVENTORY.HUBPOWER` alone only survives a same-hub one. Player
     death is handled the same way as Zandronum: `Powerup::OwnerDied()` unconditionally calls
     `Destroy()`.
 - **Belt-and-braces:** `Tick()` also self-destroys if `Owner == NULL` — true on UZDoom's `Tick()`
-  too (`if (Owner == NULL) Destroy();`, checked before the `EffectTics` condition).
+  too (its no-owner check also runs before the `EffectTics` condition).
 
 ## `PowerStrength`'s permanence is not a duration special case
 
@@ -144,9 +151,9 @@ counter also drives `APowerStrength::GetBlend()`'s berserk-red fade. A modder re
 would be wrong — the mechanism is specific to this one subclass's `Tick()` override, not a
 property-level convention.
 
-**Clean agreement on UZDoom.** `PowerStrength::Tick()` in `powerups.zs` is `EffectTics += 2;
-Super.Tick();` — structurally identical to the Zandronum excerpt above. This also means UZDoom's
-own `Tick()` divergence noted above (the `EffectTics == 0 ||` self-destroy clause) never comes
+**Clean agreement on UZDoom.** `PowerStrength::Tick()` in `powerups.zs` adds 2 to `EffectTics`
+and then calls the base `Tick()`, the same as the Zandronum excerpt above. This also means UZDoom's
+own `Tick()` divergence noted above (the `EffectTics == 0` self-destroy clause) never comes
 into play for berserk: by the time `Super.Tick()` runs each frame, `EffectTics` has already been
 incremented past 0, so the `EffectTics == 0` branch never fires for this subclass on either
 engine.

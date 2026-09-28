@@ -17,6 +17,7 @@ Targets:
     decorate-actions      decorate/inventory/actor-actions.md
     console-cvars         console/inventory/cvars.md
     console-ccmds         console/inventory/ccmds.md
+    bots-commands         bots/inventory/bot-commands.md
     acs-signatures        acs/INDEX.md's "Signature-only (tier C)" block
     all                   every target above
 
@@ -24,6 +25,7 @@ Targets:
 instead of writing. Use this in CI-less verification the same way tools/lint_docs.py is used.
 """
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -56,11 +58,51 @@ def _read_sources_local():
 _SOURCES = _read_sources_local()
 
 
+# Engine checkouts must sit on their upstream branch: a local fork branch's private patches
+# would otherwise leak into generated inventories and Verified against: stamps.
+_UPSTREAM_GUARDED = ("zandronum", "uzdoom")
+_upstream_checked = set()
+
+
+def _git(root, *args):
+    return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True)
+
+
+def _require_upstream(key, root):
+    """Exit 1 if `root` is a git checkout that is dirty or whose HEAD isn't an ancestor of
+    origin/HEAD. Skips silently when git is missing, `root` isn't a repo top level, or there's
+    no origin/HEAD to compare against."""
+    if key not in _UPSTREAM_GUARDED or key in _upstream_checked:
+        return
+    _upstream_checked.add(key)
+    try:
+        top = _git(root, "rev-parse", "--show-toplevel")
+    except FileNotFoundError:
+        return
+    if top.returncode != 0 or Path(top.stdout.strip()).resolve() != Path(root).resolve():
+        return
+    problem = None
+    anc = _git(root, "merge-base", "--is-ancestor", "HEAD", "origin/HEAD")
+    if anc.returncode == 1:
+        problem = "HEAD is not on origin/HEAD (a local fork branch?)"
+    elif anc.returncode != 0:
+        return
+    elif _git(root, "status", "--porcelain").stdout.strip():
+        problem = "the working tree has uncommitted or untracked changes"
+    if problem:
+        print(f"gen_inventory.py: '{key}' source {root}: {problem}. Point sources.local.md's "
+              f"'{key}' row at a clean checkout of the upstream branch (e.g. a git worktree of "
+              "origin/HEAD) -- see shared/AUTHORING.md's \"Engine scope\".", file=sys.stderr)
+        sys.exit(1)
+
+
 def source_root(key):
     if key in _SOURCES and _SOURCES[key].is_dir():
+        _require_upstream(key, _SOURCES[key])
         return _SOURCES[key]
     sibling = ROOT.parent / key
     if sibling.is_dir():
+        _require_upstream(key, sibling)
         return sibling
     print(f"gen_inventory.py: no source configured or found for '{key}' -- "
           f"set it in sources.local.md or place a sibling '../{key}' directory", file=sys.stderr)
@@ -262,18 +304,56 @@ def _extract_flags_from_file(path):
     return out
 
 
+# `FlagDef` is case-insensitive like every ZScript keyword (visualthinker.zs spells it that way).
+# Only the name, whether the storage field is `none`, and the bit are captured, never the field
+# name itself (GPL-3.0, see the module-level comment above `uzdoom_zscript_root`).
+ZS_FLAGDEF_RE = re.compile(r'^[ \t]*flagdef\s+(\w+)\s*:\s*(\w+)\s*,\s*(\d+)\s*;', re.M | re.I)
+
+
+def _extract_zs_flagdefs_from_tree(root):
+    """{NAME_UPPER: kind} for every ZScript `flagdef`. A `none` storage field has no backing
+    variable: bit 0 is DEPF_UNUSED (the no-op path, same as C++ DEFINE_DUMMY_FLAG), bit > 0 is a
+    DEPF_* code remapped by HandleDeprecatedFlags (same as DEFINE_DEPRECATED_FLAG). See
+    CompileFlagDefs in zcc_compile_doom.cpp and FindFlag in thingdef_data.cpp."""
+    out = {}
+    for path in iter_zs_files(root):
+        text = _strip_comments(path.read_text(errors="replace"))
+        for m in ZS_FLAGDEF_RE.finditer(text):
+            name, field, bit = m.group(1), m.group(2), int(m.group(3))
+            if name.lower() == "prefix":
+                continue
+            if field.lower() != "none":
+                kind = "flag"
+            else:
+                kind = "deprecated" if bit > 0 else "noop"
+            key = name.upper()
+            if out.get(key) != "flag":
+                out[key] = kind
+    return out
+
+
 def gen_decorate_flags(check):
     zan_file = source_root("zandronum") / "src" / "thingdef" / "thingdef_data.cpp"
     uzd_file = source_root("uzdoom") / "src" / "scripting" / "thingdef_data.cpp"
     zan_flags = _extract_flags_from_file(zan_file)
     uzd_flags = _extract_flags_from_file(uzd_file) if uzd_file.is_file() else {}
+    zs_root = uzdoom_zscript_root()
+    uzd_zs_flags = _extract_zs_flagdefs_from_tree(zs_root) if zs_root.is_dir() else {}
 
     decorate_dir = ROOT / "decorate"
     header = ["Flag", "Table", "Class", "Field", "Zan", "UZD", "Tier", "Notes"]
     rows = []
     for name in sorted(zan_flags, key=str.lower):
         table, cls, field = zan_flags[name]
-        uzd = "yes" if name in uzd_flags else "—"
+        cpp_hit = uzd_flags.get(name)
+        zs_kind = uzd_zs_flags.get(name.upper())
+        # A real flag on either side wins; otherwise a dummy/`none, 0` hit is a no-op.
+        if (cpp_hit and cpp_hit[1] != "(dummy)") or zs_kind in ("flag", "deprecated"):
+            uzd = "yes"
+        elif cpp_hit or zs_kind == "noop":
+            uzd = "no-op"
+        else:
+            uzd = "—"
         tier, notes = curated_cell(decorate_dir, "notes", name.lower())
         rows.append([name, table, cls, field, "yes", uzd, tier or "", notes or ""])
 
@@ -283,7 +363,13 @@ def gen_decorate_flags(check):
         "`DEFINE_DEPRECATED_FLAG`/`DEFINE_DUMMY_FLAG` across its five flag tables), "
         "cross-referenced against the UZDoom source's `src/scripting/thingdef_data.cpp` by name "
         "for the `UZD` column (also matching UZDoom-only `DEFINE_PROTECTED_FLAG`/"
-        "`DEFINE_PROTECTED_FLAG2`/`DEFINE_FLAG2_DEPRECATED`) -- do not hand-edit rows; add a "
+        "`DEFINE_PROTECTED_FLAG2`/`DEFINE_FLAG2_DEPRECATED`) and every ZScript `flagdef` "
+        "declaration under `wadsrc/static/zscript/` (case-insensitive name match; where most "
+        "Inventory/Weapon/PowerSpeed flags moved). `UZD: no-op` means UZDoom accepts the flag "
+        "name but does nothing with it: a C++ `DEFINE_DUMMY_FLAG`, or a `flagdef` whose storage "
+        "field is `none` with bit 0. A `none` flagdef with a nonzero bit is a remapped "
+        "deprecated flag and reads `yes`, same as C++ `DEFINE_DEPRECATED_FLAG` -- do not "
+        "hand-edit rows; add a "
         "`../notes/<flag>.md` file and its `Tier`/`Notes` cell is picked up automatically from "
         "that file's own `Tier:` stamp on the next regen. Extraction reads the Zandronum source "
         "as its base (confirmed present for every row); UZDoom presence is a name "
@@ -504,7 +590,7 @@ def gen_decorate_properties(check):
 # decorate-actions
 # ---------------------------------------------------------------------------
 
-ACTION_FUNC_RE = re.compile(r'^DEFINE_ACTION_FUNCTION(_PARAMS)?\(\s*(\w+)\s*,\s*(\w+)\s*\)', re.M)
+ACTION_FUNC_RE = re.compile(r'^DEFINE_ACTION_FUNCTION(_PARAMS)?\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)', re.M)
 
 # ZScript method declaration for a known action name: optional modifier keywords, one or more
 # comma-separated return types (ZScript allows multi-value returns, e.g. `bool, Actor
@@ -754,6 +840,68 @@ def gen_console_ccmds(check):
     text, stats = build_inventory_file("Console commands (CCMDs)", note, header, rows, path,
                                         ["Tier", "Notes"], defaults={"Tier": "C"})
     emit_diff_report("console-ccmds", stats)
+    return write_or_check(path, text, check)
+
+
+# ---------------------------------------------------------------------------
+# bots-commands -- Zandronum-only, single source file (no UZDoom counterpart,
+# so no Zan/UZD columns the way console-cvars/console-ccmds have).
+# ---------------------------------------------------------------------------
+
+BOTCMD_TABLE_RE = re.compile(r'BOTCMD_s\s+g_BotCommands\[NUM_BOTCMDS\]\s*=\s*\n?\{(.*?)\n\};', re.S)
+BOTCMD_ROW_RE = re.compile(
+    r'\{\s*"(\w+)"\s*,\s*(\w+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(RETURNVAL_\w+)\s*\}'
+)
+
+
+def _extract_botcmds_from_file(path):
+    """Return {name: (handler, num_args, num_string_args, return_type)} for every row of
+    g_BotCommands[NUM_BOTCMDS] -- a single named table in one file, not a tree walk (unlike
+    cvars/ccmds, which are declared all over src/)."""
+    text = path.read_text()
+    m = BOTCMD_TABLE_RE.search(text)
+    if m is None:
+        print(f"gen_inventory.py: 'BOTCMD_s g_BotCommands[NUM_BOTCMDS]' not found in {path} -- "
+              f"extractor regex likely stale against upstream source", file=sys.stderr)
+        sys.exit(1)
+    out = {}
+    for rm in BOTCMD_ROW_RE.finditer(m.group(1)):
+        name, handler, num_args, num_string_args, ret = rm.groups()
+        out[name] = (handler, num_args, num_string_args, ret)
+    return _require_names(path, out)
+
+
+def gen_bots_commands(check):
+    zan_file = source_root("zandronum") / "src" / "botcommands.cpp"
+    botcmds = _extract_botcmds_from_file(zan_file)
+
+    bots_dir = ROOT / "bots"
+    header = ["Command", "Args", "StringArgs", "Returns", "Tier", "Notes"]
+    rows = []
+    for name in sorted(botcmds, key=str.lower):
+        _handler, num_args, num_string_args, ret = botcmds[name]
+        returns = ret[len("RETURNVAL_"):] if ret.startswith("RETURNVAL_") else ret
+        tier, notes = curated_cell(bots_dir, "notes", name.lower())
+        rows.append([name, num_args, num_string_args, returns, tier or "", notes or ""])
+
+    note = (
+        "**Generated:** by `python3 tools/gen_inventory.py bots-commands` from the Zandronum "
+        "source's `src/botcommands.cpp` (`g_BotCommands[NUM_BOTCMDS]`, a single named table -- "
+        "the bot command set lives nowhere else, unlike cvars/ccmds which are declared tree-wide). "
+        "No `Zan`/`UZD` columns: this section is Zandronum-only, with no UZDoom counterpart at "
+        "all -- see `../AGENTS.md`. `Args`/`StringArgs` are `lNumArgs`/`lNumStringArgs` (the "
+        "int-stack and string-stack argument counts `BOTCMD_RunCommand` enforces before "
+        "dispatching); `Returns` is the row's `ReturnType` with its `RETURNVAL_` prefix stripped. "
+        "Do not hand-edit rows; add a `../notes/<name>.md` file instead -- its `Tier`/`Notes` cell "
+        "is picked up automatically on the next regen. A handler's actual behavior beyond "
+        "arity/return type -- argument semantics, failure behavior -- requires reading "
+        "`botcmd_<Name>` in `botcommands.cpp` directly until a `notes/` file exists for it. "
+        "**Tier:** per row (defaults to C until a `notes/` file promotes it)."
+    )
+    path = ROOT / "bots" / "inventory" / "bot-commands.md"
+    text, stats = build_inventory_file("Bot commands", note, header, rows, path,
+                                        ["Tier", "Notes"], defaults={"Tier": "C"})
+    emit_diff_report("bots-commands", stats)
     return write_or_check(path, text, check)
 
 
@@ -1031,6 +1179,7 @@ TARGETS = {
     "decorate-actions": gen_decorate_actions,
     "console-cvars": gen_console_cvars,
     "console-ccmds": gen_console_ccmds,
+    "bots-commands": gen_bots_commands,
     "acs-signatures": gen_acs_signatures,
 }
 

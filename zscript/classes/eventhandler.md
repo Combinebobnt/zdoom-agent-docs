@@ -250,6 +250,8 @@ void NetworkCommandProcess(NetworkCommand cmd) — Called for network commands s
    NetworkCommand allows sending arbitrary typed data (int8/16/32, float/double, string).
    Call cmd.ReadInt(), cmd.ReadDouble(), cmd.ReadString(), etc. to parse incoming data.
    Also provides Read*Array() methods for array deserialization.
+   A sized command has a real, lower-than-expected safe payload ceiling before MAX_MSGLEN is
+   even in play — see "Network command and buffer size limits" below.
 ```
 
 ### Actor replacement
@@ -356,7 +358,7 @@ All handlers expose:
 
 **EventHandler.SendNetworkEvent vs. SendNetworkCommand:** The old `SendNetworkEvent` allows three integers plus a string-embedded-in-name workaround. The newer `SendNetworkCommand` (4.12+) sends arbitrary typed data more cleanly. Both fire corresponding `NetworkProcess` handlers; they are functionally similar but `SendNetworkCommand` is more flexible.
 
-**Note on 4.12 networking API:** The `NetworkCommand`, `NetworkBuffer`, `SendNetworkCommand`, `SendNetworkBuffer`, and `NetworkCommandProcess` features were verified to exist in UZDoom 4.15pre, and their declarations are unchanged (still present, byte-for-byte, modulo whitespace) as of 5.0.0-pre; their precise semantics under network conditions (lag, packet loss, order guarantees) were not exhaustively traced either time. Behavior is described from source inspection; consult the UZDoom source or experimental testing for edge cases.
+**Note on 4.12 networking API:** The `NetworkCommand`, `NetworkBuffer`, `SendNetworkCommand`, `SendNetworkBuffer`, and `NetworkCommandProcess` features were verified to exist in UZDoom 4.15pre, and their declarations are unchanged (still present, byte-for-byte, modulo whitespace) as of 5.0.0-pre; their precise semantics under network conditions (lag, packet loss, order guarantees) were not exhaustively traced either time. Behavior is described from source inspection; consult the UZDoom source or experimental testing for edge cases. Two pieces of that gap are now narrowed rather than filled — a real size-encoding bug capping usable payload size (see [Network command and buffer size limits](../concepts/network-command-size-limits.md)) and the actual, narrower-than-it-sounds coverage of the engine's built-in desync detector (see [Consistency checking](../concepts/consistency-checking.md)) — but this is not exhaustive network-conditions coverage of this API surface either.
 
 ## Serialization note
 

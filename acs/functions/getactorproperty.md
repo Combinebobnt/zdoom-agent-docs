@@ -2,9 +2,9 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** wiki page `GetActorProperty - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28,
-`https://zdoom.org/w/index.php?title=GetActorProperty&oldid=36601`) + source-verified against `p_acs.cpp:4921-5007`/`12369-12372`, `p_acs.h:384-421`,
+`https://zdoom.org/w/index.php?title=GetActorProperty&oldid=36601`) + source-verified against `p_acs.cpp:4921-5014`/`12369-12372`, `p_acs.h:384-427`,
 `actor.h`, `d_player.h`, `zt-bcc/lib/zcommon.bcs:266-320`. Wiki/fork discrepancy (seven
 compile-but-dead `APROP_*` names) recorded below rather than silently trusted or overridden.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
@@ -12,7 +12,7 @@ compile-but-dead `APROP_*` names) recorded below rather than silently trusted or
 
 Reads a property off a single actor by TID. Compiler builtin (`PCD_GETACTORPROPERTY`,
 the Zandronum source's `src/p_acs.cpp:12369-12372`), implementation in
-`DLevelScript::GetActorProperty` (`p_acs.cpp:4921-5007`).
+`DLevelScript::GetActorProperty` (`p_acs.cpp:4921-5014`).
 
 - `tid` — actor's thing ID. **`0` means "the activator"** (`SingleActorFromTID`, `p_acs.cpp:4445`:
   `if (tid == 0) return defactor;` where `defactor` is the activator) — matches the wiki, and is
@@ -22,9 +22,45 @@ the Zandronum source's `src/p_acs.cpp:12369-12372`), implementation in
   enum exists at all**, which invites hardcoding raw integers unnecessarily — always use the
   named constant.
 - **If `tid` doesn't resolve to an actor, or `property` isn't one Zandronum's switch handles,
-  both cases silently return `0`** (`p_acs.cpp:4923-4926`, `default: return 0;` at the end of the
-  switch) — indistinguishable from each other, and indistinguishable from a genuinely-zero
-  property value.
+  both cases silently return `0`** (the null-actor check at `p_acs.cpp:4925-4927`; the switch's
+  `default: return 0;` at `p_acs.cpp:5014`) — indistinguishable from each other, and
+  indistinguishable from a genuinely-zero property value.
+
+## The three TID getters conflate "no such actor" with "that actor has TID 0"
+
+`APROP_MASTERTID`, `APROP_TARGETTID` and `APROP_TRACERTID` each return the named actor's `tid`
+field, or `0` when there is no such actor. Since `0` is also a perfectly ordinary TID value, and
+most actors in a map carry no TID at all, a `0` result is genuinely ambiguous:
+
+- the actor has no master/target/tracer, **or**
+- it has one, and that actor's TID is `0`.
+
+Nothing in the return distinguishes them, and the ambiguity is invisible at the call site because
+the function's declared return type is `raw`. This is the same shape as the unsupported-property
+conflation above, but it arises from a supported property returning a legitimate value, so it
+cannot be avoided by checking the property is valid.
+
+The workable test is to ask the pointer question directly instead of via a TID, using
+[IsPointerEqual](ispointerequal.md) against `AAPTR_NULL`, which compares resolved actor pointers
+and never routes through a TID. Only fall back to reading the TID when you specifically need the
+number, and only in a context where you already know the actor is tagged.
+
+For what actually sets `APROP_TARGETTID`'s underlying field during gameplay — damage retaliation,
+and `AActor::Die`'s unconditional overwrite — see [Damage retaliation: what writes a monster's
+`target` during
+gameplay](../../shared/concepts/monster-target-retaliation.md).
+
+**`APROP_MASTERTID` carries an extra wrinkle the other two do not.** Its getter is not a plain
+field read: when `master` is null it falls back to the actor's `FriendPlayer` player pawn's TID
+(`DoGetMasterTID` in `src/p_acs.cpp`, cited by symbol because that file is commonly patched
+locally). So a non-zero result does not prove the actor has a master at all, since it may be
+reporting a friend player, and a `0` result means "no master *and* no friend player". Do not read
+it as a symmetrical counterpart to the other two.
+
+**Provenance:** source-verified directly against the Zandronum source (no wiki starting point for
+this section): the `APROP_MasterTID`/`TargetTID`/`TracerTID` cases in `GetActorProperty`'s switch
+and `DoGetMasterTID`, both in `src/p_acs.cpp` and cited by symbol rather than line because that
+file commonly carries local patches.
 
 ## The `raw` return type hides three different real types — this is the load-bearing gap
 
@@ -39,7 +75,9 @@ actual field types in the Zandronum source's `src/actor.h`/`d_player.h`:
   legacy-style index, not a fixed value), `APROP_STENCILCOLOR` (`DWORD fillcolor`, a packed color,
   not fixed-point despite being numeric), and all the boolean-flag properties (`APROP_AMBUSH`,
   `INVULNERABLE`, `DROPPED`, `CHASEGOAL`, `FRIGHTENED`, `FRIENDLY`, `NOTARGET`, `NOTRIGGER`,
-  `DORMANT`) as `0`/`1`.
+  `DORMANT`) as `0`/`1`. `APROP_INVULNERABLE`'s *write* side (`SetActorProperty`) has an
+  engine-cooperation gotcha of its own — see `functions/setactorproperty.md`'s
+  "`APROP_Invulnerable`'s write path has no cooperating-source guard" section.
 - **`fixed_t` (fixed-point, `FRACUNIT`=65536=`1.0`) — must be treated as `fixed`, not `int`, or
   the raw value is off by 65536×:** `APROP_SPEED` (`actor.h:1125`), `APROP_ALPHA` (`actor.h:980`),
   `APROP_DAMAGEFACTOR` (`actor.h:1133`), `APROP_GRAVITY` (`actor.h:1076`), `APROP_SCALEX`/`SCALEY`
@@ -47,12 +85,12 @@ actual field types in the Zandronum source's `src/actor.h`/`d_player.h`:
   and the player-only `APROP_JUMPZ`/`VIEWHEIGHT`/`ATTACKZOFFSET` (`d_player.h:154-163`). None of
   this is discoverable from the `raw GetActorProperty(int, int)` signature — the wiki's per-property
   type column is the only source for it, and it does check out against every field above.
-- **String handle (`GlobalACSStrings.AddString(...)`, `p_acs.cpp:4999-5005`) — must be assigned to
+- **String handle (`GlobalACSStrings.AddString(...)`, `p_acs.cpp:5005-5011`) — must be assigned to
   a `str`, not `int`:** `APROP_SEESOUND`/`ATTACKSOUND`/`PAINSOUND`/`DEATHSOUND`/`ACTIVESOUND`,
-  `APROP_SPECIES`, `APROP_NAMETAG`. (The engine's own enum comment, `p_acs.h:389`, says
+  `APROP_SPECIES`, `APROP_NAMETAG`. (The engine's own enum comment, `p_acs.h:391`, says
   "Sounds can only be set, not gotten" — that note is about an inconsistency with
   `SetActorProperty`'s sibling switch; `GetActorProperty` does implement a read path for sounds
-  regardless, confirmed by the case existing at `p_acs.cpp:4999`.)
+  regardless, confirmed by the case existing at `p_acs.cpp:5005`.)
 
 ## Wiki/engine divergence: properties Zandronum doesn't actually support
 
@@ -61,8 +99,8 @@ The wiki page for `GetActorProperty` (generic ZDoom/GZDoom target) additionally 
 `APROP_MaxDropOffHeight`, `APROP_MaxStepHeight`, and `APROP_SoundClass`. **zt-bcc's `zcommon.bcs`
 does define BCS-side names for all of these** (`APROP_FRICTION` through `APROP_FRIENDLYSEEBLOCKS`,
 `zcommon.bcs:305-311`, immediately after `APROP_STENCILCOLOR`) — so they compile fine and look
-legitimate — **but Zandronum's engine-side enum (`p_acs.h:384-421`) and `GetActorProperty`'s
-switch (`p_acs.cpp:4921-5007`) stop at `APROP_StencilColor = 41` and never implement any of
+legitimate — **but Zandronum's engine-side enum (`p_acs.h:384-427`) and `GetActorProperty`'s
+switch (`p_acs.cpp:4921-5014`) stop at `APROP_StencilColor = 41` and never implement any of
 them.** Calling `GetActorProperty` with any of these seven names, or the Eternity-only
 `APROP_COUNTER0`-`COUNTER7` (`zcommon.bcs:313-320`, value `100`+), silently falls through to
 `default: return 0;` — same as a typo'd property, with no compiler or runtime warning that the
@@ -100,9 +138,9 @@ given:
   read of `->accuracy`/`->stamina` in the engine shows every one of them is gated to a **player
   pawn** context — Strife weapon spread (`src/g_strife/a_strifeweapons.cpp`), Strife pickups
   (`src/g_strife/a_strifeitems.cpp`), HUD/SBARINFO display, max-health math
-  (`src/g_shared/a_pickups.cpp`), the targeter powerup (`src/g_shared/a_artifacts.cpp`), and player
-  respawn restore (`src/p_user.cpp`). Nothing in the engine reads either field on a non-player
-  actor. That makes both fields usable as generic free integer tags on a monster/non-player
+  (`src/g_shared/a_pickups.cpp`), the targeter powerup (`src/g_shared/a_artifacts.cpp`), and an
+  old-savegame accuracy/stamina compatibility restore in `player_t::Serialize` (`src/p_user.cpp`).
+  Nothing in the engine reads either field on a non-player actor. That makes both fields usable as generic free integer tags on a monster/non-player
   DECORATE definition with zero engine side effects — as long as the mod's own player class
   doesn't also rely on them for their original Strife-derived purpose.
 - **`APROP_SCORE`** — **not** DECORATE-settable, despite being a perfectly ordinary ACS read

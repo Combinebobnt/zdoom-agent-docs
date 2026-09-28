@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
-**Provenance:** `SetMugShotState - ZDoom Wiki.html` (https://zdoom.org/w/index.php?title=SetMugShotState&oldid=52901), verified 2026-07-29 against the Zandronum source's `src/p_acs.cpp`, `sv_commands.cpp`, `cl_main.cpp`, `g_shared/shared_sbar.cpp`, `g_shared/sbarinfo.cpp`, `g_doom/doom_sbar.cpp`, and `g_shared/sbar_mugshot.cpp`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
+**Provenance:** `SetMugShotState - ZDoom Wiki.html` (https://zdoom.org/w/index.php?title=SetMugShotState&oldid=52901), verified 2026-07-29 against the Zandronum source's `src/p_acs.cpp`, `sv_commands.cpp`, `cl_main.cpp`, `g_shared/shared_sbar.cpp`, `g_shared/sbarinfo.cpp`, `g_doom/doom_sbar.cpp`, and `g_shared/sbar_mugshot.cpp`; corrections backed by `src/d_main.cpp`, `src/g_level.cpp`, `src/network/netcommand.cpp`, `wadsrc/static/sbarinfo.txt`, `wadsrc/static/sbarinfo/*.txt` and `wadsrc/static/mapinfo/heretic.txt`/`hexen.txt`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
@@ -27,25 +27,35 @@ case PCD_SETMUGSHOTSTATE:
 ```
 
 - **Completely activator-independent, and not scoped to one player at all.** Unlike
-  `Print`/`HudMessage`, the opcode never reads `activator`. On a server (`NETSTATE_SERVER`, which
-  — per `network.h:266-282` — covers a dedicated server *and* a listen server hosting), it calls
+  `Print`/`HudMessage`, the opcode never reads `activator`. On a server (`NETSTATE_SERVER`,
+  `network.h:266-282`, set by `-host` at the Zandronum source's `src/d_main.cpp:2428-2429`), which
+  never creates a status bar of its own (`src/g_level.cpp:496-497`), it calls
   `SERVERCOMMANDS_SetMugShotState(statename)`
   (the Zandronum source's `src/sv_commands.cpp:5178-5185`), which does
-  `NetCommand(...).sendCommandToClients()` with **no player argument** — the default
+  `NetCommand(...).sendCommandToClients()` with **no player argument**. The default
   (`ulPlayerExtra = MAXPLAYERS, flags = 0`, the Zandronum source's `src/network/netcommand.h:109`)
-  broadcasts to *every* connected client, unconditionally. There is no per-player targeting
+  broadcasts to every connected client. The only clients skipped are ones still joining the
+  current level (`CLS_SPAWNED_BUT_NEEDS_AUTHENTICATION`), since a no-target, no-flag send gets
+  `SVCF_SKIP_CLIENTS_WITHOUT_FULLUPDATE` added (`src/network/netcommand.cpp:79-80,307-308`), and
+  the state is not replayed to them later. There is no per-player targeting
   parameter and no way to change only the calling player's own mugshot from server-side ACS — one
   `SetMugShotState()` call changes every connected client's status bar face at once. Each client
   applies it independently on receipt (`SVC2_SETMUGSHOTSTATE` in
   the Zandronum source's `src/cl_main.cpp:2351-2360`, `StatusBar->SetMugShotState(statename)` on that
   client's own local `StatusBar`). This broadcast-to-everyone behavior is not mentioned anywhere
   on the wiki page, which only shows a single-player example.
-- When *not* running as a server (singleplayer, or executed by a `CLIENTSIDE` script on a client),
-  the `else if` branch runs instead and sets the local `StatusBar` directly with no networking at
-  all — this is the only path that actually is "just this one player."
+- When *not* running as a server (singleplayer, an offline bot game in `NETSTATE_SINGLE_MULTIPLAYER`,
+  or any script a client runs locally, normally a `CLIENTSIDE` one), the `else if` branch runs
+  instead and sets the local `StatusBar` directly with no networking at all. This is the only path
+  that actually is "just this one player."
 - `state` is looked up via `FBehavior::StaticLookupString` the same as any other string-arg
-  builtin (an invalid/out-of-range string handle resolves to whatever `StaticLookupString`
-  returns for that case, not a crash).
+  builtin. An invalid or out-of-range string handle resolves to `NULL`
+  (the Zandronum source's `src/p_acs.cpp:3318-3355`). On a server that just sends an empty name
+  (`NetCommand::addString` treats `NULL` as length 0, `src/network/netcommand.cpp:221-233`),
+  which clients ignore as an unknown state. Offline or on a client, a status bar that forwards to
+  `FMugShot::SetState` misses the lookup and then calls `strchr` on the null pointer
+  (`src/g_shared/sbar_mugshot.cpp:303`). That is undefined behavior (a null-pointer read, likely a
+  crash), not a safe no-op.
 
 ## Whether the named state existing matters, and what happens if it doesn't (silent no-op, not a fallback)
 
@@ -54,17 +64,30 @@ case PCD_SETMUGSHOTSTATE:
 `DBaseStatusBar::SetMugShotState(const char*, bool, bool) { }`). It is overridden in exactly two
 places:
 
-- `DSBarInfo` (SBARINFO-defined status bars,
-  the Zandronum source's `src/g_shared/sbarinfo.cpp:1146-1149`) — any game using a SBARINFO lump.
+- `DSBarInfo` (SBARINFO-driven status bars,
+  the Zandronum source's `src/g_shared/sbarinfo.cpp:1146-1149`).
 - Doom's own **native, non-SBARINFO** status bar
   (the Zandronum source's `src/g_doom/doom_sbar.cpp:1367-1370`, and also used to draw the classic
-  face via `MugShot.GetFace(...)` at line 1350) — so this works out of the box on Doom even
+  face via `MugShot.GetFace(...)` at line 1350). So this works out of the box on Doom even
   without a custom SBARINFO lump, contrary to what "as defined in SBARINFO" in the wiki's own
   wording might suggest.
 
-No override exists for Heretic/Hexen/Strife's native status bars in Zandronum — on those games,
-absent a SBARINFO lump, `SetMugShotState` silently does nothing at all (hits the base no-op),
-not a fallback to a default face.
+Which bar a game gets is decided by Zandronum's `CreateStatusBar`
+(`src/g_shared/sbarinfo.cpp:1575-1620`). The stock `zandronum.pk3` ships a root `SBARINFO` lump
+holding the default mugshot state definitions (`wadsrc/static/sbarinfo.txt`), so the
+custom-lump branch always runs. The parsed game type defaults to the running game
+(`sbarinfo.cpp:471`); a mod SBARINFO's `base` line, or a `statusbar` block without one, changes it:
+
+- Stock Doom and Chex get the native Doom bar (`sbarinfo.cpp:1583-1587`). The override applies.
+- Heretic and Hexen have no native bars in Zandronum. Their stock bars are SBARINFO scripts
+  (`wadsrc/static/mapinfo/heretic.txt:28`, `hexen.txt:30`) run through `DSBarInfo`, so the state
+  is set, but neither `sbarinfo/heretic.txt` nor `sbarinfo/hexen.txt` draws a mugshot, so nothing
+  visible changes unless a mod's SBARINFO adds `drawmugshot`.
+- Strife (or a mod SBARINFO with `base Strife`) gets the native Strife bar
+  (`sbarinfo.cpp:1590-1593`), which has no override. `SetMugShotState` silently does
+  nothing at all there (the base no-op), not a fallback to a default face.
+- A custom SBARINFO with its own `statusbar` block and no `base` gets `DSBarInfo`, and the
+  override applies.
 
 Both overrides just forward to `FMugShot::SetState`
 (the Zandronum source's `src/g_shared/sbar_mugshot.cpp:296-332`), which is where "state doesn't
@@ -91,10 +114,16 @@ giving up.
 If the state *is* found and differs from the currently-playing one, it always switches
 immediately and resets the new state's animation — the ACS builtin only ever supplies the
 `state_name` argument, so `wait_till_done` and `reset` both use the virtual's own defaults
-(`false`, `false`; declared in the Zandronum source's `src/g_shared/sbar.h:374`). Calling
-`SetMugShotState` again with the *same* state name that's already playing is a safe no-op that
-does **not** restart its animation (`reset` is `false`), unlike what "sets the state" might
-suggest.
+(`false`, `false`; declared in the Zandronum source's `src/g_shared/sbar.h:373`). Calling
+`SetMugShotState` again with the *same* state name that's already playing does **not** restart
+its animation (`reset` is `false`), unlike what "sets the state" might suggest. It still clears
+the mugshot's internal normal/ouch flags (`sbar_mugshot.cpp:314-315`), which keeps the automatic
+normal/god face from being reasserted until the current state finishes.
+
+The set state plays until it finishes (`FMugShot::Tick`, `sbar_mugshot.cpp:256-267`). The
+player's own status can still replace it earlier: taking damage, the evil grin, and death switch
+the face immediately, and the rampage face waits for it to finish (`FMugShot::UpdateState`,
+`sbar_mugshot.cpp:341-483`).
 
 ## Engine-family divergence: activator-scoped and view-gated, not a client-broadcast, and inert on every stock status bar
 

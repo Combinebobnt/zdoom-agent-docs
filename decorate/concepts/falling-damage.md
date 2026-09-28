@@ -2,11 +2,12 @@
 
 **Tier:** B
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-17)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** Source-derived (no wiki page consulted) — verified against the Zandronum source's
 `src/p_mobj.cpp` (`P_MonsterFallingDamage`, `P_ZMovement`, `P_XYMovement`), `src/p_user.cpp`
 (`P_FallingDamage`), `src/p_interaction.cpp` (`P_DamageMobj`'s server-only `Die()` call), `src/
-g_level.h` (`LEVEL2_MONSTERFALLINGDAMAGE`), and `src/r_defs.h` (`SECF_NOFALLINGDAMAGE`).
+g_level.h` (`LEVEL2_MONSTERFALLINGDAMAGE`), `src/r_defs.h` (`SECF_NOFALLINGDAMAGE`), and
+`src/p_lnspec.cpp` (`LS_Sector_ChangeFlags`, the runtime sector-flag writer).
 
 Both engines compute falling damage for monsters and for players through two entirely separate
 functions with different gates, different formulas, and — most importantly — different failure
@@ -19,15 +20,17 @@ Zandronum's doesn't have — see the engine-family divergence sections below.
 ## Two unrelated code paths
 
 - **`P_FallingDamage`** (`src/p_user.cpp`) — the player path. Gated on `dmflags`/`level.flags`
-  (`DF_FORCE_FALLINGZD`/`DF_FORCE_FALLINGHX`/`DF_FORCE_FALLINGST`; damage is a no-op if none of the
-  three bits is set), with three separate formulas (ZDoom-style, Hexen-style, and Strife-style)
+  (`DF_FORCE_FALLINGZD`/`DF_FORCE_FALLINGHX`/`DF_FORCE_FALLINGST`. These are a two-bit field, not
+  three bits: `DF_FORCE_FALLINGST` is both of the other two bits set together, `3 << 3`. Damage is
+  a no-op if neither bit is set), with three separate formulas (ZDoom-style, Hexen-style, and Strife-style)
   selected by whichever flag is active — a plain undercount in an earlier version of this file,
   which named only the first two; confirmed present and identical in structure on both engine
   checkouts. The ZDoom- and Hexen-style formulas each have their own "automatic death" threshold at
   extreme velocity (a `TELEFRAG_DAMAGE`, i.e. `1000000`-damage, hit), but the Hexen-style formula
-  additionally applies a **no-death threshold**: below `velz < -39*FRACUNIT`, damage is clamped to
-  `actor->health - 1`, i.e. a fall that would otherwise kill leaves the player alive at 1 HP
-  instead, unless the fall was fast enough to bypass the clamp. The Strife-style formula has no
+  additionally applies a **no-death threshold**: when the fall is slower than 39 units/tic
+  (`velz > -39*FRACUNIT`), damage that exceeds the player's health is clamped to
+  `actor->health - 1`, unless health is already 1. A fall that would otherwise kill leaves the
+  player alive at 1 HP. A fall at 39 units/tic or faster skips the clamp and can kill. The Strife-style formula has no
   automatic-death case at all — it's a straight linear scale of `vel`.
 - **`P_MonsterFallingDamage`** (`src/p_mobj.cpp`) — the monster path, called from `P_ZMovement` for
   any actor with `MF3_ISMONSTER` landing at `velz < -23*FRACUNIT`. Gated on the **level flag**
@@ -66,16 +69,20 @@ level flag:
   use a named map lump (`map map01 "..."`) rather than a bare number (`map 1 "..."`) — the latter
   form is what triggers the retraction-defeating `HexenHack` path in the first place.
 
-## A per-sector escape exists, but it's map-format-only
+## A per-sector escape exists, but only for tagged sectors at runtime
 
 Both falling-damage functions also check `floorsector->Flags & SECF_NOFALLINGDAMAGE`
 (`src/r_defs.h`) before doing anything else, and return immediately if it's set — this applies
 independently of the `LEVEL2_MONSTERFALLINGDAMAGE` level flag, per landing sector rather than per
-map. It's set via a UDMF sector property (`p_udmf.cpp`'s `nofallingdamage` key) at map-compile
-time; nothing in `src/p_acs.cpp` sets or clears this sector flag bit at runtime either, so like the
-level flag, it's a mapper-time lever, not an ACS-reachable one. It's a viable mitigation only for
-sectors a map author controls directly (e.g. re-exporting/patching a map's own sector data), not
-for suppressing the effect on arbitrary IWAD geometry from a PWAD.
+map. A map can set it statically via a UDMF sector property (`p_udmf.cpp`'s `nofallingdamage`
+key). Unlike the level flag, it is also reachable at runtime, on both engines: the action special
+`Sector_ChangeFlags(tag, set, clear)` (special 54, `LS_Sector_ChangeFlags` in `src/p_lnspec.cpp`)
+ORs and clears arbitrary bits in `Flags` on every sector with that tag. ACS can call it like any
+other special, so `Sector_ChangeFlags(tag, 2, 0)` sets `SECF_NOFALLINGDAMAGE` (value 2) live.
+Zandronum applies no mask to the bits. UZDoom only masks out the secret-sector bits
+(`SECF_NOMODIFY`), which do not include this one. The special exists at Zandronum 3.2.1 too.
+The limit is the tag: the special returns without doing anything for tag 0, so it reaches only
+sectors that carry a nonzero tag. Untagged IWAD geometry is out of its reach from a PWAD.
 
 ## `DamageFactor` is a working mitigation on Zandronum; `+INVULNERABLE` is not, on either engine
 

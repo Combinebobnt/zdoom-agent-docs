@@ -2,7 +2,7 @@
 
 **Tier:** A for all eight.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-06)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** ZDoom Wiki `GetCVar (ACS)` (https://zdoom.org/w/index.php?title=GetCVar_%28ACS%29&oldid=52409, retrieved 2026-08-06), `SetCVar (ACS)` (https://zdoom.org/w/index.php?title=SetCVar_%28ACS%29&oldid=45546, retrieved 2026-08-07), `GetCVarString (ACS)` (https://zdoom.org/w/index.php?title=GetCVarString_%28ACS%29&oldid=45557, retrieved 2026-08-06), `SetCVarString` (https://zdoom.org/w/index.php?title=SetCVarString&oldid=40915, retrieved 2026-08-07), `GetUserCVar` (https://zdoom.org/w/index.php?title=GetUserCVar&oldid=45562, retrieved 2026-08-07), `GetUserCVarString (ACS)` (https://zdoom.org/w/index.php?title=GetUserCVarString_%28ACS%29&oldid=45555, retrieved 2026-08-07), `SetUserCVar (ACS)` (https://zdoom.org/w/index.php?title=SetUserCVar_%28ACS%29&oldid=45548, retrieved 2026-08-07), `SetUserCVarString (ACS)` (https://zdoom.org/w/index.php?title=SetUserCVarString_%28ACS%29&oldid=45550, retrieved 2026-08-07). Wiki-derived and source-verified against the Zandronum source's `src/p_acs.cpp:5655-5810` (shared helpers) and `:6385-6432` (ACSF dispatchers), `:12502-12504` (PCD_GETCVAR), `:3318-3330` (StaticLookupString) — final source verification pass 2026-08-07.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `GetCVar` (int-returning form) is a compiler builtin (`PCD_GETCVAR`,

@@ -1,9 +1,10 @@
 # Doc archetypes
 
 Every section (`acs/`, `decorate/`, `zscript/`, `mapinfo/`, `gldefs/`, `sbarinfo/`, `cvarinfo/`,
-`console/`, `sprites/`, and any lump-format section added later) is built from three archetypes.
+`menudef/`, `console/`, `sprites/`, `bots/`, `zandronum-lumps/`, `netcode/`, and any lump-format section added
+later) is built from three archetypes.
 Assigning a knowledge area to an archetype — rather than inventing a bespoke layout per section —
-is what keeps nine sections maintainable as one system. A section's own `AGENTS.md` says which of
+is what keeps thirteen sections maintainable as one system. A section's own `AGENTS.md` says which of
 its directories map to which archetype; this file is the schema each archetype follows, shared
 everywhere. See `shared/AUTHORING.md` for the rules (tiers, engine scope, licensing, project-
 agnosticism) that apply to content in every archetype below.
@@ -23,7 +24,7 @@ applies. Header block goes directly under the H1, one field per line, in this or
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @fbad53bff5 (2026-08-08); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** UZDoom 5.0.0-pre @fbad53bff5 (2026-08-08); Zandronum 3.3-alpha @bdd0f7beb (2026-07-28)
 **Provenance:** ZDoom Wiki `CheckFlag` (retrieved 2026-07-29, oldid=44244) + verified against
 the Zandronum source's `src/p_acs.cpp:6802-6810`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation
@@ -51,7 +52,8 @@ Checks whether an actor with a given TID has a specified actor flag set.
 `tools/lint_docs.py` hard-errors on a file carrying only half the pair, and on the legacy
 single-field `**Engine:**` form the UZDoom retarget's Phase 5 sweep fully retired (completed
 2026-08-17) — don't add one. Stamp a real version, SHA and date from a checkout you actually read;
-don't invent a SHA to look verified.
+don't invent a SHA to look verified. The SHA must be on the engine's upstream history, never a
+local fork commit (see `shared/AUTHORING.md`'s "Engine scope").
 
 - The H1 is the signature (or, for a family file, the topic name — see the section's own
   convention for family H1s).
@@ -136,7 +138,7 @@ Authoring-rule bar as archetype 1:
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-07-28)
 **Provenance:** ...
 
 Prose that earns its cost per the Authoring rule — parameter/argument semantics, interaction with
@@ -157,7 +159,7 @@ Same header-block position and fields as archetype 1, no signature H1 — just a
 
 **Tier:** B
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @fbad53bff5 (2026-08-08); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** UZDoom 5.0.0-pre @fbad53bff5 (2026-08-08); Zandronum 3.3-alpha @bdd0f7beb (2026-07-28)
 **Provenance:** ...
 
 Prose.

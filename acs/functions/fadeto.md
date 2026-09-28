@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
-**Provenance:** ZDoom Wiki (saved 2026-07-29, https://zdoom.org/w/index.php?title=FadeTo&oldid=47784), verified against the Zandronum source's `src/p_acs.cpp` lines 4273–4352 and 11949–11952
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
+**Provenance:** ZDoom Wiki (saved 2026-07-29, https://zdoom.org/w/index.php?title=FadeTo&oldid=47784), verified against the Zandronum source's `src/p_acs.cpp` lines 4273–4353 and 11949–11952
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Compiler builtin (`PCD_FADETO`)
 

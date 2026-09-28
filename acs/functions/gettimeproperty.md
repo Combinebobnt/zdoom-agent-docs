@@ -2,15 +2,15 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
-**Provenance:** wiki page `GetTimeProperty - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetTimeProperty&oldid=1775`) + source-verified against `p_acs.cpp:7378-7401`, `zt-bcc/lib/zcommon.bcs:1219-1227,1761`, and version-gated against `f614049b4`/`28f736fb3` per shared/AUTHORING.md's "Engine scope" section.
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
+**Provenance:** wiki page `GetTimeProperty - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetTimeProperty&oldid=1775`) + source-verified against `p_acs.cpp:7378-7406`, `zt-bcc/lib/zcommon.bcs:1219-1227,1761`, and version-gated against `f614049b4`/`28f736fb3` per shared/AUTHORING.md's "Engine scope" section.
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
 
 Localizes a Unix timestamp (as returned by `SystemTime()`) into calendar/clock fields and returns
 one requested field. Extension function (`ACSF_GetTimeProperty`, index `-128` in
 the zt-bcc source's `lib/zcommon.bcs:1761`), implementation in `DLevelScript::CallFunction`'s
-`case ACSF_GetTimeProperty:` (the Zandronum source's `src/p_acs.cpp:7378-7401`).
+`case ACSF_GetTimeProperty:` (the Zandronum source's `src/p_acs.cpp:7378-7406`).
 
 Added together with `SystemTime`/`Strftime` in commit `f614049b4` ("Added ACS date and time
 functions SystemTime, GetTimeProperty and Strftime...", 2015-08-30), which is an ancestor of the
@@ -21,16 +21,16 @@ f614049b4 28f736fb3`, verified true) — so this function predates and is presen
 ## Parameters
 
 - `timestamp` — a Unix timestamp (seconds since epoch), typically from `SystemTime()` or a
-  stored/previously-fetched value. Internally cast straight to `time_t` (`p_acs.cpp:7392`,
+  stored/previously-fetched value. Internally cast straight to `time_t` (`p_acs.cpp:7391`,
   `time_t timer = args[0];`) with no clamping — unlike `Strftime`, which clamps a negative
-  timestamp to `0` before use (`p_acs.cpp:7413-7414`). `GetTimeProperty` has no such clamp, so a
+  timestamp to `0` before use (`p_acs.cpp:7415-7416`). `GetTimeProperty` has no such clamp, so a
   negative `timestamp` is passed straight to `localtime`/`gmtime` and its result depends on the
   C library's handling of pre-epoch times.
 - `which` — one of the `TM_*` constants below, selecting which calendar field to return. Any
-  value outside the six documented cases silently falls through to `return 0;`
-  (`p_acs.cpp:7401`) — indistinguishable from a genuinely-zero field (e.g. `TM_SECOND` at
+  value outside the seven documented cases silently falls through to `return 0;`
+  (`p_acs.cpp:7406`) — indistinguishable from a genuinely-zero field (e.g. `TM_SECOND` at
   `:00`, or `TM_MONTH` in January).
-- `utc` — optional (`argCount >= 3 ? !!args[2] : false`, `p_acs.cpp:7393`), defaults to `false`.
+- `utc` — optional (`argCount >= 3 ? !!args[2] : false`, `p_acs.cpp:7392`), defaults to `false`.
   `false`/omitted uses `localtime` (the **server or client machine's local timezone**), `true`
   uses `gmtime` (UTC). This is a real clientside/netcode caveat: if this is evaluated on both
   server and clients (e.g. a `CLIENTSIDE` script) with `utc` false, machines in different
@@ -47,7 +47,7 @@ f614049b4 28f736fb3`, verified true) — so this function predates and is presen
 | `TM_HOUR` | 2 | `tm_hour` | 0-23 |
 | `TM_DAY` | 3 | `tm_mday` | 1-31 |
 | `TM_MONTH` | 4 | `tm_mon` | 0-11 (0 = January) |
-| `TM_YEAR` | 5 | `1900 + tm_year` (`p_acs.cpp:7398`) | full 4-digit year, already offset — do not add 1900 yourself |
+| `TM_YEAR` | 5 | `1900 + tm_year` (`p_acs.cpp:7402`) | full 4-digit year, already offset — do not add 1900 yourself |
 | `TM_WEEKDAY` | 6 | `tm_wday` | 0-6 (0 = Sunday) |
 
 The wiki's stated `TM_YEAR` range of `[1901, 2038]` is just the practical range for a 32-bit
@@ -88,9 +88,10 @@ UZDoom's own ACSF enum reserves for Zandronum's extensions and implements none o
 call silently returns `0` — no error, no log line, script execution just continues with `0` in
 place of whatever calendar field was requested.
 
-That `0` is a real trap here, not just a lost value: `TM_SECOND`, `TM_MONTH`, and `TM_WEEKDAY` are
-all zero-valued constants in this function's own `TM_*` enum, and each has a legitimate in-range
-meaning at `0` (`:00` seconds, January, Sunday) — the same "indistinguishable from a genuinely-zero
+That `0` is a real trap here, not just a lost value: `TM_SECOND`, `TM_MONTH`, and `TM_WEEKDAY`
+each select a field whose own legitimate return value can be `0`, regardless of the `TM_*`
+constant's own numeric value in this function's enum (`:00` seconds, January, Sunday) — the same
+"indistinguishable from a genuinely-zero
 field" ambiguity this file's own Parameters/Return value sections already document for an
 out-of-range `which` on Zandronum itself, except under UZDoom every `which` hits it, including the
 in-range ones. A script checking `GetTimeProperty(SystemTime(), TM_WEEKDAY) == 0` for Sunday, or

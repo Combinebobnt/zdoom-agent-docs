@@ -2,12 +2,12 @@
 
 **Tier:** B
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-16)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** Source-verified against `zt-bcc/src/codegen/expr.c:438,468,487,588,608,615,643`
 (every `BOP_EQ`/`BOP_NE` codegen path emits plain `PCD_EQ`/`PCD_NE`, no type-directed dispatch for
 `str` operands) and `zt-bcc/src/codegen/pcode.c:43`; the Zandronum source's
 `src/p_acs.cpp:9613-9619` (`PCD_EQ`/`PCD_NE`'s VM implementation, raw `STACK(2) == STACK(1)`
-integer comparison) and `src/p_acs.h:82-103`/`src/p_acs.cpp:474-498` (`LIBRARYID_MASK`,
+integer comparison) and `src/p_acs.h:98-103`/`src/p_acs.cpp:474-498` (`LIBRARYID_MASK`,
 `STRPOOL_LIBRARYID_OR`, `ACSStringPool::AddString`); cross-checked identical in the UZDoom source's
 `src/playsim/p_acs.h:82-87` and `src/playsim/p_acs.cpp:985-1017`. Found 2026-08-06 while building
 and runtime-testing (headless, `xvfb-run` + a real engine binary) a fixture for a project unrelated
@@ -33,9 +33,9 @@ string-content awareness (`p_acs.cpp:9613-9619`). Whether that integer compariso
 - **Any runtime-built string** — `StrParam`, string concatenation, `PCD_TAGSTRING`, or (relevant
   to any ACS binding that forwards a ZScript/C++ `FString` back into ACS, e.g. a `ScriptCall`
   bridge returning a `str`) — comes from `GlobalACSStrings`/`ACSStringPool`, whose entries are
-  **unconditionally OR'd with `STRPOOL_LIBRARYID_OR`** (`STRPOOL_LIBRARYID = INT_MAX >> 20`, i.e.
-  every bit of that 12-bit field set) before being returned (`AddString`, both overloads,
-  `p_acs.cpp:985-1017`).
+  **unconditionally OR'd with `STRPOOL_LIBRARYID_OR`** (`STRPOOL_LIBRARYID = INT_MAX >> 20`, the
+  largest 12-bit value a positive `int` can carry, `0x7FF`) before being returned
+  (`AddString`, both overloads, `p_acs.cpp:985-1017`).
 
 `STRPOOL_LIBRARYID` is a reserved sentinel value specifically so pool indices can never collide
 with a real module's library ID — by construction, a literal's index and a pool string's index

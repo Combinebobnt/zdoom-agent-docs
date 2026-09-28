@@ -2,8 +2,8 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
-**Provenance:** wiki page `SetThingSpecial - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=SetThingSpecial&oldid=35980`) + source-verified against the Zandronum source (`p_acs.cpp:11525-11581`) and `zt-bcc/src/builtin.c` (signature `setthingspecial = ;ii;rrrrr`). The wiki's basic description (sets the special and arguments for things with the same TID, uses activator if tid is 0) is confirmed in Zandronum. The named-ACS-special handling and network replication are Zandronum-specific additions not on the ZDoom wiki page.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
+**Provenance:** wiki page `SetThingSpecial - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=SetThingSpecial&oldid=35980`) + source-verified against the Zandronum source (`p_acs.cpp:11525-11581`) and `zt-bcc/src/builtin.c` (signature `setthingspecial = ;ii;rrrrr`). The wiki's basic description (sets the special and arguments for things with the same TID, uses activator if tid is 0) is confirmed in Zandronum. The named-ACS-special handling (present on both engines) and Zandronum's network replication are not on the ZDoom wiki page.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin (`PCD_*` opcode in `p_acs.cpp`).
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.
@@ -15,6 +15,8 @@ the Zandronum source's `src/p_acs.cpp:11525-11581`. Sets the `special` field and
 `args[0..2]` and is callable from linedef actions, this is ACS-only and sets every argument slot.
 
 ## Signature and behavior
+
+Zandronum's case body, with its `[BB]`/`[BC]` comment lines omitted:
 
 ```cpp
 case PCD_SETTHINGSPECIAL:
@@ -82,13 +84,18 @@ break;
   script special (see `families/script-execution.md` for the `Acs_NamedExecute*` family).
   The `special` value is converted to a real action-special index via the `NamedACSToNormalACS`
   lookup table, and `arg0` is converted from a string-table index to a `-FName(...)` string
-  name for the script. This is a Zandronum-specific enhancement not documented on the ZDoom
-  wiki page.
+  name for the script. Both engines do this conversion (it is inherited ZDoom code, not a
+  Zandronum addition); the ZDoom wiki page just doesn't document it.
 
 - **Network replication in multiplayer** — on the server (`NETWORK_GetState() == NETSTATE_SERVER`),
   the function calls `SERVERCOMMANDS_SetThingArguments(actor)` for every actor modified (or the
   activator, if `tid=0`). This replicates the argument change to all connected clients. This
-  is Zandronum-specific netcode and also not documented on the wiki.
+  is Zandronum-specific netcode and also not documented on the wiki. Only the five `args`
+  are sent (as full 32-bit values, `protocolspec/spec.things.txt:197-204`); the `special`
+  number itself is never sent, so a client's copy of the actor keeps its old special. An actor
+  with no net ID (`NetID == 0`) is skipped by `EnsureActorHasNetID` (`sv_commands.cpp:99-112`),
+  so clients never see the change for it. Offline, or on a client running the script itself,
+  the change is applied locally with no broadcast.
 
 **Returns:** `void` — no return value.
 

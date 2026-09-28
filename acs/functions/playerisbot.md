@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** ZDoom Wiki (`PlayerIsBot`, `https://zdoom.org/w/index.php?title=PlayerIsBot&oldid=36026`), verified against fork source 2026-07-28.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
@@ -14,7 +14,8 @@ the zt-bcc source's `src/builtin.c:129,277`), implementation in `p_acs.cpp:12403
 - `playernumber` — a player slot index. **The wiki's "[0..7]" range is a ZDoom-era holdover and
   does not hold in Zandronum**: the Zandronum engine fork raises `MAXPLAYERS` to `64`
   (the Zandronum source's `src/doomdef.h:57`), so the valid range for a Zandronum server is actually
-  `[0, 63]`, not `[0, 7]`. Don't hardcode `8` as a loop bound when iterating players on Zandronum.
+  `[0, 63]`, not `[0, 7]`. UZDoom's `MAXPLAYERS` is also 64 (`src/common/engine/i_net.h:33`). Don't
+  hardcode `8` as a loop bound when iterating players on either engine.
 - **Out-of-range or empty slots are bounds-checked and fail closed, not undefined:** the actual
   case (`p_acs.cpp:12403-12412`) is
   ```cpp

@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** ZDoom Wiki `A_RadiusGive` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_RadiusGive&oldid=52881) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:5833-6002` and `wadsrc/static/actors/constants.txt:174-189`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_RadiusGive)` at `src/thingdef/thingdef_codeptr.cpp:5863`.
@@ -66,7 +66,7 @@ UZDoom's `A_RadiusGive` (`src/playsim/p_actionfunctions.cpp`, `DEFINE_ACTION_FUN
 
 **This is server-authoritative.** On clients:
 
-- **For client-handled actors** (the real predicate is `(pActor->NetworkFlags & NETFL_CLIENTSIDEONLY) || (pActor->NetID == 0)`, `src/network.cpp` — the `+CLIENTSIDEONLY` DECORATE actor flag, or any actor with no network ID; **`MF6_CLIENTSIDE` does not exist in Zandronum**), the function runs and gives items locally.
+- **For client-handled actors** (the real predicate is `(pActor->NetworkFlags & NETFL_CLIENTSIDEONLY) || (pActor->NetID == 0)`, `src/network.cpp:1604` — the `+CLIENTSIDEONLY` DECORATE actor flag, or any actor with no network ID; **`MF6_CLIENTSIDE` does not exist in Zandronum**), the function runs and gives items locally.
 - **For all other actors**, the function returns immediately without giving items. The server separately syncs inventory changes to clients via the engine's netcode.
 
 Spectating players (where `player->bSpectating` is true) are explicitly excluded from the `RGF_PLAYERS` eligibility check, even if the actor has a non-NULL `player` pointer.

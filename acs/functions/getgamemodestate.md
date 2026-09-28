@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** wiki page `GetGameModeState - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetGameModeState&oldid=1288`) + source-verified against `p_acs.cpp:7219-7222`, `gamemode.cpp:594-684, 1170-1184`, `gamemode.h:98-103`, `zt-bcc/lib/zcommon.bcs:1184-1188,1740`, and git ancestry check against `28f736fb3`.
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
@@ -49,7 +49,7 @@ mode is currently active (`gamemode.cpp:594-676`):
   - Cooperative (`GMF_COOPERATIVE` flag set): `WAITFORPLAYERS` when 0 active players;
     `INPROGRESS` when >= 1 active player **and** the end-of-level delay is 0.
   - These modes have no real countdown, so `GAMESTATE_COUNTDOWN` is never returned for them
-    (`IsGameInCountdown()` hard-codes `false` in the `else` branch, `gamemode.cpp:628`).
+    (`IsGameInCountdown()` hard-codes `false` in the `else` branch, `gamemode.cpp:631`).
   - `GAMESTATE_INRESULTSEQUENCE` for these modes is a substitute, defined as "the end-of-level
     delay is currently > 0" (`gamemode.cpp:675`, comment: "As substitute for such a sequence we
     consider whether the game is frozen because of the end level delay").

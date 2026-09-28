@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-06)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** ZDoom Wiki `Functions` (retrieved 2026-08-06, https://zdoom.org/w/index.php?title=Functions&oldid=53571) for base ACS `function` syntax; cross-checked against the zt-bcc wiki's `Functions.md` (BCS extensions); verified against the zt-bcc source's `src` (parser/semantic/codegen) and the Zandronum source's `src/p_acs.cpp` (VM stack-overflow behavior and function-call guard re-verified 2026-08-06). All compileability claims were confirmed with live `bcc` compiles on 2026-07-29. The "Nested-function call/return bytecode" section was added 2026-08-14 while building nested-function support into an ACS/BCS decompiler (project-agnostic finding, not tied to that project) — verified against `zt-bcc/src/codegen/{expr,dec}.c` and `semantic/dec.c`, and against real `bcc`-compiled bytecode disassembled directly (both the non-recursive and recursive/`RECURSIVE_POSSIBLY` forms, including the emission-order-is-declaration-reverse finding, confirmed by compiling two sibling nested functions and reading their actual compiled addresses).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under Zandronum's own license terms — see [LICENSE](../../LICENSE) §3.

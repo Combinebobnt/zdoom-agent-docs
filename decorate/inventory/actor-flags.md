@@ -1,6 +1,6 @@
 # DECORATE actor flags
 
-**Generated:** by `python3 tools/gen_inventory.py decorate-flags` from the Zandronum source's `src/thingdef/thingdef_data.cpp` (`DEFINE_FLAG`/`DEFINE_FLAG2`/`DEFINE_DEPRECATED_FLAG`/`DEFINE_DUMMY_FLAG` across its five flag tables), cross-referenced against the UZDoom source's `src/scripting/thingdef_data.cpp` by name for the `UZD` column (also matching UZDoom-only `DEFINE_PROTECTED_FLAG`/`DEFINE_PROTECTED_FLAG2`/`DEFINE_FLAG2_DEPRECATED`) -- do not hand-edit rows; add a `../notes/<flag>.md` file and its `Tier`/`Notes` cell is picked up automatically from that file's own `Tier:` stamp on the next regen. Extraction reads the Zandronum source as its base (confirmed present for every row); UZDoom presence is a name cross-reference only (the `UZD` column), not independently behavior-verified. **Tier:** per row (defaults to C until a `notes/` file promotes it).
+**Generated:** by `python3 tools/gen_inventory.py decorate-flags` from the Zandronum source's `src/thingdef/thingdef_data.cpp` (`DEFINE_FLAG`/`DEFINE_FLAG2`/`DEFINE_DEPRECATED_FLAG`/`DEFINE_DUMMY_FLAG` across its five flag tables), cross-referenced against the UZDoom source's `src/scripting/thingdef_data.cpp` by name for the `UZD` column (also matching UZDoom-only `DEFINE_PROTECTED_FLAG`/`DEFINE_PROTECTED_FLAG2`/`DEFINE_FLAG2_DEPRECATED`) and every ZScript `flagdef` declaration under `wadsrc/static/zscript/` (case-insensitive name match; where most Inventory/Weapon/PowerSpeed flags moved). `UZD: no-op` means UZDoom accepts the flag name but does nothing with it: a C++ `DEFINE_DUMMY_FLAG`, or a `flagdef` whose storage field is `none` with bit 0. A `none` flagdef with a nonzero bit is a remapped deprecated flag and reads `yes`, same as C++ `DEFINE_DEPRECATED_FLAG` -- do not hand-edit rows; add a `../notes/<flag>.md` file and its `Tier`/`Notes` cell is picked up automatically from that file's own `Tier:` stamp on the next regen. Extraction reads the Zandronum source as its base (confirmed present for every row); UZDoom presence is a name cross-reference only (the `UZD` column), not independently behavior-verified. **Tier:** per row (defaults to C until a `notes/` file promotes it).
 
 | Flag | Table | Class | Field | Zan | UZD | Tier | Notes |
 |---|---|---|---|---|---|---|---|
@@ -10,33 +10,33 @@
 | ACTLIKEBRIDGE | ActorFlags | AActor | flags4 | yes | yes | C |  |
 | ADDITIVEPOISONDAMAGE | ActorFlags | AActor | flags6 | yes | yes | C |  |
 | ADDITIVEPOISONDURATION | ActorFlags | AActor | flags6 | yes | yes | C |  |
-| ADDITIVETIME | InventoryFlags | AInventory | ItemFlags | yes | — | C |  |
-| ALLOW_WITH_RESPAWN_INVUL | WeaponFlags | AWeapon | WeaponFlags | yes | — | C |  |
+| ADDITIVETIME | InventoryFlags | AInventory | ItemFlags | yes | yes | C |  |
+| ALLOW_WITH_RESPAWN_INVUL | WeaponFlags | AWeapon | WeaponFlags | yes | no-op | B | [notes](../notes/allow_with_respawn_invul.md) |
 | ALLOWBOUNCEONACTORS | ActorFlags | AActor | BounceFlags | yes | yes | C |  |
-| ALLOWCLIENTSPAWN | ActorFlags | AActor | NetworkFlags | yes | yes | C |  |
+| ALLOWCLIENTSPAWN | ActorFlags | AActor | NetworkFlags | yes | no-op | A | [notes](../notes/allowclientspawn.md) |
 | ALLOWPARTICLES | ActorFlags | AActor | flags4 | yes | yes | C |  |
-| ALT_AMMO_OPTIONAL | WeaponFlags | AWeapon | WeaponFlags | yes | — | C |  |
-| ALT_USES_BOTH | WeaponFlags | AWeapon | WeaponFlags | yes | — | C |  |
+| ALT_AMMO_OPTIONAL | WeaponFlags | AWeapon | WeaponFlags | yes | yes | C |  |
+| ALT_USES_BOTH | WeaponFlags | AWeapon | WeaponFlags | yes | yes | C |  |
 | ALWAYSFAST | ActorFlags | AActor | flags5 | yes | yes | C |  |
-| ALWAYSPICKUP | InventoryFlags | AInventory | ItemFlags | yes | — | C |  |
+| ALWAYSPICKUP | InventoryFlags | AInventory | ItemFlags | yes | yes | C |  |
 | ALWAYSPUFF | ActorFlags | AActor | flags3 | yes | yes | C |  |
 | ALWAYSRESPAWN | InventoryFlags | AInventory | ItemFlags | yes | yes | C |  |
 | ALWAYSTELEFRAG | ActorFlags | AActor | flags7 | yes | yes | C |  |
 | AMBUSH | ActorFlags | AActor | flags | yes | yes | C |  |
-| AMMO_CHECKBOTH | WeaponFlags | AWeapon | WeaponFlags | yes | — | C |  |
-| AMMO_OPTIONAL | WeaponFlags | AWeapon | WeaponFlags | yes | — | C |  |
-| AUTOACTIVATE | InventoryFlags | AInventory | ItemFlags | yes | — | C |  |
+| AMMO_CHECKBOTH | WeaponFlags | AWeapon | WeaponFlags | yes | yes | C |  |
+| AMMO_OPTIONAL | WeaponFlags | AWeapon | WeaponFlags | yes | yes | C |  |
+| AUTOACTIVATE | InventoryFlags | AInventory | ItemFlags | yes | yes | C |  |
 | AVOIDMELEE | ActorFlags | AActor | flags3 | yes | yes | C |  |
-| AXEBLOOD | WeaponFlags | AWeapon | WeaponFlags | yes | — | C |  |
-| BASEARMOR | ActorFlags | AActor | STFlags | yes | yes | C |  |
-| BASEHEALTH | ActorFlags | AActor | STFlags | yes | yes | C |  |
-| BFG | WeaponFlags | AWeapon | WeaponFlags | yes | — | C |  |
-| BIGPOWERUP | InventoryFlags | AInventory | ItemFlags | yes | — | C |  |
+| AXEBLOOD | WeaponFlags | AWeapon | WeaponFlags | yes | yes | C |  |
+| BASEARMOR | ActorFlags | AActor | STFlags | yes | no-op | C |  |
+| BASEHEALTH | ActorFlags | AActor | STFlags | yes | no-op | C |  |
+| BFG | WeaponFlags | AWeapon | WeaponFlags | yes | yes | C |  |
+| BIGPOWERUP | InventoryFlags | AInventory | ItemFlags | yes | yes | C |  |
 | BLASTED | ActorFlags | AActor | flags2 | yes | yes | C |  |
 | BLOCKEDBYSOLIDACTORS | ActorFlags | AActor | flags6 | yes | yes | C |  |
 | BLOODLESSIMPACT | ActorFlags | AActor | flags3 | yes | yes | C |  |
 | BLOODSPLATTER | ActorFlags | AActor | flags5 | yes | yes | C |  |
-| BLUETEAM | ActorFlags | AActor | STFlags | yes | yes | C |  |
+| BLUETEAM | ActorFlags | AActor | STFlags | yes | no-op | C |  |
 | BOSS | ActorFlags | AActor | flags2 | yes | yes | C |  |
 | BOSSDEATH | ActorFlags | AActor | flags4 | yes | yes | C |  |
 | BOUNCEAUTOOFF | ActorFlags | AActor | BounceFlags | yes | yes | C |  |
@@ -47,30 +47,30 @@
 | BOUNCEONFLOORS | ActorFlags | AActor | BounceFlags | yes | yes | C |  |
 | BOUNCEONWALLS | ActorFlags | AActor | BounceFlags | yes | yes | C |  |
 | BRIGHT | ActorFlags | AActor | flags5 | yes | yes | C |  |
-| BUMPSPECIAL | ActorFlags | AActor | flags6 | yes | yes | C |  |
+| BUMPSPECIAL | ActorFlags | AActor | flags6 | yes | yes | B | [notes](../notes/bumpspecial.md) |
 | CANBLAST | ActorFlags | AActor | flags3 | yes | yes | C |  |
 | CANBOUNCEWATER | ActorFlags | AActor | BounceFlags | yes | yes | C |  |
 | CANJUMP | ActorFlags | AActor | flags6 | yes | yes | C |  |
 | CANNOTPUSH | ActorFlags | AActor | flags2 | yes | yes | C |  |
 | CANPASS | ActorFlags | AActor | flags2 | yes | yes | C |  |
 | CANPUSHWALLS | ActorFlags | AActor | flags2 | yes | yes | C |  |
-| CANSUPERMORPH | PlayerPawnFlags | APlayerPawn | PlayerFlags | yes | — | C |  |
+| CANSUPERMORPH | PlayerPawnFlags | APlayerPawn | PlayerFlags | yes | yes | C |  |
 | CANTLEAVEFLOORPIC | ActorFlags | AActor | flags2 | yes | yes | C |  |
 | CANTSEEK | ActorFlags | AActor | flags5 | yes | yes | C |  |
 | CANUSEWALLS | ActorFlags | AActor | flags4 | yes | yes | C |  |
 | CEILINGHUGGER | ActorFlags | AActor | flags3 | yes | yes | C |  |
-| CHEATNOTWEAPON | WeaponFlags | AWeapon | WeaponFlags | yes | — | C |  |
-| CLIENTSIDEONLY | ActorFlags | AActor | NetworkFlags | yes | yes | C |  |
+| CHEATNOTWEAPON | WeaponFlags | AWeapon | WeaponFlags | yes | yes | C |  |
+| CLIENTSIDEONLY | ActorFlags | AActor | NetworkFlags | yes | no-op | A | [notes](../notes/clientsideonly.md) |
 | CORPSE | ActorFlags | AActor | flags | yes | yes | C |  |
 | COUNTITEM | ActorFlags | AActor | flags | yes | yes | C |  |
 | COUNTKILL | ActorFlags | AActor | flags | yes | yes | C |  |
 | COUNTSECRET | ActorFlags | AActor | flags5 | yes | yes | C |  |
-| CROUCHABLEMORPH | PlayerPawnFlags | APlayerPawn | PlayerFlags | yes | — | C |  |
+| CROUCHABLEMORPH | PlayerPawnFlags | APlayerPawn | PlayerFlags | yes | yes | C |  |
 | DEFLECT | ActorFlags | AActor | flags4 | yes | yes | C |  |
 | DEHEXPLOSION | ActorFlags | AActor | flags5 | yes | yes | C |  |
 | DOHARMSPECIES | ActorFlags | AActor | flags6 | yes | yes | C |  |
 | DONTBLAST | ActorFlags | AActor | flags3 | yes | yes | C |  |
-| DONTBOB | WeaponFlags | AWeapon | WeaponFlags | yes | — | C |  |
+| DONTBOB | WeaponFlags | AWeapon | WeaponFlags | yes | yes | C |  |
 | DONTCORPSE | ActorFlags | AActor | flags6 | yes | yes | C |  |
 | DONTDRAIN | ActorFlags | AActor | flags5 | yes | yes | C |  |
 | DONTFALL | ActorFlags | AActor | flags4 | yes | yes | C |  |
@@ -78,7 +78,7 @@
 | DONTHARMCLASS | ActorFlags | AActor | flags4 | yes | yes | C |  |
 | DONTHARMSPECIES | ActorFlags | AActor | flags6 | yes | yes | C |  |
 | DONTHURTSPECIES | ActorFlags | AActor | flags4 | yes | yes | C |  |
-| DONTIDENTIFYTARGET | ActorFlags | AActor | STFlags | yes | yes | C |  |
+| DONTIDENTIFYTARGET | ActorFlags | AActor | STFlags | yes | no-op | C |  |
 | DONTMORPH | ActorFlags | AActor | flags3 | yes | yes | C |  |
 | DONTOVERLAP | ActorFlags | AActor | flags3 | yes | yes | C |  |
 | DONTREFLECT | ActorFlags | AActor | flags2 | yes | yes | C |  |
@@ -92,13 +92,13 @@
 | DROPOFF | ActorFlags | AActor | flags | yes | yes | C |  |
 | DROPPED | ActorFlags | AActor | flags | yes | yes | C |  |
 | EXPLOCOUNT | ActorFlags | AActor | flags3 | yes | yes | C |  |
-| EXPLODEONDEATH | ActorFlags | AActor | STFlags | yes | yes | C |  |
+| EXPLODEONDEATH | ActorFlags | AActor | STFlags | yes | no-op | C |  |
 | EXPLODEONWATER | ActorFlags | AActor | BounceFlags | yes | yes | C |  |
-| EXPLOSIVE | WeaponFlags | AWeapon | WeaponFlags | yes | — | C |  |
+| EXPLOSIVE | WeaponFlags | AWeapon | WeaponFlags | yes | yes | C |  |
 | EXTREMEDEATH | ActorFlags | AActor | flags4 | yes | yes | C |  |
-| FANCYPICKUPSOUND | InventoryFlags | AInventory | ItemFlags | yes | — | C |  |
-| FASTER | ActorFlags | (dummy) |  | yes | yes | C |  |
-| FASTMELEE | ActorFlags | (dummy) |  | yes | yes | C |  |
+| FANCYPICKUPSOUND | InventoryFlags | AInventory | ItemFlags | yes | yes | C |  |
+| FASTER | ActorFlags | (dummy) |  | yes | no-op | C |  |
+| FASTMELEE | ActorFlags | (dummy) |  | yes | no-op | C |  |
 | FIREDAMAGE | ActorFlags | (deprecated) |  | yes | yes | C |  |
 | FIRERESIST | ActorFlags | (deprecated) |  | yes | yes | C |  |
 | FIXMAPTHINGPOS | ActorFlags | AActor | flags4 | yes | yes | C |  |
@@ -111,7 +111,7 @@
 | FORCEDECAL | ActorFlags | AActor | flags7 | yes | yes | C |  |
 | FORCEPAIN | ActorFlags | AActor | flags6 | yes | yes | C |  |
 | FORCERADIUSDMG | ActorFlags | AActor | flags4 | yes | yes | C |  |
-| FORCERESPAWNINSURVIVAL | InventoryFlags | AInventory | ItemFlags | yes | — | C |  |
+| FORCERESPAWNINSURVIVAL | InventoryFlags | AInventory | ItemFlags | yes | no-op | C |  |
 | FORCEXYBILLBOARD | ActorFlags | AActor | renderflags | yes | yes | C |  |
 | FORCEYBILLBOARD | ActorFlags | AActor | renderflags | yes | yes | C |  |
 | FRIENDLY | ActorFlags | AActor | flags | yes | yes | C |  |
@@ -125,26 +125,26 @@
 | HITMASTER | ActorFlags | AActor | flags7 | yes | yes | C |  |
 | HITTARGET | ActorFlags | AActor | flags7 | yes | yes | C |  |
 | HITTRACER | ActorFlags | AActor | flags7 | yes | yes | C |  |
-| HUBPOWER | InventoryFlags | AInventory | ItemFlags | yes | — | C |  |
+| HUBPOWER | InventoryFlags | AInventory | ItemFlags | yes | yes | C |  |
 | ICECORPSE | ActorFlags | AActor | flags | yes | yes | C |  |
 | ICEDAMAGE | ActorFlags | (deprecated) |  | yes | yes | C |  |
-| IGNORESKILL | InventoryFlags | AInventory | ItemFlags | yes | — | C |  |
+| IGNORESKILL | InventoryFlags | AInventory | ItemFlags | yes | yes | C |  |
 | INCOMBAT | ActorFlags | AActor | flags4 | yes | yes | C |  |
 | INFLOAT | ActorFlags | AActor | flags | yes | yes | C |  |
-| INTERHUBSTRIP | InventoryFlags | (deprecated) |  | yes | — | C |  |
-| INVBAR | InventoryFlags | AInventory | ItemFlags | yes | — | C |  |
+| INTERHUBSTRIP | InventoryFlags | (deprecated) |  | yes | yes | C |  |
+| INVBAR | InventoryFlags | AInventory | ItemFlags | yes | yes | C |  |
 | INVISIBLE | ActorFlags | AActor | renderflags | yes | yes | C |  |
 | INVULNERABLE | ActorFlags | AActor | flags2 | yes | yes | C |  |
 | ISMONSTER | ActorFlags | AActor | flags3 | yes | yes | C |  |
 | JUMPDOWN | ActorFlags | AActor | flags6 | yes | yes | C |  |
 | JUSTATTACKED | ActorFlags | AActor | flags | yes | yes | C |  |
 | JUSTHIT | ActorFlags | AActor | flags | yes | yes | C |  |
-| KEEPDEPLETED | InventoryFlags | AInventory | ItemFlags | yes | — | C |  |
+| KEEPDEPLETED | InventoryFlags | AInventory | ItemFlags | yes | yes | C |  |
 | LONGMELEERANGE | ActorFlags | (deprecated) |  | yes | yes | C |  |
 | LOOKALLAROUND | ActorFlags | AActor | flags4 | yes | yes | C |  |
 | LOWGRAVITY | ActorFlags | (deprecated) |  | yes | yes | C |  |
 | MBFBOUNCER | ActorFlags | AActor | BounceFlags | yes | yes | C |  |
-| MELEEWEAPON | WeaponFlags | AWeapon | WeaponFlags | yes | — | C |  |
+| MELEEWEAPON | WeaponFlags | AWeapon | WeaponFlags | yes | yes | C |  |
 | MISSILE | ActorFlags | AActor | flags | yes | yes | C |  |
 | MISSILEEVENMORE | ActorFlags | AActor | flags4 | yes | yes | C |  |
 | MISSILEMORE | ActorFlags | AActor | flags4 | yes | yes | C |  |
@@ -153,11 +153,11 @@
 | NEVERFAST | ActorFlags | AActor | flags5 | yes | yes | C |  |
 | NEVERRESPAWN | InventoryFlags | AInventory | ItemFlags | yes | yes | C |  |
 | NEVERTARGET | ActorFlags | AActor | flags7 | yes | yes | C |  |
-| NO_AUTO_SWITCH | WeaponFlags | AWeapon | WeaponFlags | yes | — | C |  |
-| NOALERT | WeaponFlags | AWeapon | WeaponFlags | yes | — | C |  |
-| NOATTENPICKUPSOUND | InventoryFlags | AInventory | ItemFlags | yes | — | C |  |
-| NOAUTOAIM | WeaponFlags | AWeapon | WeaponFlags | yes | — | C |  |
-| NOAUTOFIRE | WeaponFlags | AWeapon | WeaponFlags | yes | — | A | [notes](../notes/noautofire.md) |
+| NO_AUTO_SWITCH | WeaponFlags | AWeapon | WeaponFlags | yes | yes | C |  |
+| NOALERT | WeaponFlags | AWeapon | WeaponFlags | yes | yes | C |  |
+| NOATTENPICKUPSOUND | InventoryFlags | AInventory | ItemFlags | yes | yes | C |  |
+| NOAUTOAIM | WeaponFlags | AWeapon | WeaponFlags | yes | yes | C |  |
+| NOAUTOFIRE | WeaponFlags | AWeapon | WeaponFlags | yes | yes | A | [notes](../notes/noautofire.md) |
 | NOBLOCKMAP | ActorFlags | AActor | flags | yes | yes | C |  |
 | NOBLOCKMONST | ActorFlags | AActor | flags3 | yes | yes | C |  |
 | NOBLOOD | ActorFlags | AActor | flags | yes | yes | C |  |
@@ -168,7 +168,7 @@
 | NODAMAGE | ActorFlags | AActor | flags5 | yes | yes | C |  |
 | NODAMAGEEVENTSCRIPT | ActorFlags | AActor | STFlags | yes | — | C |  |
 | NODAMAGETHRUST | ActorFlags | AActor | flags2 | yes | yes | C |  |
-| NODE | ActorFlags | AActor | STFlags | yes | yes | C |  |
+| NODE | ActorFlags | AActor | STFlags | yes | no-op | C |  |
 | NODECAL | ActorFlags | AActor | flags7 | yes | yes | C |  |
 | NODROPOFF | ActorFlags | AActor | flags5 | yes | yes | C |  |
 | NOEXPLODEFLOOR | ActorFlags | AActor | flags3 | yes | yes | C |  |
@@ -181,14 +181,14 @@
 | NOINTERACTION | ActorFlags | AActor | flags5 | yes | yes | C |  |
 | NOKILLSCRIPTS | ActorFlags | AActor | flags7 | yes | yes | C |  |
 | NOLIFTDROP | ActorFlags | AActor | flags | yes | yes | C |  |
-| NOLMS | WeaponFlags | AWeapon | WeaponFlags | yes | — | C |  |
+| NOLMS | WeaponFlags | AWeapon | WeaponFlags | yes | no-op | C |  |
 | NOMENU | ActorFlags | AActor | flags6 | yes | yes | C |  |
 | NOMORPHLIMITATIONS | PlayerPawnFlags | APlayerPawn | PlayerFlags | yes | — | C |  |
-| NONETID | ActorFlags | AActor | NetworkFlags | yes | yes | C |  |
+| NONETID | ActorFlags | AActor | NetworkFlags | yes | no-op | A | [notes](../notes/nonetid.md) |
 | NONSHOOTABLE | ActorFlags | AActor | flags2 | yes | yes | C |  |
 | NOPAIN | ActorFlags | AActor | flags5 | yes | yes | C |  |
 | NORADIUSDMG | ActorFlags | AActor | flags3 | yes | yes | C |  |
-| NOSCREENFLASH | InventoryFlags | AInventory | ItemFlags | yes | — | C |  |
+| NOSCREENFLASH | InventoryFlags | AInventory | ItemFlags | yes | yes | C |  |
 | NOSECTOR | ActorFlags | AActor | flags | yes | yes | C |  |
 | NOSKIN | ActorFlags | AActor | flags4 | yes | yes | C |  |
 | NOSPAWNEVENTSCRIPT | ActorFlags | AActor | STFlags | yes | — | C |  |
@@ -201,42 +201,42 @@
 | NOTELEOTHER | ActorFlags | AActor | flags3 | yes | yes | C |  |
 | NOTELEPORT | ActorFlags | AActor | flags2 | yes | yes | C |  |
 | NOTELESTOMP | ActorFlags | AActor | flags7 | yes | yes | C |  |
-| NOTHRUSTWHENINVUL | PlayerPawnFlags | APlayerPawn | PlayerFlags | yes | — | C |  |
+| NOTHRUSTWHENINVUL | PlayerPawnFlags | APlayerPawn | PlayerFlags | yes | yes | C |  |
 | NOTIMEFREEZE | ActorFlags | AActor | flags5 | yes | yes | C |  |
 | NOTONAUTOMAP | ActorFlags | AActor | flags6 | yes | yes | C |  |
-| NOTRAIL | PowerSpeedFlags | APowerSpeed | SpeedFlags | yes | — | C |  |
+| NOTRAIL | PowerSpeedFlags | APowerSpeed | SpeedFlags | yes | yes | C |  |
 | NOTRIGGER | ActorFlags | AActor | flags6 | yes | yes | C |  |
 | NOVERTICALMELEERANGE | ActorFlags | AActor | flags5 | yes | yes | C |  |
 | NOWALLBOUNCESND | ActorFlags | AActor | BounceFlags | yes | yes | C |  |
 | OLDRADIUSDMG | ActorFlags | AActor | flags5 | yes | yes | C |  |
 | PAINLESS | ActorFlags | AActor | flags5 | yes | yes | C |  |
-| PERSISTENTPOWER | InventoryFlags | AInventory | ItemFlags | yes | — | C |  |
+| PERSISTENTPOWER | InventoryFlags | AInventory | ItemFlags | yes | yes | C |  |
 | PICKUP | ActorFlags | APlayerPawn | flags | yes | yes | C |  |
-| PICKUPFLASH | InventoryFlags | (deprecated) |  | yes | — | C |  |
+| PICKUPFLASH | InventoryFlags | (deprecated) |  | yes | yes | C |  |
 | PIERCEARMOR | ActorFlags | AActor | flags5 | yes | yes | C |  |
 | POISONALWAYS | ActorFlags | AActor | flags6 | yes | yes | C |  |
-| POWERED_UP | WeaponFlags | AWeapon | WeaponFlags | yes | — | C |  |
-| PRIMARY_USES_BOTH | WeaponFlags | AWeapon | WeaponFlags | yes | — | C |  |
+| POWERED_UP | WeaponFlags | AWeapon | WeaponFlags | yes | yes | C |  |
+| PRIMARY_USES_BOTH | WeaponFlags | AWeapon | WeaponFlags | yes | yes | C |  |
 | PUFFGETSOWNER | ActorFlags | AActor | flags5 | yes | yes | C |  |
 | PUFFONACTORS | ActorFlags | AActor | flags3 | yes | yes | C |  |
 | PUSHABLE | ActorFlags | AActor | flags2 | yes | yes | C |  |
 | QUARTERGRAVITY | ActorFlags | (deprecated) |  | yes | yes | C |  |
 | QUICKTORETALIATE | ActorFlags | AActor | flags4 | yes | yes | C |  |
-| QUIET | InventoryFlags | AInventory | ItemFlags | yes | — | C |  |
+| QUIET | InventoryFlags | AInventory | ItemFlags | yes | yes | C |  |
 | RANDOMIZE | ActorFlags | AActor | flags4 | yes | yes | C |  |
-| READYSNDHALF | WeaponFlags | AWeapon | WeaponFlags | yes | — | C |  |
-| REDTEAM | ActorFlags | AActor | STFlags | yes | yes | C |  |
+| READYSNDHALF | WeaponFlags | AWeapon | WeaponFlags | yes | yes | C |  |
+| REDTEAM | ActorFlags | AActor | STFlags | yes | no-op | C |  |
 | REFLECTIVE | ActorFlags | AActor | flags2 | yes | yes | C |  |
 | RELATIVETOFLOOR | ActorFlags | AActor | flags6 | yes | yes | C |  |
-| RESTRICTABSOLUTELY | InventoryFlags | AInventory | ItemFlags | yes | — | C |  |
+| RESTRICTABSOLUTELY | InventoryFlags | AInventory | ItemFlags | yes | yes | C |  |
 | RIPPER | ActorFlags | AActor | flags2 | yes | yes | C |  |
 | ROCKETTRAIL | ActorFlags | AActor | effects | yes | yes | C |  |
-| SCOREPILLAR | ActorFlags | AActor | STFlags | yes | yes | C |  |
+| SCOREPILLAR | ActorFlags | AActor | STFlags | yes | no-op | B | [notes](../notes/scorepillar.md) |
 | SCREENSEEKER | ActorFlags | AActor | flags3 | yes | yes | C |  |
 | SEEINVISIBLE | ActorFlags | AActor | flags6 | yes | yes | C |  |
 | SEEKERMISSILE | ActorFlags | AActor | flags2 | yes | yes | C |  |
 | SEESDAGGERS | ActorFlags | AActor | flags4 | yes | yes | C |  |
-| SERVERSIDEONLY | ActorFlags | AActor | NetworkFlags | yes | yes | C |  |
+| SERVERSIDEONLY | ActorFlags | AActor | NetworkFlags | yes | no-op | A | [notes](../notes/serversideonly.md) |
 | SHADOW | ActorFlags | AActor | flags | yes | yes | C |  |
 | SHIELDREFLECT | ActorFlags | AActor | flags4 | yes | yes | C |  |
 | SHOOTABLE | ActorFlags | AActor | flags | yes | yes | C |  |
@@ -252,32 +252,32 @@
 | SPECIALFIREDAMAGE | ActorFlags | AActor | flags5 | yes | yes | C |  |
 | SPECIALFLOORCLIP | ActorFlags | AActor | flags3 | yes | yes | C |  |
 | SPECTRAL | ActorFlags | AActor | flags4 | yes | yes | C |  |
-| STAFF2_KICKBACK | WeaponFlags | AWeapon | WeaponFlags | yes | — | C |  |
+| STAFF2_KICKBACK | WeaponFlags | AWeapon | WeaponFlags | yes | yes | C |  |
 | STANDSTILL | ActorFlags | AActor | flags4 | yes | yes | C |  |
 | STAYMORPHED | ActorFlags | AActor | flags3 | yes | yes | C |  |
 | STEALTH | ActorFlags | AActor | flags | yes | yes | C |  |
 | STEPMISSILE | ActorFlags | AActor | flags6 | yes | yes | C |  |
 | STRIFEDAMAGE | ActorFlags | AActor | flags4 | yes | yes | C |  |
 | SUMMONEDMONSTER | ActorFlags | AActor | flags5 | yes | yes | C |  |
-| SUPERARMOR | ActorFlags | AActor | STFlags | yes | yes | C |  |
-| SUPERHEALTH | ActorFlags | AActor | STFlags | yes | yes | C |  |
+| SUPERARMOR | ActorFlags | AActor | STFlags | yes | no-op | C |  |
+| SUPERHEALTH | ActorFlags | AActor | STFlags | yes | no-op | C |  |
 | SYNCHRONIZED | ActorFlags | AActor | flags4 | yes | yes | C |  |
 | TELEPORT | ActorFlags | AActor | flags | yes | yes | C |  |
 | TELESTOMP | ActorFlags | AActor | flags2 | yes | yes | C |  |
 | THRUACTORS | ActorFlags | AActor | flags2 | yes | yes | C |  |
 | THRUGHOST | ActorFlags | AActor | flags2 | yes | yes | C |  |
 | THRUSPECIES | ActorFlags | AActor | flags6 | yes | yes | C |  |
-| TOSSED | InventoryFlags | AInventory | ItemFlags | yes | — | C |  |
+| TOSSED | InventoryFlags | AInventory | ItemFlags | yes | yes | C |  |
 | TOUCHY | ActorFlags | AActor | flags6 | yes | yes | C |  |
-| UNDROPPABLE | InventoryFlags | AInventory | ItemFlags | yes | — | C |  |
-| UNTOSSABLE | InventoryFlags | AInventory | ItemFlags | yes | — | C |  |
+| UNDROPPABLE | InventoryFlags | AInventory | ItemFlags | yes | yes | C |  |
+| UNTOSSABLE | InventoryFlags | AInventory | ItemFlags | yes | yes | C |  |
 | USEBOUNCESTATE | ActorFlags | AActor | BounceFlags | yes | yes | C |  |
 | USEDAMAGEEVENTSCRIPT | ActorFlags | AActor | STFlags | yes | — | C |  |
 | USEKILLSCRIPTS | ActorFlags | AActor | flags7 | yes | yes | C |  |
 | USESPAWNEVENTSCRIPT | ActorFlags | AActor | STFlags | yes | — | C |  |
 | USESPECIAL | ActorFlags | AActor | flags5 | yes | yes | C |  |
-| USESTBOUNCESOUND | ActorFlags | AActor | STFlags | yes | yes | C |  |
+| USESTBOUNCESOUND | ActorFlags | AActor | STFlags | yes | no-op | C |  |
 | VISIBILITYPULSE | ActorFlags | AActor | effects | yes | yes | C |  |
 | VULNERABLE | ActorFlags | AActor | flags6 | yes | yes | C |  |
-| WIMPY_WEAPON | WeaponFlags | AWeapon | WeaponFlags | yes | — | C |  |
+| WIMPY_WEAPON | WeaponFlags | AWeapon | WeaponFlags | yes | yes | C |  |
 | WINDTHRUST | ActorFlags | AActor | flags2 | yes | yes | C |  |

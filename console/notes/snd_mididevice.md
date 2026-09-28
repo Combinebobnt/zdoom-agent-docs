@@ -2,20 +2,20 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-16); Zandronum 3.2.1 @28f736fb3 (2026-08-02)
-**Provenance:** Zandronum source `src/sound/music_midi_base.cpp`, verified 2026-08-02.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-16); Zandronum 3.3-alpha @bdd0f7beb (2026-09-26)
+**Provenance:** Zandronum source `src/sound/music_midi_base.cpp`, verified 2026-08-02; device-ID mapping and fallback from `src/sound/music_midistream.cpp:229-248` and `src/sound/i_music.cpp:490-500`.
 
 Selects which MIDI device or synthesizer to use for MIDI and MUS music playback.
 
 **Default:** -1 (use the default FMOD synthesizer).
 
-**Behavior:** The valid range and behavior depend on the platform:
+**Behavior:** On Zandronum the negative IDs are the same on every platform: -1 FMOD, -2 TiMidity++ (external), -3 emulated OPL FM synth, -4 Gravis Ultrasound emulation (the internal Timidity-based synth), -5 FluidSynth. A song whose SNDINFO `$mididevice` names a device uses that device instead of this cvar. The valid range and validation depend on the platform:
 
-**Windows:** Accepts values from -5 to N-1, where N is the total number of MIDI devices enumerated. The value -1 selects the FMOD synthesizer, -2 selects the default system MIDI device, and -3 through -5 select specific synthesizers (TiMidity++, external TiMidity, FluidSynth, etc.). Non-negative values select available MIDI devices by index. Invalid values cause the cvar to be reset to 0 (the first enumerated device) with a console message; no range clamping is performed, so the callback validates against the actual device list at runtime.
+**Windows:** Accepts values from -5 to N-1, where N is the number of `winmm` MIDI output devices counted at music init. Non-negative values select those devices by index. A value outside that range prints "ID out of range. Using default device." and resets the cvar to 0 (the first enumerated device). The check only runs once the device count is known, so a config-loaded value is validated at music init.
 
-**Unix/Linux/Mac:** Accepts values from -5 to -1 only. Values -1 through -5 select different synthesizers (FMOD, TiMidity++, WildMIDI, FluidSynth, Timidity). Attempting to set a value outside the -5 to -1 range automatically resets the cvar to -1.
+**Unix/Linux/Mac:** Accepts values from -5 to -1 only. A value outside that range is clamped, silently: below -5 becomes -5, above -1 (including any non-negative device index) becomes -1.
 
-The value -1 (FMOD) is always available; other device indices depend on whether the corresponding synthesizer was compiled in and initialized.
+FluidSynth (-5) exists only in builds with FluidSynth compiled in. Without it, -5 falls through to the platform default (FMOD on Unix, the `winmm` device path on Windows) and is missing from the menu and `snd_listmididevices`. If the chosen synth fails to open a song while the cvar is negative, playback retries on FMOD; on Windows with a non-negative cvar, it retries on the `winmm` device.
 
 Use the `snd_listmididevices` console command to see the full list of available MIDI devices and synthesizers on your system.
 

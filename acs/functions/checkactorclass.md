@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
 **Provenance:** `CheckActorClass - ZDoom Wiki` (https://zdoom.org/w/index.php?title=CheckActorClass&oldid=37309), verified against Zandronum source 2026-07-29
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Extension function (`zcommon.bcs` index -27, dispatches to `case ACSF_CheckActorClass` in `p_acs.cpp:6202`)
@@ -51,7 +51,7 @@ These cases cannot be distinguished by the return value alone.
 
 The wiki page is feature-complete and accurate in its core description. However, it has two defects in the published code examples:
 
-1. **Negative array index in the third example:** The switch statement at line `switch (monster_msg[class_index][MONST_CLASS_NAME])` accesses the array **before** the `if (class_index > -1)` guard. When no class matches, `class_index` remains `-1`, resulting in a negative array index (`monster_msg[-1][...]`), which is undefined behavior in most contexts. This is the same class of defect already documented for `LumpRead`'s swapped argument order in the [lump-io family](families/lump-io.md). **The guard and the array access should be swapped.**
+1. **Negative array index in the third example:** The switch statement at line `switch (monster_msg[class_index][MONST_CLASS_NAME])` accesses the array **before** the `if (class_index > -1)` guard. When no class matches, `class_index` remains `-1`, resulting in a negative array index (`monster_msg[-1][...]`), which is undefined behavior in most contexts. This is the same class of defect already documented for `LumpRead`'s swapped argument order in the [lump-io family](../families/lump-io.md). **The guard and the array access should be swapped.**
 
 2. **String switch statement:** The same switch statement in the third example uses `switch (monster_msg[class_index][MONST_CLASS_NAME])`, where the switched variable is a `str`. BCS switch statements do not support string operands — they require integer types. The wiki example should either use a sequence of `if/else` statements or restructure to switch on an integer (e.g., `class_index`). This is a toolchain incompatibility, not a Zandronum fork divergence, but it prevents the example from compiling as written.
 

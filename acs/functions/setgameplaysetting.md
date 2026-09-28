@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** wiki page `SetGameplaySetting - Zandronum Wiki.html` (`_intake/`, retrieved
 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=SetGameplaySetting&oldid=2522`) + source-verified (`p_acs.cpp:8129-8174`, `gamemode.cpp:1619-1657`,
 `c_cvars.h:88,91`) and version-gated against `28f736fb3` per this repo's 3.2.1 check.

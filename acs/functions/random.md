@@ -2,10 +2,11 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-28)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `Random - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-28,
 `https://zdoom.org/w/index.php?title=Random&oldid=54552`) + source-verified against the Zandronum source (`p_acs.cpp:183,3884-3892,10501-10513`,
-`m_random.h:56-61`, `m_random.cpp` header comments) and the zt-bcc source's `src/builtin.c:37`. The
+`m_random.h:56-61`, `m_random.cpp` header comments, `m_random.cpp:263-270`, `g_level.cpp:571-577`,
+`g_game.cpp:1653-1658`) and the zt-bcc source's `src/builtin.c:37`. The
 wiki's core inclusive-range description holds; the argument-order tolerance, shared-stream/demo-sync
 nature, clientside-sync caveat, fixed-point/modulo notes, and the `compat_oldrandom` non-effect
 are this doc's source-verified additions (not on the wiki page, which is written for vanilla ZDoom
@@ -42,33 +43,39 @@ int DLevelScript::Random (int min, int max)
   upstream, ZDoom generally) tolerates the reversed order without error.
 - **Inclusive on both ends**, confirmed by the arithmetic: `pr_acs(max - min + 1)` draws a
   uniform value in `[0, max-min]` (`FRandom::operator()(int mod)`, `m_random.h:56-61`, is
-  `GenRand32() % mod`), then `min` is added back — so `max` itself is a reachable result, not
+  `GenRand32() % mod`, returning 0 only for a zero divisor), then `min` is added back — so `max` itself is a reachable result, not
   exclusive as a naive half-open reading of "a range" might suggest.
-- **Not true entropy — a single shared, deterministic PRNG stream for the entire game
-  instance.** The generator is `FRandom pr_acs("ACS")` (`p_acs.cpp:183`), one `static`/global
-  object seeded once per game instance and shared by *every* `Random()` call from *every* script
-  and *every* map for that instance's lifetime — not a fresh or independently-seeded stream per
-  script, per map, or per call. `m_random.cpp`'s header explains why: this is Killough/BOOM-style
+- **Not true entropy. A single shared, deterministic PRNG stream.** The generator is
+  `FRandom pr_acs("ACS")` (`p_acs.cpp:183`), one global object shared by *every* `Random()` call
+  from *every* script. It is not a fresh or independently-seeded stream per script or per call. On
+  Zandronum it is reseeded from `rngseed` by `FRandom::StaticClearRandom` (`m_random.cpp:263-270`),
+  which `G_InitNew` calls (`g_level.cpp:577`) on a new game or a `map`-style change, skipped only
+  on savegame restore and demo playback/recording. Offline or on a server, an ordinary exit or hub
+  transition doesn't reseed, so the stream keeps running across those maps (a client is different,
+  see the next bullet), and a savegame restores its saved state
+  (`g_game.cpp:4690`). `m_random.cpp`'s header explains why: this is Killough/BOOM-style
   per-source RNG bookkeeping, kept specifically for demo-sync and backward-compatibility
   reasons (each named source, e.g. `"ACS"`, gets isolated, reproducible state independent of other
   RNG consumers like monster AI). Practical effect: the *n*-th call to `Random()` since the level
   (or demo) was seeded depends on every prior `Random()` draw across the whole script ecosystem,
   not just calls local to the script or function doing the reasoning — there's no way to get an
   independent/isolated random stream for just one subsystem.
-- **No *per-draw* client/server sync for `pr_acs` — but it does feed the network consistency
-  check.** `pr_acs` has four references in Zandronum's `src`, not the two ("exactly one reader...
-  one definition") this file previously claimed: `m_random.cpp:89` (`extern` declaration) and
-  `:303` in addition to the definition (`p_acs.cpp:183`) and the `Random()` draw itself
-  (`p_acs.cpp:3891`). The `:303` reference is inside `FRandom::StaticSumSeeds()`, whose own header
-  comment states its purpose directly: producing a checksum "used to check the consistancy of
-  network games between different machines," summing exactly four RNG streams
-  (`pr_spawnmobj`/`pr_acs`/`pr_chase`/`pr_damagemobj`). It's called from `g_game.cpp:1658`, under a
-  comment about including "random seeds and player stuff in the consistancy check." So `pr_acs`'s
-  internal state *is* read by network-desync-detection code — just not synchronized per-draw the
-  way an individual `Random()` result is. Server-executed (default) scripts are authoritative as
-  usual and their *effects* (spawns, damage, etc.) replicate to clients normally, but a `CLIENTSIDE`
-  script's own `Random()` calls run against that client's own local `pr_acs` instance, independently
-  of the server's and of every other client's. Don't rely on `Random()` producing the same sequence
+- **No client/server sync for `pr_acs` at all.** `pr_acs` has four references in Zandronum's
+  `src`: `m_random.cpp:89` (`extern` declaration) and `:303` in addition to the definition
+  (`p_acs.cpp:183`) and the `Random()` draw itself (`p_acs.cpp:3891`). The `:303` reference is
+  inside `FRandom::StaticSumSeeds()`, whose header comment describes a checksum for checking the
+  consistency of network games between machines, summing four RNG streams
+  (`pr_spawnmobj`/`pr_acs`/`pr_chase`/`pr_damagemobj`). That is the inherited peer-to-peer
+  consistency check. Its only caller (`g_game.cpp:1658`) sits inside a block gated on
+  `NETWORK_InClientMode() == false` and `NETWORK_GetState() != NETSTATE_SERVER`
+  (`g_game.cpp:1653-1654`), so it never runs on a Zandronum client, client-demo playback or
+  server. Nothing in Zandronum's client/server protocol reads or compares `pr_acs`. Server-executed
+  (default) scripts are authoritative as usual and their *effects* (spawns, damage, etc.) replicate
+  to clients normally, but a `CLIENTSIDE` script's own `Random()` calls run against that client's
+  own local `pr_acs` instance, independently of the server's and of every other client's. A client
+  never advances `rngseed` (`g_level.cpp:571`), yet every server-driven map load runs `G_InitNew`
+  on it, so each map starts that client's `pr_acs` from the same state and its `CLIENTSIDE`
+  `Random()` sequence repeats map to map. Don't rely on `Random()` producing the same sequence
   across machines from inside a `CLIENTSIDE`
   script — it wasn't built for that, and nothing in Zandronum's source synchronizes it.
 - **Fixed-point arguments work, but `Random` itself is int-only and doesn't know it.** The wiki's
@@ -82,13 +89,13 @@ int DLevelScript::Random (int min, int max)
   bias when `mod` (`max - min + 1`) doesn't evenly divide 2^32. Negligible for the small ranges
   typical gameplay code actually uses (tens to low hundreds), not worth working around here.
 - **`compat_oldrandom` (`ZACOMPATF_OLD_RANDOM_GENERATOR`) does NOT affect this function.** The
-  flag (`d_main.cpp:846`, backing `zacompatflags`) is checked in exactly two places in
+  flag (`d_main.cpp:845`, backing `zacompatflags`) is checked in exactly two places in
   `m_random.cpp`: the no-argument `FRandom::operator()()` (`m_random.cpp:234-241`, range
   `[0,255]`) and `FRandom::Random2()` (`m_random.cpp:244-251`) — both fall back to the legacy
   `P_Random()` table when the flag is set. `DLevelScript::Random` calls `pr_acs(max - min + 1)`,
   which resolves to the *single-argument* `operator()(int mod)` overload
-  (`m_random.h:56-61`, inline) — that overload unconditionally does `GenRand32() % mod` with no
-  `zacompatflags` check at all, and `GenRand32()` itself (`sfmt/SFMT.cpp:361`) is the raw SFMT
+  (`m_random.h:56-61`, inline) — that overload does `GenRand32() % mod` with only a zero-divisor
+  guard and no `zacompatflags` check at all, and `GenRand32()` itself (`sfmt/SFMT.cpp:361`) is the raw SFMT
   generator, also compat-flag-agnostic. So toggling `compat_oldrandom` changes monster-AI-style
   `[0,255]`/`Random2()` draws elsewhere in the engine but has zero effect on ACS `Random(min,
   max)` — every mod using it draws from the same SFMT-backed `pr_acs` stream regardless of this

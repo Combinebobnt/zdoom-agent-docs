@@ -39,12 +39,20 @@ Usage:
                                                  built and verified against (see "Verification"
                                                  below) -- exits 1 on any mismatch
     python3 tools/engine_matrix.py --stale      Phase 5 prerequisite: for every doc file whose
-                                                 Verified against: names UZDoom, checks whether the
-                                                 UZDoom checkout has moved past the stamped SHA for
-                                                 that file's source bucket -- i.e. whether a
-                                                 "complete" sweep might already be out of date. The
-                                                 fifth progress query, alongside
+                                                 Verified against: names UZDoom or Zandronum, checks
+                                                 whether that engine's checkout has moved past the
+                                                 stamped SHA for that file's source bucket -- i.e.
+                                                 whether a "complete" sweep might already be out of
+                                                 date. One report block per engine; stale files are
+                                                 grouped by bucket/SHA. Also lists stamps whose
+                                                 version label disagrees with src/version.h at that
+                                                 SHA. The fifth progress query, alongside
                                                  engine_claim_progress.py's four. Writes nothing.
+                                                 Exits 1 if any stamped SHA isn't an ancestor of
+                                                 its checkout's HEAD (e.g. a fork-only commit), or
+                                                 if any stamp's version label mismatches.
+        --stale --engine uzdoom|zandronum        restrict --stale to one engine
+        --stale --verbose                        list stale files one per line instead of grouped
 
 Base-PCD-space caveat: `zandronum-only-loud` and the base-PCD flavor of `wrong-opcode` are
 real bins in this engine (129/PCD_GETINVASIONWAVE, 130/PCD_GETINVASIONSTATE = loud;
@@ -509,12 +517,12 @@ _INV = _Inventories()
 SCRIPTED_COHORTS = {
     "acs_both", "acs_zandronum_only", "acs_zandronum_only_loud", "acs_uzdoom_only",
     "acs_compiler_only", "decorate_actions_joined", "decorate_actions_unjoined_uzdoom_only",
-    "decorate_notes_joined", "console_notes_yes", "zscript_blanket",
+    "decorate_notes_joined", "console_notes_yes", "zscript_blanket", "bots_notes_blanket",
 }
 JUDGMENT_COHORTS = {
     "acs_unresolved", "acs_family_unresolved", "decorate_notes_joined_dash",
     "decorate_notes_unjoined", "decorate_classes_unjoined", "decorate_families_unjoined",
-    "console_notes_dash", "concepts_judgment",
+    "console_notes_dash", "concepts_judgment", "menudef_notes_unjoined",
 }
 
 
@@ -541,6 +549,7 @@ ACS_FAMILY_OVERRIDES = {
     "script-execution": ("acs_both", {"UZDoom": "yes", "Zandronum": "yes"}),  # 4/4 both (1 via macro)
     "database": ("acs_zandronum_only", {"UZDoom": "no", "Zandronum": "yes"}),  # 15/15 silent
     "login-account": ("acs_zandronum_only", {"UZDoom": "no", "Zandronum": "yes"}),  # 2/2 silent
+    "map-rotation": ("acs_zandronum_only", {"UZDoom": "no", "Zandronum": "yes"}),  # 4/4 silent
     # inventory: 15/16 both; GetMaxInventory is the outlier (uzdoom-only -- dead on Zandronum,
     # live on UZDoom, the one member where the divergence runs the opposite direction from every
     # other reserved-range case in this tree). File-level claim follows the majority; the
@@ -682,6 +691,12 @@ def classify_doc_file(path):
         return "decorate_families_unjoined", None, "family topic name, not name-resolvable"
     if parts[0] == "console" and parts[1] == "notes":
         return _classify_console_notes(path)
+    if parts[0] == "bots" and parts[1] == "notes":
+        return "bots_notes_blanket", {"UZDoom": "no", "Zandronum": "yes"}, \
+            "BOTINFO/botscript does not exist on UZDoom at all"
+    if parts[0] == "menudef" and parts[1] == "notes":
+        # menudef/inventory/ is hand-maintained with per-engine class columns, not a UZD cell.
+        return "menudef_notes_unjoined", None, "no mechanical join -- menudef inventories have no UZD column"
     if len(parts) >= 2 and parts[-2] == "concepts":
         return "concepts_judgment", None, "concept page, not name-resolvable"
     return "uncategorized", None, f"no cohort rule for {rel} -- add one before trusting phase-3 coverage"
@@ -792,6 +807,10 @@ def _print_files_report(plan):
 # under `wadsrc/static/zscript/` for many). A coarse per-directory bucket errs toward reporting
 # more files stale than strictly necessary, never fewer -- the safe direction for a query whose
 # job is "don't silently trust an old claim".
+#
+# One bucket table per engine (BUCKET_PATHS for UZDoom, ZAN_BUCKET_PATHS for Zandronum), same
+# (section, dir) keys, each narrow or `src/`-wide in the same places. A file with stamps for both
+# engines is checked once per engine, each against its own checkout.
 # ---------------------------------------------------------------------------
 import subprocess  # noqa: E402
 
@@ -816,38 +835,120 @@ BUCKET_PATHS = {
     ("gldefs", "concepts"): ("src/",),
     ("sbarinfo", "concepts"): ("src/",),
     ("sprites", "concepts"): ("src/",),
+    ("bots", "notes"): ("src/",),
+    ("bots", "concepts"): ("src/",),
+    ("zandronum-lumps", "concepts"): ("src/",),
+    ("menudef", "notes"): ("src/", "wadsrc/static/zscript/"),
+    ("menudef", "concepts"): ("src/",),
+    ("netcode", "concepts"): ("src/",),
     ("shared", "concepts"): ("src/",),
 }
 
+# Zandronum's counterpart, same keys at the same granularity. No zscript/* entry on purpose:
+# ZScript doesn't exist on Zandronum, so a Zandronum stamp there must surface as "no bucket rule".
+_ZAN_ACS = ("src/p_acs.cpp", "src/p_acs.h", "src/actionspecials.h")
+ZAN_BUCKET_PATHS = {
+    ("acs", "functions"): _ZAN_ACS,
+    ("acs", "families"): _ZAN_ACS,
+    ("acs", "concepts"): _ZAN_ACS,
+    ("decorate", "actions"): (
+        "src/thingdef/", "src/p_enemy.cpp", "src/g_shared/", "wadsrc/static/actors/",
+    ),
+    ("decorate", "notes"): ("src/thingdef/thingdef_properties.cpp", "src/thingdef/thingdef_data.cpp"),
+    ("decorate", "classes"): ("wadsrc/static/actors/", "src/g_shared/"),
+    ("decorate", "families"): ("wadsrc/static/actors/", "src/g_shared/"),
+    ("decorate", "concepts"): ("wadsrc/static/actors/", "src/thingdef/"),
+    ("console", "notes"): ("src/",),
+    ("console", "concepts"): ("src/",),
+    ("mapinfo", "concepts"): ("src/",),
+    ("cvarinfo", "concepts"): ("src/",),
+    ("gldefs", "concepts"): ("src/",),
+    ("sbarinfo", "concepts"): ("src/",),
+    ("sprites", "concepts"): ("src/",),
+    ("bots", "notes"): ("src/",),
+    ("bots", "concepts"): ("src/",),
+    ("zandronum-lumps", "concepts"): ("src/",),
+    ("menudef", "notes"): ("src/", "wadsrc/static/"),
+    ("menudef", "concepts"): ("src/",),
+    ("netcode", "concepts"): ("src/",),
+    ("shared", "concepts"): ("src/",),
+}
 
-def bucket_paths_for(rel_path):
-    """-> tuple of UZDoom-checkout-relative paths to check for staleness, or () if this
-    directory has no bucket rule yet (reported separately, never silently skipped)."""
+# Verified against: engine name -> (sources.local.md key, bucket table, table name for messages).
+STALE_ENGINES = {
+    "UZDoom": ("uzdoom", BUCKET_PATHS, "BUCKET_PATHS"),
+    "Zandronum": ("zandronum", ZAN_BUCKET_PATHS, "ZAN_BUCKET_PATHS"),
+}
+
+
+def _bucket_key(rel_path):
+    """-> the (section, dir) key a doc path buckets under, or None for a path too shallow to have one."""
     parts = rel_path.parts
     if len(parts) >= 2 and parts[-2] == "concepts":
-        return BUCKET_PATHS.get((parts[0], "concepts"), ())
+        return (parts[0], "concepts")
     if len(parts) >= 2:
-        return BUCKET_PATHS.get((parts[0], parts[1]), ())
-    return ()
-
-
-def _uzdoom_verified_entry(text):
-    """-> (version, sha, date) from this file's Verified against: field, or None if it carries
-    no UZDoom entry yet (nothing to check staleness against)."""
-    fields = _L.extract_all_fields(text, _L.VERIFIED_AGAINST_START_RE)
-    if not fields:
-        return None
-    entries, _problems = _L.parse_verified_against(_L._field_body(fields[0]))
-    for engine, version, sha, date in entries:
-        if engine == "UZDoom":
-            return version, sha, date
+        return (parts[0], parts[1])
     return None
 
 
-def _git_log_since(uzdoom_root, sha, paths):
+def bucket_paths_for(rel_path, engine="UZDoom"):
+    """-> tuple of engine-checkout-relative paths to check for staleness, or () if this
+    directory has no bucket rule yet (reported separately, never silently skipped)."""
+    key = _bucket_key(rel_path)
+    return STALE_ENGINES[engine][1].get(key, ()) if key else ()
+
+
+def _verified_entries(text, engine):
+    """-> every (version, sha, date) for `engine` in this file's Verified against: field, in order."""
+    fields = _L.extract_all_fields(text, _L.VERIFIED_AGAINST_START_RE)
+    if not fields:
+        return []
+    entries, _problems = _L.parse_verified_against(_L._field_body(fields[0]))
+    return [(version, sha, date) for e, version, sha, date in entries if e == engine]
+
+
+_DEFINE_RE = re.compile(r"^\s*#\s*define\s+(\w+)\s+(.*)$", re.M)
+
+
+def _version_label_at(root, sha):
+    """-> VERSIONSTR as `src/version.h` spells it at `sha` (macros and string literals expanded),
+    or None if it can't be read. Zandronum builds it from GAMEVER_STRING plus a suffix."""
+    result = subprocess.run(["git", "-C", str(root), "show", f"{sha}:src/version.h"],
+                            capture_output=True, text=True)
+    if result.returncode != 0:
+        return None
+    defs = {}
+    for m in _DEFINE_RE.finditer(result.stdout):
+        defs.setdefault(m.group(1), m.group(2).split("//")[0])
+
+    def expand(name, depth=0):
+        body = defs.get(name)
+        if body is None or depth > 8:
+            return None
+        out = []
+        for tok in re.findall(r'"[^"]*"|\w+', body):
+            if tok.startswith('"'):
+                out.append(tok[1:-1])
+                continue
+            sub = expand(tok, depth + 1)
+            if sub is None:
+                return None
+            out.append(sub)
+        return "".join(out)
+
+    return expand("VERSIONSTR")
+
+
+def _git_log_since(engine_root, sha, paths):
     """-> count of commits in (sha, HEAD] touching any of paths, or None if the SHA itself
     isn't reachable (rewritten history, wrong checkout) -- distinct from 0, which means clean."""
-    cmd = ["git", "-C", str(uzdoom_root), "log", "--oneline", f"{sha}..HEAD", "--", *paths]
+    # Ancestry, not mere existence: a fork-only commit can sit in a shared object store and
+    # would otherwise count as a false 0.
+    anc = subprocess.run(["git", "-C", str(engine_root), "merge-base", "--is-ancestor", sha, "HEAD"],
+                         capture_output=True, text=True)
+    if anc.returncode != 0:
+        return None
+    cmd = ["git", "-C", str(engine_root), "log", "--oneline", f"{sha}..HEAD", "--", *paths]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         return None
@@ -855,44 +956,65 @@ def _git_log_since(uzdoom_root, sha, paths):
     return len(lines)
 
 
-def run_stale():
-    """-> list of dicts (one per UZDoom-stamped doc file), each with path/sha/date/paths/
-    commits_since (None = SHA unreachable, i.e. check this by hand)."""
-    uzdoom_root = source_root("uzdoom")
+def run_stale(engine="UZDoom"):
+    """-> list of dicts (one per doc file stamped for `engine`), each with engine/path/bucket/
+    version/sha/date/paths/commits_since (None = SHA unreachable, i.e. check this by hand) and
+    mislabeled: [(version, sha, VERSIONSTR at that sha)] over every entry for `engine`, not
+    just the first one staleness is measured from."""
+    root = source_root(STALE_ENGINES[engine][0])
+    labels = {}
     out = []
     for path in iter_cohort_files():
         text = path.read_text(encoding="utf-8")
-        entry = _uzdoom_verified_entry(text)
-        if entry is None:
+        stamps = _verified_entries(text, engine)
+        if not stamps:
             continue
-        version, sha, date = entry
+        version, sha, date = stamps[0]
         rel = path.relative_to(ROOT)
-        paths = bucket_paths_for(rel)
-        commits_since = _git_log_since(uzdoom_root, sha, paths) if paths else None
+        paths = bucket_paths_for(rel, engine)
+        commits_since = _git_log_since(root, sha, paths) if paths else None
+        mislabeled = []
+        for v, s, _d in stamps:
+            if s not in labels:
+                labels[s] = _version_label_at(root, s)
+            if labels[s] is not None and labels[s] != v:
+                mislabeled.append((v, s, labels[s]))
         out.append({
-            "path": rel, "version": version, "sha": sha, "date": date,
-            "paths": paths, "commits_since": commits_since,
+            "engine": engine, "path": rel, "bucket": _bucket_key(rel), "version": version,
+            "sha": sha, "date": date, "paths": paths, "commits_since": commits_since,
+            "mislabeled": mislabeled,
         })
     return out
 
 
-def _print_stale_report(entries):
-    print(f"engine_matrix.py --stale: {len(entries)} doc files carry a UZDoom Verified against: stamp")
+def _print_stale_report(engine, entries, verbose=False):
+    print(f"engine_matrix.py --stale: {len(entries)} doc files carry a {engine} Verified against: stamp")
     if not entries:
-        print("  (none yet -- Phase 5 hasn't stamped any file. This query becomes useful once it has.)")
+        print(f"  (none yet -- no file carries a {engine} stamp. This query becomes useful once one does.)")
         return
     no_bucket = [e for e in entries if not e["paths"]]
     unreachable = [e for e in entries if e["paths"] and e["commits_since"] is None]
     stale = [e for e in entries if e["commits_since"] is not None and e["commits_since"] > 0]
     fresh = [e for e in entries if e["commits_since"] == 0]
+    mislabeled = [e for e in entries if e["mislabeled"]]
     print(f"  fresh (no commits since stamp):  {len(fresh)}")
     print(f"  stale (commits landed since):    {len(stale)}")
     print(f"  SHA unreachable (check by hand): {len(unreachable)}")
     print(f"  no bucket-path rule (add one):   {len(no_bucket)}")
-    if stale:
+    print(f"  version label mismatch:          {len(mislabeled)}")
+    if stale and verbose:
         print("\n  STALE:")
         for e in sorted(stale, key=lambda e: -e["commits_since"]):
             print(f"    {e['path']}  ({e['commits_since']} commits since @{e['sha']}, stamped {e['date']})")
+    elif stale:
+        # Grouped: hundreds of files share one SHA, so per-file output is only useful via --verbose.
+        groups = {}
+        for e in stale:
+            k = ("/".join(e["bucket"]), e["sha"], e["commits_since"])
+            groups[k] = groups.get(k, 0) + 1
+        print("\n  STALE (grouped; --verbose lists files):")
+        for (bucket, sha, since), n in sorted(groups.items(), key=lambda kv: (-kv[0][2], kv[0][0], kv[0][1])):
+            print(f"    {bucket} @{sha}: {since} commits since, {n} file{'s' if n != 1 else ''}")
     if unreachable:
         print("\n  SHA UNREACHABLE:")
         for e in unreachable:
@@ -901,18 +1023,48 @@ def _print_stale_report(entries):
         print("\n  NO BUCKET RULE:")
         for e in no_bucket:
             print(f"    {e['path']}")
+    if mislabeled:
+        print("\n  VERSION LABEL MISMATCH (stamp label vs src/version.h at that SHA):")
+        for e in mislabeled:
+            for version, sha, actual in e["mislabeled"]:
+                print(f"    {e['path']}  ({engine} {version} @{sha}, version.h says {actual})")
 
 
 def main():
     args = sys.argv[1:]
     check = "--check" in args
-    args = [a for a in args if a != "--check"]
+    verbose = "--verbose" in args
+    args = [a for a in args if a not in ("--check", "--verbose")]
+    stale_engines = list(STALE_ENGINES)
+    if "--engine" in args:
+        i = args.index("--engine")
+        by_key = {v[0]: k for k, v in STALE_ENGINES.items()}
+        choice = args[i + 1] if i + 1 < len(args) else None
+        if choice not in by_key:
+            print(f"--engine takes one of: {', '.join(by_key)}", file=sys.stderr)
+            sys.exit(1)
+        stale_engines = [by_key[choice]]
+        args = args[:i] + args[i + 2:]
 
     if check:
         return _run_check()
 
     if "--stale" in args:
-        _print_stale_report(run_stale())
+        all_entries = []
+        for n, engine in enumerate(stale_engines):
+            if n:
+                print()
+            entries = run_stale(engine)
+            _print_stale_report(engine, entries, verbose)
+            all_entries += entries
+        if any(e["paths"] and e["commits_since"] is None for e in all_entries):
+            print("engine_matrix.py --stale: FAILED -- a SHA UNREACHABLE stamp isn't on the checkout's "
+                  "history (a fork-only commit?); restamp it against upstream", file=sys.stderr)
+            sys.exit(1)
+        if any(e["mislabeled"] for e in all_entries):
+            print("engine_matrix.py --stale: FAILED -- a stamp's version label disagrees with "
+                  "src/version.h at its SHA; relabel it (see VERSION LABEL MISMATCH above)", file=sys.stderr)
+            sys.exit(1)
         return
 
     if "--files" in args:
@@ -1026,13 +1178,20 @@ def _run_check():
     assert_eq("build_file_plan() determinism",
               [(e["path"], e["cohort"], e["applies"], e["deferred"]) for e in plan1],
               [(e["path"], e["cohort"], e["applies"], e["deferred"]) for e in plan2])
-    assert_eq("--files total doc files", len(plan1), 518)
+    # Updated 2026-09-22: 518->591, all 73 files added since the 1d5f742 pin (see the cohort-count
+    # comment below for the per-cohort reconciliation). Then 591->588: four map-rotation function
+    # files merged into acs/families/map-rotation.md. 2026-09-24: 588->601, 13 new files since
+    # the 32c6a14 pin (see the cohort-count comment below).
+    assert_eq("--files total doc files", len(plan1), 601)
     uncategorized = [e for e in plan1 if e["kind"] == "uncategorized"]
     assert_eq("--files uncategorized files", [str(e['path']) for e in uncategorized], [])
     stamped_now = sum(1 for e in plan1 if e["kind"] == "scripted" and not e["deferred"])
     deferred = sum(1 for e in plan1 if e["deferred"])
     judgment = len(plan1) - stamped_now - deferred
-    assert_eq("--files scripted+stamped-now", stamped_now, 412)
+    # Updated 2026-09-22: 412->441 and judgment 103->147 below, from the same 73 new files.
+    # Then 441->438 from the map-rotation merge. 2026-09-24: 438->435 and judgment 147->163, from
+    # the 32c6a14 reconciliation below (new kill.md scripted, 5 flag notes -> judgment, 1 back).
+    assert_eq("--files scripted+stamped-now", stamped_now, 435)
     # Updated 2026-08-16 (C4 wave 1): 3 files (acs-old-object-format.md, integer-arithmetic.md,
     # operators.md) gained a real Zandronum verification date this wave, moving them out of
     # "deferred" -- expected drift per this function's own doc-tree-changed case above, not a
@@ -1080,7 +1239,7 @@ def _run_check():
     # closed even though these 3 files still show up here for legitimate, already-documented
     # reasons.
     assert_eq("--files deferred (no recoverable Zandronum date)", deferred, 3)
-    assert_eq("--files judgment/uncategorized", judgment, 103)
+    assert_eq("--files judgment/uncategorized", judgment, 163)
     by_cohort = {}
     for e in plan1:
         by_cohort[e["cohort"]] = by_cohort.get(e["cohort"], 0) + 1
@@ -1093,15 +1252,29 @@ def _run_check():
     # zt-bcc table entry under any name at their numeric slot -- same class as the pre-existing
     # checkautomap.md already in this cohort, confirmed by direct numeric-slot inspection of
     # zcommon.bcs before writing either file, not just a name-search miss).
+    # 2026-09-22: re-pinned after adding cohort rules for bots/notes/ (bots_notes_blanket, 11,
+    # Zandronum-only by section) and menudef/notes/ (menudef_notes_unjoined, 4, judgment). Every
+    # other delta since the 1d5f742 pin is new files only: each cohort's count of files that
+    # already existed at 1d5f742 still equals its old pin exactly, so nothing moved cohorts.
+    # Growth: concepts_judgment +29, decorate_notes_joined +9, decorate_actions_joined +5 (incl.
+    # a_faceconsoleplayer.md, joined after the ACTION_FUNC_RE whitespace fix in 38e8ba7),
+    # decorate_classes_unjoined +3, decorate_families_unjoined +3, decorate_notes_joined_dash +3,
+    # console_notes_dash +2, console_notes_yes +1, zscript_blanket +2, acs_both +1.
+    # 2026-09-22: acs_zandronum_only 53->50, four map-rotation files merged into one family file
+    # (resolved via its ACS_FAMILY_OVERRIDES entry).
+    # 2026-09-24: re-pinned against 32c6a14 (clean there). New files: concepts_judgment +1
+    # (zandronum-weapon-sway.md), decorate_notes_joined_dash +8 (sway/bob/pitch properties),
+    # console_notes_dash +3 (cl_usecustom*), console_notes_yes +1 (kill.md). Moves: 680bd9a's
+    # no-op UZD cell took 5 flag notes joined -> joined_dash, and NOAUTOFIRE went back the other way.
     expected_cohorts = {
-        "acs_both": 148, "acs_compiler_only": 10, "acs_family_unresolved": 1,
-        "acs_unresolved": 4, "acs_uzdoom_only": 9, "acs_zandronum_only": 53,
-        "acs_zandronum_only_loud": 2,
-        "concepts_judgment": 49, "console_notes_dash": 34, "console_notes_yes": 30,
-        "decorate_actions_joined": 111, "decorate_actions_unjoined_uzdoom_only": 13,
-        "decorate_classes_unjoined": 12, "decorate_families_unjoined": 2,
-        "decorate_notes_joined": 2, "decorate_notes_joined_dash": 1,
-        "decorate_notes_unjoined": 3, "zscript_blanket": 34,
+        "acs_both": 149, "acs_compiler_only": 10, "acs_family_unresolved": 1,
+        "acs_unresolved": 4, "acs_uzdoom_only": 9, "acs_zandronum_only": 50,
+        "acs_zandronum_only_loud": 2, "bots_notes_blanket": 11,
+        "concepts_judgment": 79, "console_notes_dash": 39, "console_notes_yes": 32,
+        "decorate_actions_joined": 116, "decorate_actions_unjoined_uzdoom_only": 13,
+        "decorate_classes_unjoined": 15, "decorate_families_unjoined": 5,
+        "decorate_notes_joined": 7, "decorate_notes_joined_dash": 16,
+        "decorate_notes_unjoined": 3, "menudef_notes_unjoined": 4, "zscript_blanket": 36,
     }
     assert_eq("--files cohort counts", by_cohort, expected_cohorts)
 
@@ -1115,17 +1288,18 @@ def _run_check():
     # missing bucket rule, never silently). Also exercises the actual machinery
     # (bucket_paths_for, _git_log_since) against a synthetic old SHA and a synthetic bogus SHA,
     # both known-stable rather than tied to whatever commit UZDoom's checkout is on.
-    stale_entries = run_stale()
-    assert_eq("--stale: at least the C0a pilot is stamped", len(stale_entries) >= 1, True)
-    for e in stale_entries:
-        if e["paths"] and e["commits_since"] is None:
-            ok = False
-            print(f"CHECK FAILED: --stale: {e['path']} has a bucket rule but an unresolved "
-                  f"SHA @{e['sha']} -- investigate, don't silently ignore", file=sys.stderr)
-        if not e["paths"]:
-            ok = False
-            print(f"CHECK FAILED: --stale: {e['path']} has no bucket-path rule -- add one to "
-                  "BUCKET_PATHS", file=sys.stderr)
+    for engine, (_key, _table, table_name) in STALE_ENGINES.items():
+        stale_entries = run_stale(engine)
+        assert_eq(f"--stale: at least one {engine}-stamped file", len(stale_entries) >= 1, True)
+        for e in stale_entries:
+            if e["paths"] and e["commits_since"] is None:
+                ok = False
+                print(f"CHECK FAILED: --stale: {e['path']} has a bucket rule but an unresolved "
+                      f"{engine} SHA @{e['sha']} -- investigate, don't silently ignore", file=sys.stderr)
+            if not e["paths"]:
+                ok = False
+                print(f"CHECK FAILED: --stale: {e['path']} has a {engine} stamp but no bucket-path "
+                      f"rule -- add one to {table_name}", file=sys.stderr)
     assert_eq(
         "bucket_paths_for: acs/functions maps to a real bucket",
         bucket_paths_for(Path("acs/functions/foo.md")),
@@ -1140,6 +1314,18 @@ def _run_check():
     assert_eq("_git_log_since: old SHA has commits since", old_sha_commits is not None and old_sha_commits > 0, True)
     assert_eq("_git_log_since: bogus SHA is unreachable, not a false zero",
               _git_log_since(uzdoom_root, "0000000000", ("src/playsim/p_acs.cpp",)), None)
+    assert_eq(
+        "bucket_paths_for: Zandronum acs/functions maps to the ACS triple",
+        bucket_paths_for(Path("acs/functions/foo.md"), "Zandronum"), _ZAN_ACS,
+    )
+    assert_eq("bucket_paths_for: Zandronum has no zscript bucket",
+              bucket_paths_for(Path("zscript/classes/foo.md"), "Zandronum"), ())
+    zan_root = source_root("zandronum")
+    zan_old = _git_log_since(zan_root, "28f736fb3", ("src/p_acs.cpp",))
+    assert_eq("_git_log_since: Zandronum 3.2.1 SHA has commits since", zan_old is not None and zan_old > 0, True)
+    assert_eq("_git_log_since: bogus Zandronum SHA is unreachable, not a false zero",
+              _git_log_since(zan_root, "0000000000", ("src/p_acs.cpp",)), None)
+    assert_eq("_version_label_at: Zandronum 3.2.1 bump commit", _version_label_at(zan_root, "28f736fb3"), "3.2.1")
 
     if ok:
         print("engine_matrix.py --check: clean")

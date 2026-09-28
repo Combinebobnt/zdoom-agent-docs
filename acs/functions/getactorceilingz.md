@@ -2,8 +2,8 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
-**Provenance:** wiki page `GetActorCeilingZ - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=GetActorCeilingZ&oldid=35971`) + source-verified against `p_acs.cpp:12025-12030, 4445-4456`, `p_map.cpp:228-252` (3D-floor clamping in `P_FindFloorCeiling`), `p_map.cpp:6013-6044` (`P_AdjustFloorCeil` refresh behavior), and `actor.h:989` (ceilingz member comment). The 3D-floor-awareness and cached-value-refresh behavior were verified from source (not mentioned on the wiki but present in the fork). No wiki/fork divergence found.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-24)
+**Provenance:** wiki page `GetActorCeilingZ - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://zdoom.org/w/index.php?title=GetActorCeilingZ&oldid=35971`) + source-verified against `p_acs.cpp:12025-12030, 4445-4456`, `p_map.cpp:229-253` (3D-floor clamping in `P_GetFloorCeilingZ`, called from `P_FindFloorCeiling`), `p_map.cpp:6013-6044` (`P_AdjustFloorCeil` refresh behavior), and `actor.h:989` (ceilingz member comment). The 3D-floor-awareness and cached-value-refresh behavior were verified from source (not mentioned on the wiki but present in the fork). No wiki/fork divergence found.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
 
@@ -15,10 +15,10 @@ and then extracts its `ceilingz` member.
 - `ceilingz` (return value) — the lowest ceiling point above the actor, as a **fixed-point
   world coordinate**. This is an **absolute height, not a relative value** — the returned
   height is in the world's coordinate system (same units as `GetActorZ`, `GetActorFloorZ`).
-  The value is **3D-floor-aware**: when an actor is inside a 3D floor, `ceilingz` is the
-  bottom of the 3D floor (not the raw sector ceiling), giving the actual clearance above the
-  actor. See `p_map.cpp:228-252` for the multi-sector ceiling clamping logic that includes
-  3D floor checks. This cached value is refreshed whenever the actor's position is updated
+  The value is **3D-floor-aware**: when a solid 3D floor sits above the actor in its sector,
+  `ceilingz` is the bottom of that 3D floor (not the raw sector ceiling), giving the actual
+  clearance above the actor. See `p_map.cpp:229-253` for the per-sector 3D floor clamping
+  logic. This cached value is refreshed whenever the actor's position is updated
   or a sector motion triggers `P_AdjustFloorCeil` (see `p_map.cpp:6013-6044`), ensuring the
   return value is current.
 - `tid` — **`0` means "the activator"** (`SingleActorFromTID`'s `tid == 0` fallback, line

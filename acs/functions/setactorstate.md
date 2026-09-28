@@ -2,10 +2,10 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** wiki page `SetActorState - ZDoom Wiki.html` (`_intake/`, retrieved 2026-07-29,
 `https://zdoom.org/w/index.php?title=SetActorState&oldid=36009`) + source-verified against `p_acs.cpp:12604-12652`, `p_states.cpp:217-317`,
-`p_mobj.cpp:502-560`, `zt-bcc/src/builtin.c:151`. No wiki/fork behavioral divergence found beyond
+`p_mobj.cpp:502-611`, `zt-bcc/src/builtin.c:151`, `sv_commands.cpp:99-112,2070-2127`. No wiki/fork behavioral divergence found beyond
 the Zandronum-only netcode replication call noted above (an addition, not a contradiction).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin.
@@ -57,7 +57,12 @@ wiki folklore.
 
 ## Zandronum-specific: netcode note (not in the ZDoom wiki source)
 
-On a listen/dedicated server (`NETWORK_GetState() == NETSTATE_SERVER`), every successful state
-change triggers `SERVERCOMMANDS_SetThingFrame` to replicate the new frame to clients
-(`p_acs.cpp:12617-12618`, `12641-12642`) — this is a Zandronum multiplayer addition with no
-equivalent in the vanilla ZDoom wiki page this doc was sourced from.
+On a server (`NETWORK_GetState() == NETSTATE_SERVER`), every successful state change calls
+`SERVERCOMMANDS_SetThingFrame` before `SetState` (`p_acs.cpp:12617-12618`, `12641-12642`). This is
+a Zandronum multiplayer addition with no equivalent in the vanilla ZDoom wiki page this doc was
+sourced from. That call sends nothing for an actor with no net ID (e.g. a client-side-only actor),
+only a "doesn't have a netID" warning when `sv_showwarnings` is on and the actor isn't
+server-side-only. If the target state is the actor's melee, missile, `Wound` or `Pain` state, it
+sends the shorter `SetThingState` command instead. Otherwise clients get `SetThingFrame`, which
+applies the state and runs its action on their copy (`sv_commands.cpp:99-112`, `2070-2127`). Offline
+and on a client, the state change is purely local.

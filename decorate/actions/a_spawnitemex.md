@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-31)
-**Provenance:** ZDoom Wiki `A_SpawnItemEx` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_SpawnItemEx&oldid=52288) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:2591-2710` and `src/thingdef/thingdef_codeptr.cpp:2394-2510` (`InitSpawnedItem` helper). `SXF_TRANSFERAMBUSHFLAG` re-confirmed present and wired (`wadsrc/static/actors/constants.txt:56`, checked in `InitSpawnedItem`) 2026-08-01; `SXF_SETMASTER`/`SXF_TRANSFERPOINTERS`/originator target-override interaction re-traced the same day, resolving the prior "open question" below.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_SpawnItemEx` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_SpawnItemEx&oldid=52288) + verified against the Zandronum source's `src/thingdef/thingdef_codeptr.cpp:2591-2710` and `src/thingdef/thingdef_codeptr.cpp:2394-2510` (`InitSpawnedItem` helper). `SXF_TRANSFERAMBUSHFLAG` re-confirmed present and wired (`wadsrc/static/actors/constants.txt:56`, checked in `InitSpawnedItem`) 2026-08-01; `SXF_SETMASTER`/`SXF_TRANSFERPOINTERS`/originator target-override interaction re-traced the same day, resolving the prior "open question" below. Re-read 2026-09-25 at the `3.3-alpha` checkout: corrected the `SXF_TELEFRAG`/`SXF_TRANSFERAMBUSHFLAG` monster-gating claims and the Return value/networking sections against `src/thingdef/thingdef_codeptr.cpp:2394-2710`, `src/thingdef/thingdef_codeptr.cpp:105`'s `NETWORK_ShouldActorNotBeSpawned`, `src/network.cpp:1552`'s `NETWORK_InClientMode`, and `src/sv_main.cpp:5544`'s `SERVER_SetThingNonZeroAngleAndVelocity`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AActor, A_SpawnItemEx)` in `src/thingdef/thingdef_codeptr.cpp`.
 
@@ -80,11 +80,11 @@ Thing ID to assign to the spawned actor. If non-zero and the spawn succeeds, the
 
 - `SXF_NOCHECKPOSITION` (32) — Skips space-availability validation for monster-based spawned actors. Normally, if the spawned actor is a monster (`MF3_ISMONSTER`), Zandronum calls `P_TestMobjLocation` to ensure the spawn point is passable; if the test fails, the actor is destroyed and the action returns false. This flag bypasses that test. Non-monster actors are never space-checked regardless of this flag.
 
-- `SXF_TELEFRAG` (64) — Calls `P_TeleportMove` with `telefrag = true` on the spawned actor's spawn point, potentially killing any actor in the way. Implies `SXF_NOCHECKPOSITION` (the flag is bitwise OR'd into the flags set after telefragging). Only applies to monster-based spawned actors. For non-monsters, the flag is ignored.
+- `SXF_TELEFRAG` (64) — Calls `P_TeleportMove` with `telefrag = true` on the spawned actor's spawn point, potentially killing any actor in the way. This call runs unconditionally for any spawned actor, monster or not; it is not gated on `MF3_ISMONSTER`. The flag also implies `SXF_NOCHECKPOSITION` (OR'd into the flags set right after the telefrag call), but that implied flag only changes behavior for a monster-based spawned actor, since only monsters go through the `P_TestMobjLocation` space check `SXF_NOCHECKPOSITION` bypasses.
 
 - `SXF_CLIENTSIDE` (128) — Marks the spawn as client-side-only in Zandronum multiplayer (documented in the wiki as "Skulltag only: not supported by ZDoom"). The spawn is gated through `NETWORK_ShouldActorNotBeSpawned(self, missile, true)` — if that returns true (server-authoritative spawn restrictions), the action returns without spawning. On successful client-side-only spawn, the actor gets the `NETFL_CLIENTSIDEONLY` flag set.
 
-- `SXF_TRANSFERAMBUSHFLAG` (256) — Copies the `MF_AMBUSH` flag from the calling actor to the spawned actor. Only applies if the spawned actor is monster-based and can have the `MF_AMBUSH` flag set.
+- `SXF_TRANSFERAMBUSHFLAG` (256) — Copies the `MF_AMBUSH` flag from the calling actor to the spawned actor. This assignment sits outside (after) `InitSpawnedItem`'s `MF3_ISMONSTER` branch, so it runs for any spawned actor, not just monster-based ones.
 
 - `SXF_TRANSFERPITCH` (512) — Copies the calling actor's `pitch` (vertical aiming angle) to the spawned actor. Does **not** affect the spawned actor's velocity — the velocity is calculated from the `xvel`/`yvel`/`zvel` parameters and the angle, with no pitch component applied. To incorporate pitch into trajectory, manually calculate trajectory offsets; see the wiki's example (involving `cos(pitch)` and `sin(pitch)` math) if you need this behavior.
 
@@ -120,14 +120,13 @@ These are either GZDoom-family additions or were introduced after Zandronum 3.2.
 
 **Zandronum-specific note:** The wiki describes a return of two values (a `bool` plus an `Actor` pointer). Zandronum's DECORATE only sets a single boolean result via `ACTION_SET_RESULT(res)`:
 
-- `true` if the spawn succeeded (including successful space validation or when space checks are skipped, and also when the spawn is skipped due to `failchance`).
-- `false` if the spawn failed (null missile class, failed space check for a monster actor, or certain network gate checks like `SXF_CLIENTSIDE` being disallowed by the server).
+- `true` if the spawn succeeded, including a monster-based spawn that passed its space check, and any spawn where the space check was skipped or bypassed (non-monster actor, or `SXF_NOCHECKPOSITION`/`SXF_TELEFRAG` in effect).
+- `false` if the spawn was attempted but failed: a null `missile` class, or a monster-based spawned actor that failed its space check.
+- **Left unset (whatever the calling state's prior result was)** for three early-return paths that skip the spawn before `ACTION_SET_RESULT` is ever reached: a `failchance` skip (line 2612 of the source), the `DamageType == NAME_Massacre` skip (see "Monster spawn restrictions" below), and the `NETWORK_ShouldActorNotBeSpawned` network gate (see "Zandronum-specific networking behavior" below) rejecting the spawn. All three are bare `return;` statements that run before the actor is even spawned, not just before the result is set.
 
-**Important:** A `failchance` early-return (line 2612 of the source) happens **before** `ACTION_SET_RESULT` is called, so the result slot is **not updated** in the case of a chance-based skip. The action's result in this case is whatever the calling state's prior result was (or the actor's default).
-
-To distinguish "spawn succeeded" from "spawn was skipped by chance" in calling DECORATE, you must either:
+To distinguish "spawn succeeded" from one of these three skip cases in calling DECORATE, you must either:
 - Use a separate action before `A_SpawnItemEx` to detect the failure mode directly (e.g., with `A_JumpIf` on an actor variable you set just before the spawn).
-- Accept that a chance-skipped spawn leaves the prior result unchanged and structure your state machine accordingly.
+- Accept that a skipped spawn leaves the prior result unchanged and structure your state machine accordingly.
 
 ## Originator concept
 
@@ -141,18 +140,26 @@ The originator is used by `InitSpawnedItem` to:
 
 ## Zandronum-specific networking behavior
 
-- **Server-side authority for spawn decision:** The entire spawn is server-authoritative. In client mode, the action returns early (before spawning) if the missile would not be server-allowed (see the `NETWORK_ShouldActorNotBeSpawned` check in the source).
+- **Server-side authority for spawn decision:** `NETWORK_ShouldActorNotBeSpawned(self, missile, forceClientSide)` gates the entire spawn before `Spawn()` is even called; a `true` result means the action returns immediately with no actor created, leaving the result unset (see "Return value" above). The gate treats a spawn as client-side-only, flipping the usual polarity, when any of three things hold: `SXF_CLIENTSIDE` is passed, the calling actor itself already carries `NETFL_CLIENTSIDEONLY`, or the spawned class's own defaults carry `NETFL_CLIENTSIDEONLY`. For a spawn that is client-side-only by any of those three, the check blocks the server and allows the client. For every other spawn, it blocks the client and allows the server, matching the usual server-authoritative model. See "Client-side-only actors" below.
 
-- **Client-side-only actors:** If `SXF_CLIENTSIDE` is set and the spawn succeeds, the actor gets `NETFL_CLIENTSIDEONLY` set. On a dedicated server or listen server, this flag remains set but has no immediate effect (it marks the actor as a visual-only client update).
+- **Client-side-only actors:** Because the gate above blocks the server from ever creating a client-side-only actor (by any of the three conditions above), the server has nothing to broadcast for one. Each client instead spawns and owns its own local copy. `A_SpawnItemEx` itself only adds `NETFL_CLIENTSIDEONLY` to the spawned actor when the call runs under `NETWORK_InClientMode()` (a real client connection or demo playback); the spawned class's own defaults may already carry the flag independently of this. The flag-setting line at the end of the function never runs on the server for such a spawn, since the server's own call already returned early at the network gate.
 
 - **Server broadcast on success:** If spawning on the server and the spawn succeeds:
   - `SERVERCOMMANDS_SpawnThing(mo)` sends the basic spawn to all clients.
-  - If the spawned actor's angle is non-zero, `SERVERCOMMANDS_SetThingAngle(mo)` is sent (optimization to avoid zero-angle spam).
+  - If the spawned actor's angle or any velocity component (`velx`/`vely`/`velz`) is non-zero, `SERVER_SetThingNonZeroAngleAndVelocity(mo)` sends a single `SERVERCOMMANDS_MoveThingExact(mo, bits)` covering whichever of `CM_ANGLE`/`CM_VELX`/`CM_VELY`/`CM_VELZ` are non-zero; nothing is sent if all four are zero.
   - If the spawned actor received a translation (`SXF_TRANSFERTRANSLATION` or `SXF_USEBLOODCOLOR`), `SERVERCOMMANDS_SetThingTranslation(mo)` is sent.
   - TID assignment (if `tid` parameter is non-zero) is synced separately via `SERVERCOMMANDS_SetThingTID(mo)`.
   - If the spawned actor is a missile or has bounce flags, `SERVERCOMMANDS_SetThingTarget(mo)` syncs the target pointer.
   - If the spawned actor's scale differs from its actor definition default, `SERVERCOMMANDS_UpdateThingScaleNotAtDefault(mo)` is sent.
   - If the spawned actor's `fillcolor` (stencil color) differs from its actor definition default, `SERVERCOMMANDS_SetThingProperty(mo, APROP_StencilColor)` is sent.
+
+  **Added after 3.2.1:** the TID-sync (`SERVERCOMMANDS_SetThingTID`) and stencil-color-sync
+  (`SERVERCOMMANDS_SetThingProperty(mo, APROP_StencilColor)`) bullets above postdate the 3.2.1
+  version-bump commit (`28f736fb3`) and are not ancestors of it, so a real Zandronum 3.2.1 client
+  does neither: `92472813e` ("Fixed: A_SpawnItemEx didn't sync the TID of spawned actors to
+  clients in online games") and `ae4ce1012` ("Fixed: A_SpawnItemEx's SXF_TRANSFERSTENCILCOL flag
+  didn't work in online games"). Both are confirmed present and wired in the `3.3-alpha` checkout
+  this entry was read from. Every other bullet in this list predates `28f736fb3`.
 
 - **Monster spawn restrictions:** If `DamageType == NAME_Massacre` on the calling actor and the spawned actor is monster-based, the spawn is skipped entirely (before `ACTION_SET_RESULT` is set). This prevents re-spawning during a player-wipe death.
 
@@ -211,19 +218,20 @@ wiki, not the single-bool Zandronum behavior described above.
 
 ## Engine-family divergence: failchance/massacre skips always set an explicit result on UZDoom
 
-Zandronum's `failchance` early-return and its massacre-check early-return (see "Monster spawn
-restrictions" below) both `return` without calling `ACTION_SET_RESULT`, so the action's result slot
-is left at whatever it was before the call — the behavior the "Return value" section above
-describes as "not updated."
+Zandronum's `failchance` early-return, its massacre-check early-return (see "Monster spawn
+restrictions" below), and its `NETWORK_ShouldActorNotBeSpawned` network-gate early-return (see
+"Zandronum-specific networking behavior" below) all `return` without calling `ACTION_SET_RESULT`,
+so the action's result slot is left at whatever it was before the call — the behavior the "Return
+value" section above describes as "left unset."
 
-UZDoom has no such carryover concept: both the `failchance` skip and the massacre skip are plain
-`return true, null;` statements, so the result is always explicitly `true` (with a `null` actor
-reference) in both cases, never a leftover prior value. Code that relies on Zandronum's
-"result unchanged on a chance-skipped spawn" behavior to distinguish that case from a real spawn
-does not work the same way on UZDoom — both a successful spawn and a chance/massacre skip can
-return `true`; only the `Actor` half of the return value distinguishes them (`null` for a skip,
-non-null for an actual spawn — actual-spawn failure from a blocked monster space check does still
-return `false`).
+UZDoom has no such carryover concept, and no client/server split for the third case to even exist
+on (see the next section): the `failchance` skip and the massacre skip are plain `return true,
+null;` statements, so the result is always explicitly `true` (with a `null` actor reference) in
+both cases, never a leftover prior value. Code that relies on Zandronum's "result unchanged on a
+skipped spawn" behavior to distinguish that case from a real spawn does not work the same way on
+UZDoom — both a successful spawn and a chance/massacre skip can return `true`; only the `Actor`
+half of the return value distinguishes them (`null` for a skip, non-null for an actual spawn —
+actual-spawn failure from a blocked monster space check does still return `false`).
 
 ## Engine-family divergence: no client/server split — `SXF_CLIENTSIDE` is inert on UZDoom
 

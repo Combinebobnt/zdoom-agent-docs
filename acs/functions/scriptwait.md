@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** `ScriptWait - ZDoom Wiki.html`
 (`https://zdoom.org/w/index.php?title=ScriptWait&oldid=35861`), verified against
 the Zandronum source's `src/p_acs.cpp` on 2026-07-29. The wiki's usage line is accurate as far as it
@@ -30,13 +30,23 @@ it to *start* first if it isn't already running when `ScriptWait` is called.
   - `SCRIPT_ScriptWait` — polled once per tic; as soon as `RunningScripts` *no longer* has an
     entry for `script` (the target finished, terminated, or errored out — anything that hits
     `SCRIPT_PleaseRemove`, `p_acs.cpp:13028-13037`, removes it from `RunningScripts`), transitions
-    back to `SCRIPT_Running` and calls `PutFirst()` so the newly-woken script is scheduled ahead of
-    everything else already in the tic's run list — it can execute its resumed bytecode in the
-    same tic the target script finished, rather than waiting for the following tic.
+    back to `SCRIPT_Running` and falls straight into the bytecode loop in the same `RunScript()`
+    call, so the caller resumes in that same poll. Because the caller was moved to the end of the
+    script list when it began waiting (`PutLast()`, `p_acs.cpp:10664`), that poll normally comes
+    after the target's own run in the tic the target finished. The `PutFirst()` call on wake does
+    not affect the current tic's pass (`DACSThinker::Tick` has already saved the next pointer). It
+    only moves the woken script to the head of the list for later tics.
 - **`RunningScripts` only reflects "currently executing," with no history.** A script number is
-  added to `RunningScripts` when it starts (`p_acs.cpp:13131`) and removed the moment it stops
+  added to `RunningScripts` when it starts, but only if the start lacks the `ACS_ALWAYS` flag
+  (`p_acs.cpp:13130-13131`). It is removed the moment that tracked instance stops
   (`p_acs.cpp:13035`, on `SCRIPT_PleaseRemove` — natural completion, `Terminate`, or a runtime
   error alike). There is no separate "has this script ever run" flag.
+- **Scripts started with `ACS_ALWAYS` are invisible to `ScriptWait`.** `ACS_ExecuteAlways`,
+  `ACS_ExecuteWithResult`, and typed scripts the engine starts with the always flag (e.g. `ENTER`,
+  `RESPAWN`, `DEATH`) never enter `RunningScripts`. A `ScriptWait` on a script that only ever runs
+  that way stays in `SCRIPT_ScriptWaitPre` forever, even while the script is visibly running.
+  Removal is also gated on the map entry being the stopping instance (`p_acs.cpp:13032-13033`), so
+  an untracked copy finishing never unregisters a tracked one.
 - **Can't tell "never started" from "already finished" — the real gotcha.** Because
   `SCRIPT_ScriptWaitPre` only asks "is it running *right now*," calling `ScriptWait(N)` *after*
   script `N` has already run to completion looks identical, from the interpreter's point of view,

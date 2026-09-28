@@ -2,8 +2,8 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
-**Provenance:** wiki page `GetActorSectorLocation - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetActorSectorLocation&oldid=2244`) + source-verified against `p_acs.cpp:5518,7955-7994`, `zcommon.bcs:1783`. Cross-checked against `functions/getcontrolpointinfo.md`'s documented `point`-index semantics, which the `point == true` branch here directly feeds. Wiki/engine divergence: wiki implies both modes return a name string; the `point == true` mode actually returns a raw control-point index (or `-1`), never a string.
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
+**Provenance:** wiki page `GetActorSectorLocation - Zandronum Wiki.html` (`_intake/`, retrieved 2026-07-29, `https://wiki.zandronum.com/w/index.php?title=GetActorSectorLocation&oldid=2244`) + source-verified against `p_acs.cpp:5518,7955-7994`, `zcommon.bcs:1783`; raw-index `Log(s:)` behavior per `p_acs.cpp:3318-3355,10734-10741`. Cross-checked against `functions/getcontrolpointinfo.md`'s documented `point`-index semantics, which the `point == true` branch here directly feeds. Wiki/engine divergence: wiki implies both modes return a name string; the `point == true` mode actually returns a raw control-point index (or `-1`), never a string.
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function (negative index, `p_acs.cpp`'s `ACSF_*` switch).
 
@@ -34,8 +34,10 @@ implying `point == true` still gives back a name string (just derived from the p
 instead of `Names`). The actual C++ (`p_acs.cpp:7969-7985,7993`) does nothing of the kind — it
 returns a bare `unsigned int`/`-1` index value, never touching `GlobalACSStrings` in that branch.
 A caller that does `str s = GetActorSectorLocation(tid, true); Log(s: s);` will not print a point
-name — it will print whatever garbage the engine's string table happens to have at that raw index
-position (or crash/misbehave, since the value was never registered as a string). The correct
+name. On Zandronum, `Log(s:)` resolves a small raw value `i` as string-table slot `i` of the first
+loaded ACS module (the map's own BEHAVIOR lump when it has one), not the calling library's table
+(`p_acs.cpp:3318-3355`). So it prints an unrelated string literal from that module, or nothing
+when the slot is out of range; `-1` prints nothing (`p_acs.cpp:10734-10741`). It doesn't crash. The correct
 usage for `point == true` is to treat the result as an `int` — typically to feed straight into
 `GetControlPointInfo(result, POINTINFO_NAME)` to actually get a name back. This is corroborated by
 an in-source comment right above the branch: `// [TRSR] We'd actually rather return the index of

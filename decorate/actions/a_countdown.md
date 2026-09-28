@@ -2,12 +2,12 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
-**Provenance:** ZDoom Wiki `A_Countdown` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_Countdown&oldid=47867) + verified against the Zandronum source's `src/g_strife/a_strifestuff.cpp:621-637`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `A_Countdown` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_Countdown&oldid=47867) + verified against the Zandronum source's `src/g_strife/a_strifestuff.cpp:621-637`, `src/p_mobj.cpp:1536-1716` (`P_ExplodeMissile`, server `MissileExplode` at 1571), `src/cl_main.cpp:6650-6666` (client handler), `src/p_acs.cpp:4874-4876` (`APROP_ReactionTime`).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION(AActor, A_Countdown)` in `src/g_strife/a_strifestuff.cpp` — callable from any actor's state table (defined on `AActor`).
 
-Decrements the calling actor's `ReactionTime` property once per call. When `ReactionTime` reaches 0 or below, explodes and destroys the calling actor.
+Decrements the calling actor's `ReactionTime` property once per call. When `ReactionTime` reaches 0 or below, explodes the calling actor: it stops and enters its `Death` state, or is removed if it has none.
 
 ## Signature
 
@@ -23,7 +23,7 @@ None.
 
 When called, this action decrements the `reactiontime` field by 1. If the result is 0 or less:
 
-1. Calls `P_ExplodeMissile()` to explode the actor (creating an explosion effect at its current position).
+1. Calls `P_ExplodeMissile()` to explode the actor. This zeroes its velocity, clears `SHOOTABLE`, plays its `DeathSound` and sets it to its `Death` state. It spawns nothing by itself; any visible explosion is whatever the `Death` state does. With no `Death` state the actor is removed.
 2. Clears the `MF_SKULLFLY` flag from the actor.
 
 If `reactiontime` is still above 0 after the decrement, the actor continues normally until the next call to `A_Countdown`.
@@ -55,7 +55,7 @@ In this example, each loop advances two frames with `A_Tracer` (4 tics total), t
 
 ## Network behavior
 
-**Zandronum multiplayer:** The server handles this action exclusively. On network clients, the action returns without effect if the actor is not marked as client-side-only. After the explosion occurs on the server, the destruction is synchronized to all clients via the normal actor-death replication.
+**Zandronum multiplayer:** The server handles this action exclusively. On network clients, the action returns without effect if the actor is not marked as client-side-only. When the countdown expires, the server's `P_ExplodeMissile` sends a missile-explode command, and each client runs its own `P_ExplodeMissile` on the actor (skipped if it is already in its `Death` state). The server then sends the actor's flags separately so clients also see the `MF_SKULLFLY` clear. The countdown itself is not sent; only the explosion is.
 
 ## Engine-family divergence: Network behavior
 
@@ -63,5 +63,5 @@ In this example, each loop advances two frames with `A_Tracer` (4 tics total), t
 
 ## Related actions and properties
 
-- **`ReactionTime`** — the property decremented by this action. Can be set in the actor definition or modified at runtime via `A_SetReactionTime` or similar.
+- **`ReactionTime`** — the property decremented by this action. Can be set in the actor definition, or changed at runtime from ACS with `SetActorProperty(tid, APROP_ReactionTime, value)`. Neither engine has an `A_SetReactionTime` action.
 - **`A_CountdownArg`** — a more general version that counts down an arbitrary `args[n]` field instead of `ReactionTime`.

@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** `SoundSequenceOnActor - ZDoom Wiki` (https://zdoom.org/w/index.php?title=SoundSequenceOnActor&oldid=35963), verified 2026-07-29 against fork source.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** extension function.
@@ -29,10 +29,15 @@ the zt-bcc source's `lib/zcommon.bcs:1658`), implementation in `p_acs.cpp:6214-6
   a different (or the same) sequence stops whatever was already playing on it rather than layering
   sounds. Not mentioned by the wiki.
 - The `modenum` argument of the underlying `SN_StartSequence(AActor*, const char*, int)` is always
-  hardcoded to `0` by this ACS entry point (`p_acs.cpp:6223,6233`) — the "mode" mechanism `SNDSEQ`
-  choice blocks use (e.g. for lock-type-dependent door sequences, matched via `m_ModeNum` in
-  `s_sndseq.cpp:1219`) isn't reachable through this function; it only ever runs a sequence's
-  default/`SEQ_NOTRANS` path.
+  hardcoded to `0` by this ACS entry point (`p_acs.cpp:6223,6233`). A `SNDSEQ` choice block
+  (e.g. lock-type-dependent door sequences, matched via `m_ModeNum` in `s_sndseq.cpp:1219`)
+  therefore always resolves as mode 0. It jumps to the block's mode-0 entry if it lists one and
+  otherwise falls through to the next command. Other modes are unreachable through this function.
 - No transfer/translation is applied (`SEQ_NOTRANS` is passed at the numbered-overload level via
   the named overload, `s_sndseq.cpp:895`), consistent with the wiki not describing any translation
   behavior for this call.
+- **Zandronum netcode:** nothing is sent to clients. Actor sequences play through `S_Sound`
+  without its `bSoundOnClient` argument (`s_sndseq.cpp:110`), and Zandronum has a server command
+  for sector sequences only (`SERVERCOMMANDS_StartSectorSequence`), none for actor sequences. A
+  call from a server-side script is therefore inaudible to clients. To be heard online, the call
+  must run on each client, e.g. from a `CLIENTSIDE` script.

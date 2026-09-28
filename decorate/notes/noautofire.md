@@ -2,44 +2,46 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-17)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** Source-derived (no wiki page consulted) — verified against the Zandronum source's
-`src/p_pspr.cpp:931-961` (`P_CheckWeaponFire`, the sole consumer of `WIF_NOAUTOFIRE`) and
-`src/g_shared/a_weapons.h`/`a_pickups.h:360` (`WIF_NOAUTOFIRE` definition).
+`src/p_pspr.cpp:931-961` (`P_CheckWeaponFire`, the sole consumer of `WIF_NOAUTOFIRE`),
+`src/p_pspr.cpp:1466-1469` (`P_MovePsprites`, the ready-bit guard around its only call) and
+`src/g_shared/a_pickups.h:360` (`WIF_NOAUTOFIRE` definition).
 **Bucket:** `DEFINE_FLAG(WIF, NOAUTOFIRE, AWeapon, WeaponFlags)` in `src/thingdef/thingdef_data.cpp`.
 
-Suppresses **continuous** firing while the fire button is held through consecutive tics in which
-the weapon is already ready — it does not suppress a single shot the instant the weapon
-transitions into its ready state, if the fire button happens to already be down at that moment.
+Suppresses **continuous** firing while the fire button is held. A flagged weapon fires only when
+the button is down on a ready tic and the player's `attackdown` latch is clear. After a shot, the
+next one needs the button to be seen released on a ready tic first.
 
 ## Behavior notes
 
-- `P_CheckWeaponFire` (`src/p_pspr.cpp:931-961`) runs every tic a weapon exists. Its firing
-  condition is `!player->attackdown || !(weapon->WeaponFlags & WIF_NOAUTOFIRE)`: fire happens if
-  *either* the player's per-tic `attackdown` latch was false on entry, *or* the weapon lacks this
-  flag. So for a flagged weapon, the button must go from not-considered-down to down across one
-  tic boundary to produce a shot; while already-down state alone does not.
-- Critically, `attackdown` is a **per-player** field (`d_player.h:599`), not per-weapon, and it is
-  forced back to `false` on every tic the weapon is *not* in its ready state (the `else` branch at
-  `p_pspr.cpp:959`, reached whenever neither the primary nor alt-fire "weapon ready" bit is set —
-  e.g. every tic of a weapon-raise/lower animation, since `A_WeaponReady` is what sets those bits
-  and raise/lower states don't call it).
-- Net effect: if a player holds the fire button down continuously while switching from one weapon
-  to another, the raise animation's tics reset `attackdown` to `false`, so the instant the new
-  weapon's ready state calls `A_WeaponReady` (setting the ready bit) with the button still held,
-  `P_CheckWeaponFire` sees `!attackdown == true` and fires immediately — **regardless of whether
-  the new weapon has `NOAUTOFIRE` set**. The flag only prevents a *second* shot on the next tic
-  while the button stays down; it does not, and cannot by this logic, prevent the first one.
-- A mod that wants to prevent "fires on switch if the button was already held" needs to gate on
-  something else (e.g. its own edge-detection via `keysPressed()`/`keysHeld()` in ACS, or an
-  explicit inventory/state check in the weapon's own ready state), since the engine's own
-  `attackdown` latch does not survive a weapon switch.
-- `g_game.cpp:2235` sets `attackdown = true` on player reborn ("don't do anything immediately"),
-  which looks like it should suppress an immediate shot on spawn — but this initialization is
-  itself undone by the very first tic of the starting weapon's raise animation (same `else`
-  branch), unless that weapon's raise is a single zero-tic transition straight into its ready
-  state. In practice, almost any DECORATE `Select:` block with a nonzero-duration frame defeats
-  this safeguard.
+- `P_CheckWeaponFire` (`src/p_pspr.cpp:931-961`) is not run on every tic. Its only caller,
+  `P_MovePsprites`, calls it only while the player's `WeaponState` has `WF_WEAPONREADY` or
+  `WF_WEAPONREADYALT` set (`p_pspr.cpp:1466-1469`). Those bits are cleared every time the weapon
+  psprite enters a new state (`P_SetPsprite`, `p_pspr.cpp:204-211`) and re-set only by
+  `A_WeaponReady`, so the check runs only on ready tics.
+- Its firing condition is `!player->attackdown || !(weapon->WeaponFlags & WIF_NOAUTOFIRE)`
+  (`p_pspr.cpp:941`, and `:950` for alt-fire): fire happens if *either* the `attackdown`
+  latch was false on entry, *or* the weapon lacks this flag. Every shot sets the latch to `true`.
+- `attackdown` is a **per-player** field (`d_player.h:599`), not per-weapon. Inside the game
+  simulation its only reset to `false` is the `else` branch at `p_pspr.cpp:959`. That branch is
+  reached only on a ready tic where the button matching the set ready bit is not pressed. On tics
+  where the weapon is not ready (firing, raise and lower animations) the function isn't called, so
+  the latch keeps its value.
+- Consequences for a flagged weapon:
+  - Releasing and re-pressing the button entirely within a firing animation does not count as a
+    new press. The release has to land on a ready tic.
+  - Holding the fire button through a weapon switch carries the latch across. If the old weapon
+    was firing, `attackdown` is still `true` when the new weapon's ready state first calls
+    `A_WeaponReady`, so a `NOAUTOFIRE` weapon does not fire until the button is released and
+    pressed again. A weapon without the flag fires straight away, as it would anyway.
+  - A press that starts while the old weapon is lowering or the new one is raising, with the
+    latch clear, fires on the new weapon's first ready tic. That is an ordinary first press, not
+    autofire.
+- `g_game.cpp:2235` sets `attackdown = true` on player reborn ("don't do anything immediately").
+  Because the raise animation doesn't touch the latch, this survives until the starting weapon's
+  first ready tic. So a `NOAUTOFIRE` starting weapon does not fire on spawn from a button already
+  held, until it is released on a ready tic. A weapon without the flag ignores the latch and fires.
 
 ## UZDoom: clean agreement, straight ZScript port
 
@@ -58,21 +60,22 @@ Every element of the mechanism above matches:
   alt-fire respectively) — the same two-term `||` Zandronum uses.
 - `attackdown` is the same kind of per-player, non-weapon-specific latch (native field,
   `src/playsim/d_player.h:366`), reset to `false` in the identical `else` branch
-  (`player.zs:503`) whenever neither `WF_WEAPONREADY` nor `WF_WEAPONREADYALT` is set on
-  `player.WeaponState`.
+  (`player.zs:503`). As on Zandronum, `CheckWeaponFire`'s caller only runs it while
+  `WF_WEAPONREADY` or `WF_WEAPONREADYALT` is set on `player.WeaponState`, so that branch is only
+  reached on a ready tic with the matching button up.
 - Those ready-state bits are cleared and re-granted the same way: UZDoom's `DPSprite::SetState`
   (`src/playsim/p_pspr.cpp:479-485`) clears the ready-flag mask whenever the weapon psprite enters
   a new state — the exact same point Zandronum's `P_SetPsprite` (`src/p_pspr.cpp:204-211`) clears
   it — and `A_WeaponReady`'s `DoReadyWeaponToFire`
   (`wadsrc/static/zscript/actors/inventory/weapons.zs:399-426`) re-sets them, mirroring Zandronum's
   `DoReadyWeaponToFire`. Since raise/lower/select/deselect states still don't call
-  `A_WeaponReady`, the weapon-switch edge case described above (an already-held fire button firing
-  immediately on the new weapon's first ready tic, regardless of `NOAUTOFIRE`) reproduces
+  `A_WeaponReady`, the weapon-switch behavior described above (a fire button held through the
+  switch keeps the latch set, so a `NOAUTOFIRE` weapon waits for a release) reproduces
   identically on UZDoom.
-- The reborn-spawn initialization has the same shape and the same practical defeat: UZDoom's
+- The reborn-spawn initialization has the same shape and the same practical effect: UZDoom's
   `G_PlayerReborn` also initializes the `attackdown` latch to true on reborn, with an inline
-  comment explaining the same intent as Zandronum's (`src/g_game.cpp:1468`), and it is undone the
-  same way by the starting weapon's raise animation on both engines.
+  comment explaining the same intent as Zandronum's (`src/g_game.cpp:1468`), and it survives the
+  starting weapon's raise animation the same way on both engines.
 
 No behavioral divergence was found for this mechanism; the two implementations are functionally
 identical, so no `## Engine-family divergence` section applies here.

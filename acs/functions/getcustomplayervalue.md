@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-07-29)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** `GetCustomPlayerValue - Zandronum Wiki.html` (wiki `https://wiki.zandronum.com/w/index.php?title=GetCustomPlayerValue&oldid=2282`, a stub page), verified against the Zandronum source's `src/p_acs.cpp` 2026-07-29.
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Extension function (index -157; `SetCustomPlayerValue` at -156, `ResetCustomDataToDefault` at -158)
@@ -75,9 +75,10 @@ way to distinguish "this field was never set (or never declared via `addcustomda
 value genuinely is 0" from "this build doesn't implement the call at all". It's worse for the two
 string-handle types: per "Return value depends on the column's declared data type" above,
 `DATATYPE_STRING`/`DATATYPE_TEXTURE` columns return a global ACS string-table handle, not a raw
-int, and `0` is not a valid handle produced by that path — a script that hands the fallback
+int, and `0` is not a valid handle produced by that path. A script that hands the fallback
 straight to a string-consuming opcode gets whatever unrelated string an untagged lookup at index 0
-resolves to, not the empty string Zandronum's own "key not found" case would produce. The paired
+resolves to. Zandronum's own "key not found" and "player invalid" failures return that same plain
+`0`, not an empty-string handle, so a string-typed read fails the same way on both engines. The paired
 setter, `SetCustomPlayerValue` (CALLFUNC index 156), sits in the same reserved range and fails the
 same way: the write silently never happens under UZDoom, so a round-trip set-then-get through this
 pair looks like "read back 0" either way, with nothing to flag that neither call actually ran.

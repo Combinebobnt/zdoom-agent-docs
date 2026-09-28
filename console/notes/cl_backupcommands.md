@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-02)
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** Zandronum Wiki "Console variables" (https://wiki.zandronum.com/w/index.php?title=Console_variables&oldid=2468, verified 2026-08-02) for behavior guidance; Zandronum source `src/cl_main.cpp` (CUSTOM_CVAR declaration and validation logic) for range enforcement (0–3 clamping).
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 
@@ -30,4 +30,4 @@ This cvar is marked `CVAR_ARCHIVE` only — it's not part of `CVAR_USERINFO`, so
 
 `cl_backupcommands` does not exist in UZDoom at all — confirmed absent from source, not merely undocumented. UZDoom's networking model doesn't carry this cvar or any equivalent client-side redundant-command mechanism.
 
-Attempting to set it under UZDoom (via the console, a config file, or ACS's `ConsoleCommand()`) prints `Unknown command "cl_backupcommands"` to console/log and does nothing else — the write silently fails to apply, so no clamping, no bandwidth change, nothing. This is visible if someone's watching the console at the time, but easy to miss in an unattended `autoexec.cfg` line or server-launch script. As a result, a UZDoom client has no way to trade extra bandwidth for packet-loss recovery on movement/weapon-selection commands the way a Zandronum client can.
+Attempting to set it under UZDoom via ACS's `ConsoleCommand()` only prints a "doesn't support execution of console commands from scripts" error, since UZDoom's `ConsoleCommand` p-codes discard their arguments without reaching the console dispatcher. Attempting it via the console or a config file prints `Unknown command "cl_backupcommands"` to console/log and does nothing else — the write silently fails to apply, so no clamping, no bandwidth change, nothing. This is visible if someone's watching the console at the time, but easy to miss in an unattended `autoexec.cfg` line or server-launch script. As a result, a UZDoom client has no way to trade extra bandwidth for packet-loss recovery on movement/weapon-selection commands the way a Zandronum client can.

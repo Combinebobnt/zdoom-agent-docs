@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-06)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** ZDoom Wiki `VectorLength` (retrieved 2026-08-06, https://zdoom.org/w/index.php?title=VectorLength&oldid=54145) + verified against
 the Zandronum source's `src/p_acs.cpp` (`case ACSF_VectorLength:`) and `src/m_fixed.h`
 (`FIXED2DBL`/`FLOAT2FIXED` macros).

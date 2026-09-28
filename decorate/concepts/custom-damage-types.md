@@ -2,15 +2,15 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-02)
-**Provenance:** ZDoom Wiki `Custom damage types` (retrieved 2026-08-02, https://zdoom.org/w/index.php?title=Custom_damage_types&oldid=52258) + verified against the Zandronum source's damage-type implementation in `src/p_interaction.cpp`, `src/p_mobj.cpp`, `src/g_shared/a_armor.cpp`, `src/info.cpp`, and `src/thingdef/thingdef_parse.cpp`.
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** ZDoom Wiki `Custom damage types` (retrieved 2026-08-02, https://zdoom.org/w/index.php?title=Custom_damage_types&oldid=52258) + verified against the Zandronum source's damage-type implementation in `src/p_interaction.cpp`, `src/p_mobj.cpp`, `src/g_shared/a_armor.cpp`, `src/info.cpp`, and `src/thingdef/thingdef_parse.cpp`; the built-in name list, `PainChance`/`DamageFactor` `"Normal"` mapping and shipped `Drowning` declaration corrected against `src/namedef.h`, `src/p_terrain.cpp`, `src/thingdef/thingdef_properties.cpp` and `wadsrc/static/actors/shared/damagetypes.txt`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 DECORATE allows you to define custom damage types for projectiles, attacks, and actors — and to create specialized behavior (different pain/death/impact states, armor-bypassing, resistance/vulnerability) tailored to each type.
 
 ## Overview
 
-Damage types are names (like `Fire`, `Ice`, `Poison`) that you assign to a projectile or attack and then use to trigger corresponding state sequences in receiving actors. Zandronum predefines a few built-in types (`Fire`, `Ice`, `Poison`, `Extreme`, `Drowning`, `Slime`, `Lava`, `Crush`, `Telefrag`, `Falling`, `Spike`, `Massacre`) but you can declare custom ones with their own default damage-reduction factors and armor-bypass rules.
+Damage types are names (like `Fire`, `Ice`, `Poison`) that you assign to a projectile or attack and then use to trigger corresponding state sequences in receiving actors. The engine itself inflicts or special-cases a handful of built-in names (`Fire`, `Ice`, `Poison`, `Electric`, `Extreme`, `Drowning`, `Slime`, `Crush`, `Telefrag`, `Falling`, `Massacre`, among others). There is no built-in `Spike` type, and a TERRAIN `damagetype lava` is read as `Fire`. Any other name works too, and you can declare custom ones with their own default damage-reduction factors and armor-bypass rules.
 
 ## Assigning damage types to attacks
 
@@ -85,7 +85,7 @@ Actor MyZombie : ZombieMan
 ```
 
 The engine searches for damage-typed death states in this order:
-1. If the damage type exists and health is below `GibHealth` (extreme death): `Death.Extreme.<DamageType>` (e.g., `Death.Extreme.Fire`)
+1. If the damage type exists and death is extreme (health below `GibHealth`, or an inflictor with `EXTREMEDEATH`, and no `NOEXTREMEDEATH` on the inflictor): `Death.Extreme.<DamageType>` (e.g., `Death.Extreme.Fire`)
 2. If no such state exists or death is not extreme: `Death.<DamageType>`
 3. For `Ice`-type damage on monsters/players with no custom ice death state: automatic generic freeze death (unless disabled via `deh.NoAutofreeze` or the `MF4_NOICEDEATH` flag)
 4. If still no state found and death is extreme: `Death.Extreme` (the generic extreme/gib death)
@@ -95,7 +95,7 @@ The engine searches for damage-typed death states in this order:
 
 ### Wound states
 
-For projectile impacts and grazes, define `Wound.<DamageType>` states:
+`Wound.<DamageType>` states are entered when a hit of that type leaves the actor alive at or below its `WoundHealth` (default 6), whatever kind of attack delivered it:
 
 ```text
 Actor MyZombie : ZombieMan
@@ -111,21 +111,26 @@ Actor MyZombie : ZombieMan
 
 ### Crash states
 
-For unblocked projectiles hitting non-actors (floor/ceiling/wall impacts), define `Crash.<DamageType>` states. Crash states apply both in 2-name form (`Crash.<DamageType>`) and in 3-name form with extreme gib (`Crash.Extreme.<DamageType>`):
+Damage-typed `Crash` states belong to the victim, not the projectile. When a killed actor's corpse comes to rest on the floor (or on top of another actor), the engine looks for `Crash.Extreme.<DamageType>` if its health is below `GibHealth`, then `Crash.<DamageType>`, then the plain `Crash.Extreme`/`Crash` labels. The damage type is the one that killed it, and it only survives death if the actor had a matching `Death.<DamageType>` or `Death.Extreme.<DamageType>` state. Otherwise it is cleared (except `Massacre`), so only the plain labels can match. Ice-frozen corpses never enter a crash state.
 
 ```text
-Actor IceShard : Actor
+Actor MyZombie : ZombieMan
 {
-    Projectile
-    DamageType Ice
     States
     {
-        Crash.Ice:
-            ICSN A 10
+        Death.Fire:
+            ZMBF EFG 3
+            ZMBF H -1
+            stop
+        Crash.Fire:
+            ZMBF M 5
+            ZMBF N -1
             stop
     }
 }
 ```
+
+Projectiles and puffs only use the plain `Crash` label, with no damage-type suffix. A projectile enters `Crash` when it hits a `NOBLOOD` actor, and a puff enters it when it hits no actor at all. A projectile hitting a wall, floor or ceiling uses its `Death` state.
 
 ## Pain chance per damage type
 
@@ -134,13 +139,13 @@ Use `PainChance` with a damage-type parameter to set the probability an actor en
 ```text
 Actor MyZombie : ZombieMan
 {
-    PainChance "Fire", 255     // Always enter pain state for Fire damage (100%)
+    PainChance "Fire", 256     // Always enter pain state for Fire damage (100%)
     PainChance "Freeze", 0     // Never enter pain state for Freeze damage (0%)
-    PainChance "Normal", 100   // Default chance (50% = 100 out of 200)
+    PainChance "Normal", 100   // Untyped damage only: 100 out of 256 (about 39%)
 }
 ```
 
-The numeric argument is out of 256 (where 256 = 100%). Set it to `0` to suppress pain states for a type entirely, and to `255` for guaranteed pain reaction.
+The numeric argument is out of 256: the engine rolls 0 to 255 and enters pain when the roll is below the chance (and the damage reaches `PainThreshold`). Set it to `0` to suppress pain states for a type entirely, and to `256` for a guaranteed pain reaction; `255` still misses 1 time in 256. `"Normal"` names untyped damage, not a default: a typed hit with no entry of its own falls back to the actor's plain `PainChance` property.
 
 ## Damage resistance and vulnerability
 
@@ -157,12 +162,11 @@ Actor RaiDoom : DoomImp
 Multiple `DamageFactor` entries work with one another. If an actor has no `DamageFactor` entry for a type, or has no `DamageFactor` entries at all, the global default factor for that type (see "Declaring damage types" below) is applied instead.
 
 **Precedence chain for damage reduction:** When an actor takes damage:
-1. If the actor has a `DamageFactor` for the exact damage type, use that (highest priority).
-2. Otherwise, apply the global default factor for that damage type (if one exists).
-3. Otherwise, if the actor has `DamageFactor "Normal"` (the untyped fallback), apply that.
-4. Otherwise, use a factor of 1.0 (no reduction).
+1. If the actor has a `DamageFactor` for the exact damage type, use that alone (highest priority).
+2. Otherwise, for typed damage, multiply the actor's `DamageFactor "Normal"` (the untyped fallback, 1.0 if absent) by the damage type's global `Factor` (1.0 if the type was never declared).
+3. Untyped damage uses only the actor's `"Normal"` factor, or 1.0.
 
-The global `ReplaceFactor` flag (see below) can suppress step 3 by making the global default **replace** the untyped fallback rather than multiply it.
+The global `ReplaceFactor` flag (see below) changes step 2 so the global `Factor` **replaces** the actor's `"Normal"` factor instead of multiplying it.
 
 ## Declaring damage types with default properties
 
@@ -211,6 +215,8 @@ DamageType Drowning
     NoArmor
 }
 ```
+
+Both engines already ship exactly this declaration (Zandronum in its DECORATE `actors/shared/damagetypes.txt`, UZDoom in its base MAPINFO), so it only matters as a reset. Redeclaring `Drowning` with, say, just a `Factor` drops the built-in `NoArmor`.
 
 **Important:** Declaring a damage type resets its definition to defaults. If you declare the same type twice, the second declaration replaces the first, not merges with it.
 

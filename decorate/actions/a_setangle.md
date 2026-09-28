@@ -2,7 +2,7 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.2.1 @28f736fb3 (2026-08-01)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
 **Provenance:** ZDoom Wiki `A_SetAngle` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=A_SetAngle&oldid=55323) + verified against
 the Zandronum source's native declaration `wadsrc/static/actors/actor.txt:296` and implementation
 `src/thingdef/thingdef_codeptr.cpp` (DEFINE_ACTION_FUNCTION_PARAMS) and `src/p_mobj.cpp:3941`.

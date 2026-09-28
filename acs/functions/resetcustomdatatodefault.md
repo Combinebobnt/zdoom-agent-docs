@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
-**Verified against:** Zandronum 3.2.1 @28f736fb3 (2026-08-18)
-**Provenance:** `ResetCustomDataToDefault - Zandronum Wiki.html` (wiki `https://wiki.zandronum.com/w/index.php?title=ResetCustomDataToDefault&oldid=2263`, a stub page), verified against the Zandronum source's `src/p_acs.cpp:8206-8218` and `src/scoreboard.cpp:748-767` (2026-08-18); UZDoom has no implementation of this function (grep found no `ACSF_ResetCustomDataToDefault` in `src/playsim/p_acs.cpp`).
+**Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Provenance:** `ResetCustomDataToDefault - Zandronum Wiki.html` (wiki `https://wiki.zandronum.com/w/index.php?title=ResetCustomDataToDefault&oldid=2263`, a stub page), verified against the Zandronum source's `src/p_acs.cpp:8242-8255` and `src/scoreboard.cpp:748-767` (2026-08-18); UZDoom has no implementation of this function (grep found no `ACSF_ResetCustomDataToDefault` in `src/playsim/p_acs.cpp`).
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Bucket:** Extension function (index -158; `SetCustomPlayerValue` at -156, `GetCustomPlayerValue` at -157)
 
