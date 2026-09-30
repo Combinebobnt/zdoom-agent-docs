@@ -30,6 +30,30 @@ when the router table doesn't resolve your question, or you want the overall cov
 - **[menudef/](menudef/INDEX.md)** — MENUDEF block/menu-item grammar, shared by both engines
   (item-keyword dispatch is closed on Zandronum, open on UZDoom), plus Zandronum's own
   option-menu-item additions.
+- **[keyconf/](keyconf/INDEX.md)** — the KEYCONF startup script and its nine-command allowlist,
+  shared by both engines. Per-command prose lives in `console/notes/`.
+- **[lockdefs/](lockdefs/INDEX.md)** — LOCKDEFS lock definitions (which keys open a lock, its
+  messages, sound and automap color), shared by both engines.
+- **[gameinfo-lump/](gameinfo-lump/INDEX.md)** — the standalone GAMEINFO lump read at startup
+  (IWAD choice, loaded files, startup screen), shared by both engines with extra UZDoom keys.
+  Not MAPINFO's `GameInfo` block, which lives under `mapinfo/`.
+- **[sndinfo/](sndinfo/INDEX.md)** — SNDINFO logical sound names and its `$`-commands, shared by
+  both engines with extra UZDoom commands.
+- **[textures/](textures/INDEX.md)** — TEXTURES lump definition blocks and patch sub-blocks,
+  shared by both engines with extra UZDoom keywords.
+- **[language/](language/INDEX.md)** — the LANGUAGE string table: section codes, `$ifgame`,
+  escapes and override order, shared by both engines; the CSV format and `LMACROS` are UZDoom-only.
+- **[terrain/](terrain/INDEX.md)** — the TERRAIN lump: splash and terrain definitions and
+  floor-to-terrain assignment, shared by both engines; footsteps and per-sector terrain are
+  UZDoom-only.
+- **[decaldef/](decaldef/INDEX.md)** — the DECALDEF lump: decals, decal groups, generators and
+  animators, shared by both engines; `translatable` and `generator optional` are UZDoom-only.
+- **[animdefs/](animdefs/INDEX.md)** — the ANIMDEFS lump: texture/flat animations, switches,
+  warps, camera textures, animated doors and sky offsets, shared by both engines;
+  `canvastexture`, `firetexture`, `random` and `notrim` are UZDoom-only.
+- **[fonts/](fonts/INDEX.md)** — the FONTDEFS and TEXTCOLO lumps: custom fonts, named text
+  colors and `\c` escapes, shared by both engines; folder/TrueType fonts and four extra built-in
+  colors are UZDoom-only, `\c?` and the extra `textcolors.za` colors Zandronum-only.
 - **[zandronum-lumps/](zandronum-lumps/INDEX.md)** — nine other Zandronum/Skulltag-native lump
   formats (`ANCRINFO`, `AUTHINFO`, `CMPGNINF`, `GAMEMODE`, `MEDALDEF`, `SCORINFO`, `SECTINFO`,
   `SKININFO`, `VOTEINFO`), each unrelated to the others beyond sharing that lineage.
@@ -46,8 +70,9 @@ when the router table doesn't resolve your question, or you want the overall cov
   ccmds have curated `notes/` prose — see the section's own `INDEX.md` for what's covered.
 - **[sprites/](sprites/INDEX.md)** — sprite naming/rotation conventions.
 - **[bots/](bots/INDEX.md)** — the `BOTINFO` declaration lump and the compiled botscript bytecode
-  its `script =` key names. **Zandronum-only** — UZDoom/GZDoom-family engines parse neither. Two
-  tier-B concept pages cover both lumps; the 114-entry bot command table is not yet inventoried.
+  its `script =` key names. **Zandronum-only** — UZDoom/GZDoom-family engines parse neither. Four
+  concept pages cover both lumps, the bot chat file and bot pathing; a generated inventory lists
+  the bot command table.
 
 ## Networking
 
@@ -94,15 +119,9 @@ for what earns an entry.
 
 | Format | Backing source (once someone documents it) |
 |---|---|
-| KEYCONF | `UDB/Build/Scripting/ZDoom_KEYCONF.cfg` |
-| GAMEINFO | `UDB/Build/Scripting/ZDoom_GAMEINFO.cfg` |
-| TEXTURES | `UDB/Build/Scripting/ZDoom_TEXTURES.cfg` |
-| SNDINFO | `UDB/Build/Scripting/ZDoom_SNDINFO.cfg` |
-| ANIMDEFS | `UDB/Build/Scripting/ZDoom_ANIMDEFS.cfg` |
-| LOCKDEFS | `UDB/Build/Scripting/ZDoom_LOCKDEFS.cfg` |
-| TERRAIN | `UDB/Build/Scripting/ZDoom_TERRAIN.cfg` |
 | REVERBS | `UDB/Build/Scripting/ZDoom_REVERBS.cfg` |
-| FONTDEFS | `UDB/Build/Scripting/ZDoom_FONTDEFS.cfg` |
+| SNDSEQ | `UDB/Build/Scripting/ZDoom_SNDSEQ.cfg` |
+| X11R6RGB | `UDB/Build/Scripting/ZDoom_X11R6RGB.cfg` |
 | MODELDEF | `UDB/Build/Scripting/ZDoom_MODELDEF.cfg` |
 | VOXELDEF | `UDB/Build/Scripting/ZDoom_VOXELDEF.cfg` |
 | DEHACKED | `UDB/Build/Scripting/Dehacked.cfg` |

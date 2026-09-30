@@ -32,6 +32,7 @@ Router only. See `AGENTS.md` for where cvars/ccmds are declared in engine source
 
 - [autoaim](notes/autoaim.md) — vertical-distance autoaim threshold; corrects a wiki description of a nonexistent horizontal-angle-preset system.
 - [cl_backupcommands](notes/cl_backupcommands.md) — clamp range and packet-loss recovery semantics.
+- [cl_hitscandecalhack](notes/cl_hitscandecalhack.md) — Zandronum client: off skips its own hitscan wall and blood decals (the server never sends hitscan decals); covers the stock Doom guns and DECORATE `A_FireBullets`, all via `A_CustomFireBullets`.
 - [cl_ticsperupdate](notes/cl_ticsperupdate.md) — clamp range and bandwidth/latency tradeoff.
 - [cl_usecustombob](notes/cl_usecustombob.md) — Zandronum-only client override of a weapon's bob style/speed and still bob; also `cl_alwaysbob`.
 - [cl_usecustomsway](notes/cl_usecustomsway.md) — Zandronum-only client override of a weapon's sway speeds and style; on alone disables sway.
@@ -101,3 +102,12 @@ Router only. See `AGENTS.md` for where cvars/ccmds are declared in engine source
 - [quickload](notes/quickload.md) — F9 default bind; loads the remembered quicksave slot; refuses in netgames (on Zandronum, in any non-single-player network state, including offline with bots).
 - [menu_save](notes/menu_save.md) — F2 default bind; thin wrapper opening the `SavegameMenu` screen.
 - [menu_load](notes/menu_load.md) — F3 default bind; thin wrapper opening the `LoadgameMenu` screen.
+- [alias](notes/alias.md) — KEYCONF-allowed; an alias defined in KEYCONF runs in the unsafe context (see `keyconf/concepts/unsafe-aliases.md`).
+- [defaultbind](notes/defaultbind.md) — KEYCONF-allowed; binds only if the key is free and the command unbound elsewhere; can't override saved binds (they load first).
+- [addkeysection](notes/addkeysection.md) — KEYCONF-only in effect; same-name calls don't merge (title compared against ini name), so duplicates appear and clobber each other's saved binds.
+- [addmenukey](notes/addmenukey.md) — KEYCONF-only in effect; adds a bindable command to the current key section.
+- [weaponsection](notes/weaponsection.md) — KEYCONF-allowed; sets one global ini section prefix for slot overrides, last one wins, not positional.
+- [setslot](notes/setslot.md) — KEYCONF-queued and replayed at every slot rebuild; negative slot is an unchecked index; online no-op on Zandronum.
+- [addslotdefault](notes/addslotdefault.md) — KEYCONF-queued; adds a weapon only if it isn't in any slot yet.
+- [clearplayerclasses](notes/clearplayerclasses.md) — KEYCONF-only; UZDoom's `setslotstrict` off keeps custom MAPINFO classes.
+- [addplayerclass](notes/addplayerclass.md) — KEYCONF-only; `nomenu` hides from the new-game menu only; UZDoom dedupes, Zandronum doesn't.

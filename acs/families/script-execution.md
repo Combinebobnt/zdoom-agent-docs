@@ -9,7 +9,7 @@ a base PCD present on both engines) are fully portable, so the macro is too
 **Provenance:** wiki pages `ACS_NamedExecute - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=ACS_NamedExecute&oldid=35683`),
 `ACS_NamedExecuteAlways - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=ACS_NamedExecuteAlways&oldid=40212`), `ACS_NamedExecuteWait - ZDoom Wiki.html`
 (`https://zdoom.org/w/index.php?title=ACS_NamedExecuteWait&oldid=36649`), `ACS_NamedExecuteWithResult - ZDoom Wiki.html` (`https://zdoom.org/w/index.php?title=ACS_NamedExecuteWithResult&oldid=46388`) (all `_intake/`,
-retrieved 2026-07-28) + source-verified against `p_acs.cpp:5400-5406,6339-6360,9120-13050,
+retrieved 2026-07-28) + source-verified against `p_acs.cpp:5400-5406,6339-6356,9120-13050,
 9190-13288`, `p_lnspec.cpp:86-95,1753-1851`, `zcommon.bcs:1565,1667,1672-1673`,
 `zt-bcc/src/builtin.c:178,331-332`, `zt-bcc/src/codegen/expr.c:1991-2033`; see each function's own
 section below for its full source citations.
@@ -48,6 +48,12 @@ has figured out yet).
   clients see a `levelnum` above 255 truncated. The **polarity of the
   fallback return value differs per function** — see each section below; this is not uniform
   across the family and has bitten at least one doc draft already.
+- Zandronum DECORATE has its own `ACS_NamedExecute`, `ACS_NamedExecuteAlways` and
+  `ACS_NamedExecuteWithResult` actions (`wadsrc/static/actors/actor.txt:320-326`,
+  `src/thingdef/thingdef_codeptr.cpp:5717-5772`). They call the same numbered specials with the
+  actor as activator, and on a client they do nothing for an actor the client doesn't handle
+  itself (`NETWORK_InClientModeAndActorNotClientHandled`). There is no DECORATE
+  `ACS_NamedExecuteWait`.
 - None of the fork-specific caveats below are documented on the ZDoom wiki, which predates or
   doesn't model Zandronum's client/server split.
 
@@ -90,12 +96,16 @@ the name pre-resolved to a number first.
 - `s_arg1`/`s_arg2`/`s_arg3` — passed through as the script's own args; in `zt-bcc`'s signature
   these are optional (after the `;`) and default to `0` if omitted, unlike the wiki's C-style
   prototype which shows all 5 params as mandatory.
-- **Return value**, per `P_StartScript` (`p_acs.cpp:13234-13284`):
-  - Script not found on the target map -> `false`, plus a console message.
+- **Return value**, per `P_StartScript` (`p_acs.cpp:13234-13288`):
   - Target map differs from the current map -> queued via `addDefered`, **always returns `true`**
-    immediately — but only reached if `map` resolved to a real `levelnum` in the first place.
-  - Target map is the current map -> the script actually runs; return value is the normal
-    start/failure result.
+    immediately, with no check that the script exists — but only reached if `map` resolved to a
+    real `levelnum` in the first place.
+  - Target map is the current map and the script name doesn't resolve -> `false`, plus a
+    `P_StartScript: Unknown ...` console message.
+  - Target map is the current map and an instance is already in `RunningScripts` -> nothing new
+    starts and the call returns `false` with no message. If that instance is suspended, it is
+    resumed instead and the call returns `true` (`P_GetScriptGoing`, `p_acs.cpp:13055-13072`).
+  - Otherwise the script starts and the call returns `true`.
 - **Clientside carve-out:** server-side call for a `CLIENTSIDE`-flagged script unconditionally
   returns **`true`** — success is reported regardless of whether any client actually
   has/loads the script. The check runs before the `map` lookup (`p_lnspec.cpp:1762-1767`), so
@@ -105,7 +115,7 @@ the name pre-resolved to a number first.
     CLIENTSIDE carve-out is dead code on UZDoom" above.
 
 **Provenance:** wiki page `ACS_NamedExecute - ZDoom Wiki.html` (`_intake/`, `https://zdoom.org/w/index.php?title=ACS_NamedExecute&oldid=35683`) +
-source-verified against `zt-bcc/lib/zcommon.bcs:1667`, `p_acs.cpp:5400,6339-6353,13234-13284`,
+source-verified against `zt-bcc/lib/zcommon.bcs:1667`, `p_acs.cpp:5400,6339-6353,13055-13072,13234-13288`,
 `p_lnspec.cpp:86-92,1753-1782`, `g_mapinfo.cpp:128-134`.
 
 ---
@@ -201,7 +211,7 @@ the wait half.
   `[return];[required];[optional]` — only the script name is mandatory.
 - **`PCD_SCRIPTWAITNAMED` waits by name hash, not by script instance**
   (`p_acs.cpp:10672-10674`), using the same `SCRIPT_ScriptWait`/`SCRIPT_ScriptWaitPre` state
-  machine as the numbered `PCD_SCRIPTWAIT`/`ScriptWait()` (`p_acs.cpp:9190-9200`) — it just keys
+  machine as the numbered `PCD_SCRIPTWAIT`/`ScriptWait()` (`p_acs.cpp:9190-9203`) — it just keys
   `RunningScripts` by a negative `FName` instead of a positive script number.
 - **Footgun: if the named script never actually starts, the caller waits forever, not
   immediately.** `SCRIPT_ScriptWaitPre` (`p_acs.cpp:9190-9193`) only advances to
@@ -250,7 +260,7 @@ named script actually ran.
 **Provenance:** wiki page `ACS_NamedExecuteWait - ZDoom Wiki.html` (`_intake/`, retrieved
 2026-07-28, `https://zdoom.org/w/index.php?title=ACS_NamedExecuteWait&oldid=36649`) + source-verified against `zt-bcc` codegen
 (`src/builtin.c:178,331-332`, `src/codegen/expr.c:1991-2033`, `src/parse/token/info.c:166`) and
-the Zandronum source's `src/p_acs.cpp:6339-6360,9190-9200,10656-10665,10672-10674,13061-13069`,
+the Zandronum source's `src/p_acs.cpp:6339-6356,9190-9203,10656-10665,10672-10674,13061-13069`,
 `src/p_lnspec.cpp:1762-1767`.
 
 ---

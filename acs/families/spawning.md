@@ -344,7 +344,7 @@ listed in that bullet. Not on either wiki, which has no concept of the client/se
 ## `int SpawnDecal(int tid, str decalname [, int flags [, fixed angle [, int zoffset [, int distance]]]])`
 
 Not an actor-spawning function at all, despite the name — it fires a line-trace from an existing
-actor and stamps a `DECALDEF`-defined texture onto whatever wall/flat the trace hits. "Success"
+actor and stamps a [`DECALDEF`](../../decaldef/concepts/decaldef-lump.md)-defined texture onto whatever wall/flat the trace hits. "Success"
 means "the trace hit a surface," not "a new `AActor` was created," and `decalname` indexes a
 completely separate decal-definition namespace, not an actor class. `ACSF_SpawnDecal`
 (`p_acs.cpp:5433`), dispatch `p_acs.cpp:6696-6727`, helper `DoSpawnDecal` (`p_acs.cpp:5812-5836`),
@@ -395,6 +395,40 @@ lineage accurately; Zandronum is the outlier that never backported the two newer
 else (`DoSpawnDecal`'s relative-vs-absolute angle logic, `SDF_PERMANENT` gating decal persistence,
 the `tid==0`/multi-tid trace-per-actor pattern) matches line-for-line between
 `src/playsim/p_acs.cpp:5106-5115` (UZDoom) and Zandronum's `DoSpawnDecal` — see shared traits above.
+
+## Zandronum-specific: `SpawnDecal` over the network
+
+On a Zandronum server, `DoSpawnDecal` wraps `ShootDecal` so that every decal the server's own
+trace places is also sent to clients as `SVC2_SHOOTDECAL` (`p_acs.cpp:5812-5836`,
+`sv_commands.cpp:5283-5297`). Each client then runs its own `ShootDecal` (`cl_main.cpp:2412-2426`).
+What that means for a script:
+
+- **A decal group is picked separately on every machine.** `GetDecalByName` returns the group
+  itself, not one of its members (`decallib.cpp:958-968`), and `ShootDecal` resolves the group
+  with a fresh weighted pick on every call (`a_decals.cpp:782`, `decallib.cpp:1127-1142`). So the
+  server picks once per matching actor, and the command carries the **group name**, not the
+  picked decal (`sv_commands.cpp:5290`). Each client then picks again. With a `DECALDEF` group,
+  the server and every client can show a different member on the same wall. A single decal name
+  looks the same everywhere.
+- **The height is sent as a 16-bit whole number.** The command carries the trace origin's
+  absolute `z` (the actor's mid-height plus `zoffset`), shifted down to whole map units and
+  written as a signed 16-bit value (`sv_commands.cpp:5292`, read back at `cl_main.cpp:2416`,
+  `networkshared.cpp:242-247`). The fraction is dropped, and a height outside -32768..32767
+  wraps. The angle is also cut to its top 16 bits (`:5293`), which is too small to see.
+- **Clients re-trace from their own view of the actor.** Only the actor's net ID, `z`, angle,
+  distance and the permanent flag are sent. The client uses its own copy of the actor's x/y and
+  its own map state, so a decal can land elsewhere, or miss, if the client's actor position
+  differs from the server's.
+- **Nothing is sent when the server's trace misses**, and a client that doesn't know the decal
+  name, or doesn't have the actor, silently skips it (`cl_main.cpp:2423`). A `CLIENTSIDE` script's
+  `SpawnDecal` sends nothing, since only the server sends.
+
+The ACS return value is the server's own count and says nothing about what clients drew.
+
+**Provenance:** Zandronum 3.3-alpha @bdd0f7beb, read 2026-09-29: `src/p_acs.cpp:5812-5836`,
+`src/sv_commands.cpp:5283-5297`, `src/cl_main.cpp:2412-2426`, `src/networkshared.cpp:242-252`,
+`src/g_shared/a_decals.cpp:780-782`, `src/decallib.cpp:958-968`, `:1127-1142`,
+`src/weightedlist.h:104-115`.
 
 ---
 

@@ -28,7 +28,7 @@ Returns the numeric index of the player's skin in the current game's skin list. 
 - The `PLAYERSKIN_VISIBLE` type resolves an ACS-set skin against the equipped weapon's preferred skin: the weapon's skin wins by default when both exist, unless `SetPlayerSkin()`'s optional third argument set the ACS skin to override the weapon skin instead. Whichever of those two applies (or the only one present) is used; if neither is set, it falls back to the personal skin setting, then the class base skin.
 - Skin indices below the number of player classes are each class's own reserved "Base" pseudo-skin slot, at an index equal to that class's own index; named skins from the `SKININFO` lump occupy the indices after that, in lump order. The "Base" skin therefore is not a fixed index like 0. It resolves to the querying player's own class index.
 
-## Zandronum-specific
+## Zandronum-specific: no UZDoom counterpart
 
 This function exists only in Zandronum. UZDoom has no equivalent skin query mechanism.
 

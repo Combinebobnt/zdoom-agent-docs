@@ -75,8 +75,9 @@ must agree on in server-authoritative actions.
 
 Setting an argument on spawn so the actor works without map-editor args. Plain DECORATE: no
 `Default { }` block (that is ZScript) and one action per frame, since Zandronum's DECORATE has
-no `{ }` action blocks. The first Spawn frame needs `NoDelay`, or its action is skipped when the
-actor spawns.
+no `{ }` action blocks. The first Spawn frame needs `NoDelay` (or a blank `TNT1 A 0` state ahead
+of it), or its action is skipped when the actor spawns. See
+[The first Spawn state's action and `NoDelay`](../concepts/spawn-state-nodelay.md).
 
 ```text
 ACTOR CustomDispenser

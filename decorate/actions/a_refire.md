@@ -3,7 +3,7 @@
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
 **Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-11); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
-**Provenance:** ZDoom Wiki `A_ReFire` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_ReFire&oldid=54720) + verified against the Zandronum source's `src/p_pspr.cpp:1046-1082` and `src/g_shared/a_weapons.cpp:864-886`. **Tic-timing addition (2026-09-22):** the "Tic timing" section is source-derived, read from the Zandronum source's `src/p_pspr.cpp:204-267` (`P_SetPsprite`), `:338` (`P_FireWeapon`) and `:1046-1082`, bodies unchanged since `28f736fb3`; and the UZDoom source (@98b16b78fc) `wadsrc/static/zscript/actors/inventory/stateprovider.zs:434` (`A_ReFire`), `wadsrc/static/zscript/actors/player/player.zs:410` (`FireWeapon`) and `src/playsim/p_pspr.cpp:479-585` (`DPSprite::SetState`). The "Network behavior" section is source-derived from the Zandronum source's `src/p_pspr.cpp:338-382` (`P_FireWeapon`), `src/g_shared/a_weapons.cpp:689-700` (`CheckAmmo` client gate), `src/p_user.cpp:1205-1243` (`PickNewWeapon`), `src/p_user.cpp:4174` and `src/cl_pred.cpp:291` (client-side `P_MovePsprites`).
+**Provenance:** ZDoom Wiki `A_ReFire` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=A_ReFire&oldid=54720) + verified against the Zandronum source's `src/p_pspr.cpp:1046-1082` and `src/g_shared/a_weapons.cpp:864-886`. **Tic-timing addition (2026-09-22):** the "Tic timing" section is source-derived, read from the Zandronum source's `src/p_pspr.cpp:204-267` (`P_SetPsprite`), `:338` (`P_FireWeapon`) and `:1046-1082`, bodies unchanged since `28f736fb3`; and the UZDoom source (@98b16b78fc) `wadsrc/static/zscript/actors/inventory/stateprovider.zs:434` (`A_ReFire`), `wadsrc/static/zscript/actors/player/player.zs:410` (`FireWeapon`) and `src/playsim/p_pspr.cpp:479-585` (`DPSprite::SetState`). The "Network behavior" section is source-derived from the Zandronum source's `src/p_pspr.cpp:338-382` (`P_FireWeapon`), `src/g_shared/a_weapons.cpp:689-700` (`CheckAmmo` client gate), `src/p_user.cpp:1205-1243` (`PickNewWeapon`), `src/p_user.cpp:4174` and `src/cl_pred.cpp:291` (client-side `P_MovePsprites`). **Switch-cancel addition (2026-09-29):** the "Weapon switch during a charge Hold" section is source-derived from the Zandronum source's `src/p_pspr.cpp:204-211` (`P_SetPsprite` flag clear), `:785-818` (`DoReadyWeaponToSwitch`/`DoReadyWeaponDisableSwitch`), `:907-919` (`A_WeaponReady`), `:972-990` (`P_CheckWeaponSwitch`), `:1054-1082` and `:1424-1466` (`P_MovePsprites`), plus UZDoom's `stateprovider.zs:443` and `weapons.zs:376-391` for parity, and was live-verified on a Zandronum 3.x build in single-player and a loopback host + client game.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** `DEFINE_ACTION_FUNCTION_PARAMS(AInventory, A_ReFire)` at `src/p_pspr.cpp:1046`. Defined on the `AInventory` class; only available in weapon/inventory states, not on arbitrary actors.
 
@@ -48,12 +48,28 @@ When called from a weapon state:
 
 ## Interaction with Hold/AltHold states
 
-`A_ReFire` is the standard mechanism for transitioning from a `Fire` sequence to a `Hold` sequence (or `AltFire` to `AltHold`). If a weapon defines a `Hold` state, it is responsible for:
-
-- Using `A_ReFire` at the end of the `Hold` sequence to loop back (continuously firing while the button is held).
-- Reaching `Hold` only via the automatic fallback logic in `A_ReFire`, not through explicit state jumps elsewhere.
+`A_ReFire` is the standard mechanism for transitioning from a `Fire` sequence to a `Hold` sequence (or `AltFire` to `AltHold`). The automatic selection picks `Hold` whenever `player.refire` is nonzero (`GetAtkState(!!player->refire)`, `p_pspr.cpp:373-376`), which `A_ReFire` guarantees by incrementing it first. A weapon that defines a `Hold` state normally ends the `Hold` sequence with another `A_ReFire`, so it keeps re-entering `Hold` while the button is held.
 
 If no `Hold` state is defined, `A_ReFire` loops in the `Fire` state itself, creating continuous rapid-fire behavior.
+
+## Weapon switch during a charge Hold
+
+A charge-and-release weapon (hold fire to charge, release to shoot) that ends its `Hold` in `A_ReFire` followed by the shot state fires when the player switches weapons mid-charge, even with fire still held. Two engine details combine:
+
+- **`WF_REFIRESWITCHOK` is sticky.** `P_SetPsprite` clears `WF_WEAPONSWITCHOK` on every weapon-layer state change, but not `WF_REFIRESWITCHOK`. Only an `A_WeaponReady` call sets or clears it (cleared by `WRF_NOSWITCH` or `WRF_DISABLESWITCH`). So after the `Ready` state's switch-permitting `A_WeaponReady`, every later `A_ReFire` treats a pending switch as "released" and falls through to the shot.
+- **State advance runs before the switch check.** In `P_MovePsprites` the layer's tic count expires and the following 0-tic chain (including `A_ReFire` and its fall-through) runs first. Only then does `P_CheckWeaponSwitch` drop the weapon, and only if the state the layer rests in called a switch-permitting `A_WeaponReady` that tic. A switch requested at the start of a tic therefore reaches `A_ReFire` first. Adding `A_WeaponReady(WRF_NOFIRE|WRF_NOBOB)` to the resting frame alone does **not** cancel the shot.
+
+Cancelling pattern, both engines:
+
+```decorate
+Hold:
+    BOWG B 1 A_WeaponReady(WRF_NOFIRE|WRF_NOBOB)             // rest frame: a pending switch deselects at the end of this tic
+    BOWG B 0 A_WeaponReady(WRF_NOFIRE|WRF_NOBOB|WRF_NOSWITCH) // clears WF_REFIRESWITCHOK
+    BOWG B 0 A_ReFire                                          // still held: refires into Hold despite the pending switch
+    Goto Shoot                                                 // reached only on a real release
+```
+
+On the switch tic, `A_ReFire` refires, the chain re-enters the rest frame, its `A_WeaponReady` sets `WF_WEAPONSWITCHOK`, and `P_CheckWeaponSwitch` sends the layer to `Deselect` with no shot. A release on the same tic as the switch still shoots. Anything the charge accumulated (inventory counters) survives the deselect, so clear it in `Deselect` if other weapons read it. The same shape applies to `AltHold` with `A_ReFire` reading alt-fire.
 
 ## Tic timing
 
@@ -69,7 +85,7 @@ Both engines, same shape. When attack is held, `A_ReFire` sets the weapon layer 
 
 Zandronum:
 
-- **Runs on both sides, sends nothing itself.** `A_ReFire` has no network code. A client ticks its own player's weapon layer locally (`P_PlayerThink` calls `P_MovePsprites` for the console player), so it makes the refire decision from its own button state. The server makes the same decision independently from the input the client sent. When the held path reaches `P_FireWeapon()`/`P_FireWeaponAlt()`, the server only tells the other clients to play the player body's attack animation (`SERVERCOMMANDS_SetPlayerState`, skipping the firing client); the weapon layer's jump itself is not sent.
+- **Runs on both sides, sends nothing itself.** `A_ReFire` has no network code. A client ticks every player's weapon layer locally (`P_PlayerThink`, which calls `P_MovePsprites`, runs for other players from `p_tick.cpp:385-392` and for the console player through prediction), so it makes its own player's refire decision from its own button state. The server makes the same decision independently from the input the client sent. When the held path reaches `P_FireWeapon()`/`P_FireWeaponAlt()`, the server only tells the other clients to play the player body's attack animation (`SERVERCOMMANDS_SetPlayerState`, skipping the firing client); the weapon layer's jump itself is not sent.
 - **Out-of-ammo switch also runs on both sides.** The server's `CheckAmmo()` picks a new weapon for any player. On a client it only does so for the console player (it returns without switching for other players, whose ammo the client may not know exactly), and that client's `PickNewWeapon` also sends its choice to the server with a weapon-select client command.
 
 ## Examples

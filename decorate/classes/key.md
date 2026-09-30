@@ -16,7 +16,7 @@ Lock-and-key matching in Zandronum is **class-identity based**, not inheritance-
 
 Zandronum's lock-checking occurs via its own engine function `P_CheckKeys(owner, keynum, remote)` (`src/g_shared/a_keys.cpp:398`), which:
 
-1. Looks up the lock number (a value from `0` to `255`, typically drawn from a linedef's argument or a map special) in a global locks table
+1. Looks up the lock number (looked up as `1` to `255`, though LOCKDEFS can only define `1` to `254` on Zandronum; typically drawn from a linedef's argument or a map special) in a global locks table
 2. For each key group in that lock's key list, iterates through the required keys
 3. Checks if the owner has an inventory item whose exact class type (`GetClass() == type`, not subclass-inclusive) matches any key in the group
 4. Returns `true` if all key groups are satisfied; `false` otherwise
@@ -25,7 +25,7 @@ An undefined lock (one with no LOCKDEFS entry) triggers a failure message and so
 
 ## The `KeyNumber` field
 
-Each Zandronum `AKey` subclass has a `BYTE KeyNumber` field, but this is **not** the lock number and is **not** used for lock matching. `KeyNumber` is assigned sequentially (starting from 1) by the LOCKDEFS parser at game startup (`P_InitKeyMessages`, called once from `P_Init()` in `src/d_main.cpp`, not per map), and it is used only for display and cheat purposes: sorting keys in the HUD, the `give keys` cheat, and SBARINFO key-icon drawing. Lock checking uses the linedef/map-special argument directly, bypassing `KeyNumber` entirely. UZDoom's `Key` has no equivalent native field at all — see "Engine-family divergence: lock-number range and key-number storage" below for what it uses instead.
+Each Zandronum `AKey` subclass has a `BYTE KeyNumber` field, but this is **not** the lock number and is **not** used for lock matching. `KeyNumber` is assigned sequentially (starting from 1) by the LOCKDEFS parser at game startup (`P_InitKeyMessages`, called once from `P_Init()` in `src/p_setup.cpp`, itself called from `D_DoomMain`, not per map), and it is used only for display, cheat and loadout purposes: sorting keys in the HUD, the `give keys` cheat, SBARINFO key-icon drawing, and the deathmatch spawn loadout (`GiveDeathmatchInventory`). Lock checking uses the linedef/map-special argument directly, bypassing `KeyNumber` entirely. UZDoom's `Key` has no equivalent native field at all — see "Engine-family divergence: lock-number range and key-number storage" below for what it uses instead.
 
 ## Multiplayer and pickup behavior
 
@@ -83,3 +83,4 @@ The `+DONTGIB` flag prevents keys from being destroyed by crushers. `+INVENTORY.
 
 - Predefined key subclasses: `DoomKey`, `HereticKey`, `HexenKey`, `StrifeKey`, and game-specific variants (`RedCard`, `KeyGreen`, etc.) exist by the same names on both engines (UZDoom adds `Chex`-game key variants too).
 - Related lock-checking functions: `P_CheckKeys()` (line special evaluation; separate implementations per engine — `src/g_shared/a_keys.cpp` on Zandronum, `src/gamedata/a_keys.cpp` on UZDoom, see "Engine-family divergence" sections above), `P_GetMapColorForLock()` (automap display)
+- The LOCKDEFS grammar, lock-number semantics and stock lock numbers: [`lockdefs/concepts/lockdefs-lump.md`](../../lockdefs/concepts/lockdefs-lump.md)

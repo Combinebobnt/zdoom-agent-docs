@@ -380,6 +380,11 @@ def _exact_hit(q):
     rel = Path(target).resolve().relative_to(ROOT).as_posix()
     if isinstance(result, L.InventoryResult):
         desc = f"inventory row in {Path(result.file).relative_to(ROOT).as_posix()}"
+    elif result.kind == "concept":
+        try:
+            desc = L.concept_header(result.file)[0]
+        except (OSError, UnicodeDecodeError):
+            desc = result.kind
     else:
         desc = result.signature.text if result.signature else result.kind
     return (rel, desc, key), None

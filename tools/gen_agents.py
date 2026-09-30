@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Generate the per-harness subagent adapters from the harness-neutral procedure docs.
 
-Each canonical doc under agents/procedures/<name>.md is plain markdown. Its `## When to delegate`
-section (one paragraph) becomes every adapter's description; everything after that section
-becomes the adapter's body / system prompt. Everything before it (H1 plus the note for humans) is
+Each canonical doc at the top level of agents/ (agents/<name>.md) is plain markdown. Its
+`## When to delegate` section (one paragraph) becomes every adapter's description; everything
+after that section becomes the adapter's body / system prompt. Everything before it (H1 plus the note for humans) is
 dropped. HARNESSES below holds each harness's output path and frontmatter/TOML template.
 
 Formats were checked against each harness's own docs on 2026-09-25/26:
-  - Claude Code  .claude/agents/*.md          frontmatter name/description/tools(/model)
+  - Claude Code  .claude/agents/*.md          frontmatter name/description/tools
   - Codex CLI    .codex/agents/*.toml         name, description, developer_instructions
   - Gemini CLI   .gemini/agents/*.md          frontmatter name/description/kind/tools list
   - OpenCode     .opencode/agents/*.md        frontmatter description/mode/permission; name = filename
@@ -15,15 +15,17 @@ Formats were checked against each harness's own docs on 2026-09-25/26:
 Loader behavior (symlinks, read-only enforcement) was checked against Codex, gemini-cli and
 opencode source on 2026-09-26; the root AGENTS.md "Subagents" table records the consequences.
 
-agents/<name>.md (the Claude Code adapter) keeps its historical path, since machines symlink
-~/.claude/agents/ straight to it.
+Only procedures sit at the top level of agents/; each harness's adapters live in its own
+agents/<harness>/ folder, and any other file under agents/ is reported as a stray by --check.
+A symlink to the old Claude path agents/<name>.md must be re-pointed to agents/claude/<name>.md.
 
 Usage:
     python3 tools/gen_agents.py            # write every adapter
-    python3 tools/gen_agents.py --check    # exit 1 if any committed adapter differs
+    python3 tools/gen_agents.py --check    # exit 1 if any adapter differs or a stray file sits under agents/
 """
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -31,11 +33,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import sections as S  # noqa: E402
 
 ROOT = S.ROOT
-PROCEDURES_DIR = "agents/procedures"
+PROCEDURES_DIR = "agents"
 DELEGATE_HEADING = "## When to delegate"
 
-# Only Claude pins a model, carried over from the pre-generator adapter; model IDs don't port.
-CLAUDE_MODELS = {"zdoom-docs-lookup": "haiku"}
+# No adapter pins a model, so every subagent inherits the caller's (decided 2026-09-29).
 
 
 def _note(name, comment):
@@ -50,8 +51,6 @@ def _md(frontmatter_lines, name, body):
 
 def _claude(name, desc, body):
     fm = [f"name: {name}", f"description: {desc}", "tools: Read, Grep, Glob"]
-    if name in CLAUDE_MODELS:
-        fm.append(f"model: {CLAUDE_MODELS[name]}")
     return _md(fm, name, body)
 
 
@@ -89,7 +88,7 @@ def _copilot(name, desc, body):
 
 # (harness, output path template, renderer)
 HARNESSES = [
-    ("claude", "agents/{name}.md", _claude),
+    ("claude", "agents/claude/{name}.md", _claude),
     ("codex", "agents/codex/{name}.toml", _codex),
     ("gemini", "agents/gemini/{name}.md", _gemini),
     ("opencode", "agents/opencode/{name}.md", _opencode),
@@ -130,19 +129,47 @@ def drift(rendered, actual):
     return msgs
 
 
+def strays(rendered, procedures, present):
+    """Pure: one message per `present` path that is neither a procedure nor a rendered adapter."""
+    known = set(rendered) | set(procedures)
+    return [f"{rel} is neither a procedure nor a generated adapter; remove it, adapters are regenerated from {PROCEDURES_DIR}/<name>.md"
+            for rel in sorted(present) if rel not in known]
+
+
+def _agent_files(root):
+    """Repo-relative files under agents/: git's tracked + untracked-unignored, else a plain walk."""
+    try:
+        out = subprocess.run(["git", "ls-files", "-co", "--exclude-standard", "-z", "--", PROCEDURES_DIR],
+                             cwd=root, capture_output=True, check=True).stdout.decode()
+        rels = [r for r in out.split("\0") if r and (root / r).is_file()]
+    except (OSError, subprocess.CalledProcessError):
+        rels = [p.relative_to(root).as_posix() for p in (root / PROCEDURES_DIR).rglob("*") if p.is_file()]
+    # Editor/OS junk (.DS_Store, .swp, backup~) is never a procedure or an adapter.
+    return sorted(r for r in rels if not r.rsplit("/", 1)[-1].startswith(".") and not r.endswith("~"))
+
+
+def _procedures(root):
+    return [root / r for r in _agent_files(root) if r.count("/") == 1 and r.endswith(".md")]
+
+
 def render_all(root=ROOT):
     rendered = {}
-    for src in sorted((root / PROCEDURES_DIR).glob("*.md")):
-        rendered.update(render(src.stem, src.read_text()))
+    for src in _procedures(root):
+        try:
+            rendered.update(render(src.stem, src.read_text()))
+        except ValueError as e:
+            rel = src.relative_to(root).as_posix()
+            raise ValueError(f"{rel}: {e} (only procedures belong at the top level of {PROCEDURES_DIR}/)") from e
     return rendered
 
 
 def check(root=ROOT):
-    """Return a list of drift/error messages for the whole tree; empty means clean."""
+    """Return a list of drift/stray/error messages for the whole tree; empty means clean."""
     try:
         rendered = render_all(root)
         actual = {rel: (root / rel).read_text() if (root / rel).is_file() else None for rel in rendered}
-        return drift(rendered, actual)
+        procedures = [p.relative_to(root).as_posix() for p in _procedures(root)]
+        return drift(rendered, actual) + strays(rendered, procedures, _agent_files(root))
     except ValueError as e:
         return [str(e)]
 

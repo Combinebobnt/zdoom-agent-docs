@@ -108,7 +108,7 @@
 | FLOORHUGGER | ActorFlags | AActor | flags3 | yes | yes | C |  |
 | FOILINVUL | ActorFlags | AActor | flags3 | yes | yes | C |  |
 | FORCEALLYCOLLISION | ActorFlags | AActor | STFlags | yes | — | C |  |
-| FORCEDECAL | ActorFlags | AActor | flags7 | yes | yes | C |  |
+| FORCEDECAL | ActorFlags | AActor | flags7 | yes | yes | B | [notes](../notes/forcedecal.md) |
 | FORCEPAIN | ActorFlags | AActor | flags6 | yes | yes | C |  |
 | FORCERADIUSDMG | ActorFlags | AActor | flags4 | yes | yes | C |  |
 | FORCERESPAWNINSURVIVAL | InventoryFlags | AInventory | ItemFlags | yes | no-op | C |  |

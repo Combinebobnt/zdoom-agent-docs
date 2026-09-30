@@ -34,7 +34,7 @@ Zandronum performs removal via `P_RemoveThing` (UZDoom's version is covered furt
 - Clears kill/item/secret counters
 - Hides rather than destroys the actor only when all of these hold: the game mode resets the map, the actor was spawned with the level, and this is not a client. Anything else, including actors spawned at runtime by `A_SpawnItemEx`, is destroyed outright
 
-## Zandronum-specific behavior
+## Zandronum-specific: single removeall parameter, no filter flags
 
 **Parameter count differs significantly from the ZDoom wiki.** The wiki describes an advanced version with optional `flags` (bitfield), `filter` (class name), and `species` parameters that **do not exist in Zandronum**. Passing a second argument is a fatal DECORATE **parse error** at load time: after the single `removeall` argument the state parser requires a closing `)` (`src/thingdef/thingdef_states.cpp:430`).
 
@@ -44,7 +44,7 @@ Zandronum performs removal via `P_RemoveThing` (UZDoom's version is covered furt
 
 ## Zandronum-specific: full wiki parameter set exists on UZDoom
 
-**The ZDoom Wiki describes the GZDoom/UZDoom version**, and UZDoom's actual signature matches it exactly: `A_RemoveSiblings(bool removeall = false, int flags = 0, class<Actor> filter = null, name species = "None")` (native declaration at `wadsrc/static/zscript/actors/actor.zs:1409`, implementation at `src/playsim/p_actionfunctions.cpp:4426-4449`). All of the constructs the existing "Zandronum-specific behavior" section above says are missing are present and functional on UZDoom:
+**The ZDoom Wiki describes the GZDoom/UZDoom version**, and UZDoom's actual signature matches it exactly: `A_RemoveSiblings(bool removeall = false, int flags = 0, class<Actor> filter = null, name species = "None")` (native declaration at `wadsrc/static/zscript/actors/actor.zs:1409`, implementation at `src/playsim/p_actionfunctions.cpp:4426-4449`). All of the constructs the existing "Zandronum-specific: single removeall parameter, no filter flags" section above says are missing are present and functional on UZDoom:
 
 - **Flag constants work.** `RMVF_MISSILES`, `RMVF_NOMONSTERS`, `RMVF_MISC`, `RMVF_EVERYTHING`, `RMVF_EXFILTER`, `RMVF_EXSPECIES`, and `RMVF_EITHER` are all defined (`src/playsim/p_actionfunctions.cpp:4303-4312`) and consumed by the shared `DoRemove` helper.
 - **Type discrimination works.** `DoRemove` checks `RMVF_EVERYTHING` (unconditional removal once the filter passes), `RMVF_MISC` (non-monster, non-missile actors), the monster case (removed unless `RMVF_NOMONSTERS` is set), and the missile case (`RMVF_MISSILES`) as separate conditions, so monsters, missiles, and misc actors can be selectively spared.

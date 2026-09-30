@@ -122,7 +122,7 @@ These are either GZDoom-family additions or were introduced after Zandronum 3.2.
 
 - `true` if the spawn succeeded, including a monster-based spawn that passed its space check, and any spawn where the space check was skipped or bypassed (non-monster actor, or `SXF_NOCHECKPOSITION`/`SXF_TELEFRAG` in effect).
 - `false` if the spawn was attempted but failed: a null `missile` class, or a monster-based spawned actor that failed its space check.
-- **Left unset (whatever the calling state's prior result was)** for three early-return paths that skip the spawn before `ACTION_SET_RESULT` is ever reached: a `failchance` skip (line 2612 of the source), the `DamageType == NAME_Massacre` skip (see "Monster spawn restrictions" below), and the `NETWORK_ShouldActorNotBeSpawned` network gate (see "Zandronum-specific networking behavior" below) rejecting the spawn. All three are bare `return;` statements that run before the actor is even spawned, not just before the result is set.
+- **Left unset (whatever the calling state's prior result was)** for three early-return paths that skip the spawn before `ACTION_SET_RESULT` is ever reached: a `failchance` skip (line 2612 of the source), the `DamageType == NAME_Massacre` skip (see "Monster spawn restrictions" below), and the `NETWORK_ShouldActorNotBeSpawned` network gate (see "Zandronum-specific: networking behavior" below) rejecting the spawn. All three are bare `return;` statements that run before the actor is even spawned, not just before the result is set.
 
 To distinguish "spawn succeeded" from one of these three skip cases in calling DECORATE, you must either:
 - Use a separate action before `A_SpawnItemEx` to detect the failure mode directly (e.g., with `A_JumpIf` on an actor variable you set just before the spawn).
@@ -138,7 +138,7 @@ The originator is used by `InitSpawnedItem` to:
 - Set the spawned actor's `master` when `SXF_SETMASTER` is set and the originator is monster-based (see that flag's entry above — the master becomes the *originator*, not necessarily the calling actor).
 - **Override `target`** to the originator's `player->attacker` when the originator is a player-type actor with a live attacker — unconditionally, independent of any flag (see `SXF_TRANSFERPOINTERS` above).
 
-## Zandronum-specific networking behavior
+## Zandronum-specific: networking behavior
 
 - **Server-side authority for spawn decision:** `NETWORK_ShouldActorNotBeSpawned(self, missile, forceClientSide)` gates the entire spawn before `Spawn()` is even called; a `true` result means the action returns immediately with no actor created, leaving the result unset (see "Return value" above). The gate treats a spawn as client-side-only, flipping the usual polarity, when any of three things hold: `SXF_CLIENTSIDE` is passed, the calling actor itself already carries `NETFL_CLIENTSIDEONLY`, or the spawned class's own defaults carry `NETFL_CLIENTSIDEONLY`. For a spawn that is client-side-only by any of those three, the check blocks the server and allows the client. For every other spawn, it blocks the client and allows the server, matching the usual server-authoritative model. See "Client-side-only actors" below.
 
@@ -220,7 +220,7 @@ wiki, not the single-bool Zandronum behavior described above.
 
 Zandronum's `failchance` early-return, its massacre-check early-return (see "Monster spawn
 restrictions" below), and its `NETWORK_ShouldActorNotBeSpawned` network-gate early-return (see
-"Zandronum-specific networking behavior" below) all `return` without calling `ACTION_SET_RESULT`,
+"Zandronum-specific: networking behavior" below) all `return` without calling `ACTION_SET_RESULT`,
 so the action's result slot is left at whatever it was before the call — the behavior the "Return
 value" section above describes as "left unset."
 
@@ -235,7 +235,7 @@ actual-spawn failure from a blocked monster space check does still return `false
 
 ## Engine-family divergence: no client/server split — `SXF_CLIENTSIDE` is inert on UZDoom
 
-Zandronum's `SXF_CLIENTSIDE` flag and the entire "Zandronum-specific networking behavior" section
+Zandronum's `SXF_CLIENTSIDE` flag and the entire "Zandronum-specific: networking behavior" section
 above (server-authoritative spawn gating via `NETWORK_ShouldActorNotBeSpawned`, `SERVERCOMMANDS_*`
 broadcast on success, `NETFL_CLIENTSIDEONLY`) are Zandronum/Skulltag-only mechanisms. UZDoom's
 source still declares the `SXF_CLIENTSIDE` bit constant (carrying over its original "only used by

@@ -9,7 +9,9 @@ file already states as architectural reasoning, not fact).
 docs (compiled 2026-07-31, extended 2026-08-01) — not a wiki-intake page, no new source reading
 beyond what's cited in each linked file. The `A_TakeInventory` item-held precondition is from
 Zandronum's `src/thingdef/thingdef_codeptr.cpp:2284-2296`; the `A_Chase` client-mode gate is
-`src/p_enemy.cpp:2576-2577,2681-2683`.
+`src/p_enemy.cpp:2576-2577,2681-2683`. The jump-family general rule, the sibling trace and the
+`-1` hold's delivery point at the per-function and netcode trace in
+`network-jump-synchronization.md`, read 2026-09-29 at the same Zandronum revision.
 
 A running, checklist-style index of **verified, recurring** crash/bug-causing patterns in Zandronum's
 DECORATE layer — not a tutorial, not exhaustive. Each entry is one sentence of "what to
@@ -131,12 +133,30 @@ above as exhaustive, only as what's been found *so far*.
 
 ## Network synchronization footguns in jump functions (`A_Jump`/`A_JumpIf*`)
 
-Full background, all four causes, and the reasoning behind each fix live in
-[Jump functions and network synchronization](network-jump-synchronization.md) — the four items
-below are the reviewable, grep-for-this-in-the-diff form of that file's causes 1–4, kept here so a
-DECORATE review doesn't need to open a second file to be reminded of them.
+Full background, the general rule, all four causes, and the reasoning behind each fix live in
+[Jump functions and network synchronization](network-jump-synchronization.md). Items 1-5 below
+are the reviewable, grep-for-this-in-the-diff form of that file's general rule and causes 1-4;
+item 6 is the same wasted-roll shape outside the jump family. They're kept here so a DECORATE
+review doesn't need to open a second file to be reminded of them.
 
-1. **RNG inside an `A_JumpIf` (or similar non-`A_Jump`) condition, on an actor that isn't
+1. **Any gated jump on a networked (non-`+CLIENTSIDEONLY`) actor: the server decides it, and every
+   client falls through first.** `A_Jump` (including chance 256), `A_JumpIf`,
+   `A_JumpIfHealthLower`, `A_JumpIfCloser`, the `A_JumpIfInventory` family, the melee-range and
+   `A_JumpIfInTargetLOS` jumps and the other guarded jumps are inert on a client. The server sends
+   its jump as `SetThingFrame` (or `SetThingState` for a Melee/Missile/Pain/Wound target), and the
+   client runs the target's action when it lands. Only `Goto`/plain state flow is client-local.
+   Until the jump lands the client runs the stretch from the gate through the fall-through, so
+   review that stretch for client-visible effects: `+CLIENTSIDEONLY` spawns (`A_SpawnItemEx` lets a
+   clientside type through), the frames shown, and unguarded actions. Fall-through sounds are not
+   a finding: `A_PlaySound`/`A_PlaySoundEx` return on a client for a networked actor. Exceptions the
+   client decides itself: `A_JumpIfInventory` on the local player's own actor or from weapon/flash
+   states, the flags-`0` checks (`A_CheckFloor`, `A_CheckFlag`, `A_JumpIfArmorType`, ...), the
+   unguarded `A_JumpIfTargetInLOS`/`A_JumpIfTracerCloser`/`A_JumpIfMasterCloser`, and the
+   `NotClientHandled`-guarded group on an actor with no net ID. Zandronum only; UZDoom has no
+   client/server split. See
+   [The general rule](network-jump-synchronization.md#the-general-rule-the-server-decides-every-gated-jump-and-the-client-falls-through-first)
+   for the per-function trace.
+2. **RNG inside an `A_JumpIf` (or similar non-`A_Jump`) condition, on an actor that isn't
    `+CLIENTSIDEONLY`.** `A_JumpIf` evaluates its expression — including any embedded
    `random()`/`frandom()`/`random2()` call — *before* checking `NETWORK_InClientMode()`, the
    opposite order from `A_Jump`. Because unnamed random calls all draw from the single shared
@@ -148,7 +168,7 @@ DECORATE review doesn't need to open a second file to be reminded of them.
    not a hard gameplay desync (no RNG-state consistency check exists between server and client in
    Zandronum) — the real cost is quietly less-reproducible `+CLIENTSIDEONLY` cosmetic randomness on
    that client. See [A_JumpIf](../actions/a_jumpif.md) for the full source trace.
-2. **A `+CLIENTSIDEONLY` actor's `A_Jump`/`A_JumpIf*`-gated behavior affecting anything other than
+3. **A `+CLIENTSIDEONLY` actor's `A_Jump`/`A_JumpIf*`-gated behavior affecting anything other than
    its own local visuals.** `rngseed` is never synchronized between server and client in live play
    (verified: the one mechanism that would, `D_ArbitrateNetStart`'s `NCMD_SETUP` handshake, has its
    only call site commented out), so a `+CLIENTSIDEONLY` actor's jump-driven RNG rolls are
@@ -158,15 +178,16 @@ DECORATE review doesn't need to open a second file to be reminded of them.
    made server-side and broadcast instead. Purely cosmetic divergence (particle/debris variety,
    idle-animation branching) is fine and expected. See
    [A_Jump](../actions/a_jump.md)'s "Network considerations" section.
-3. **A position/LOS/inventory-gated jump (`A_JumpIfCloser`, `A_JumpIfTargetInLOS`,
-   `A_JumpIfInventory`, and siblings — not individually source-traced the way `A_Jump`/`A_JumpIf`
-   were) whose design assumes the server and a client evaluate the same condition at the exact same
+4. **A position/LOS/inventory-gated jump (`A_JumpIfCloser`, `A_JumpIfTargetInLOS`,
+   `A_JumpIfInventory`, and siblings; each one's guard and relay is traced under
+   [The general rule](network-jump-synchronization.md#the-general-rule-the-server-decides-every-gated-jump-and-the-client-falls-through-first))
+   whose design assumes the server and a client evaluate the same condition at the exact same
    tic.** The client's copy of another actor's position/inventory/etc. can lag the server's true
    value by up to one round-trip under Zandronum's predict-and-correct model, so an exact-tic
    assumption is inherently fragile, not a specific bug to patch. **Fix/avoidance:** design for a
    tic of visible lag on the client instead of an instantaneous jump the moment a networked value
    changes.
-4. **A `+CLIENTSIDEONLY` actor spawned from inside a non-`+CLIENTSIDEONLY` actor's `A_JumpIf`-gated
+5. **A `+CLIENTSIDEONLY` actor spawned from inside a non-`+CLIENTSIDEONLY` actor's `A_JumpIf`-gated
    "skip" branch shows up unconditionally on every client, ignoring the gate entirely.** `A_JumpIf`
    not jumping means state advancement just continues to the next state — any action function
    between the (inert-on-client) jump and its target still runs there. `A_SpawnItemEx`/`A_SpawnItem`
@@ -177,8 +198,21 @@ DECORATE review doesn't need to open a second file to be reminded of them.
    condition into the spawned `+CLIENTSIDEONLY` actor's own `Spawn:` state chain, passing whatever
    data the check needs (e.g. via `A_SpawnItemEx`'s `xvel`/`yvel`/`zvel` params) — a check on `self`
    there is on a genuinely `+CLIENTSIDEONLY` actor, so its own `A_JumpIf` gate evaluates correctly.
-   See [Jump functions and network synchronization](network-jump-synchronization.md#cause-4-a-not-taken-branchs-own-side-effects-still-execute-on-every-client-verified-a_jumpif).
-5. **Same wasted-roll shape as #1 above, outside the jump-function family: an attack action function
+   That only works when the child can compute the condition on the client from data passed in.
+   For a condition only the server knows (an ACS-set value such as a skill setting, a cvar,
+   inventory, health, the target), keep the gate on the parent and use the two-gate shape with a
+   holding fall-through described next for `Death`.
+   **In a `Death` state the client runs the fall-through branch regardless:** it enters `Death`
+   itself on the server's kill message and spawns the fall-through's items. If the fall-through
+   ends in a 0-tic `Stop`, the client's copy is gone before the server's relayed jump arrives, so
+   the client shows only the fall-through (wrong when the server jumped); if it outlives the tic,
+   the relayed jump spawns the target branch's items too, so the client shows both. Fix by putting both branches on jump targets
+   (`A_JumpIf(cond, "A")`, `A_JumpIf(!(cond), "B")`) with a fall-through that only holds the actor
+   (not `Stop`). A `-1` hold is not a hang risk: the server's jump is a reliable command, resent on
+   loss, so for a connected client the hold ends within a resend round trip (or the client is
+   kicked). See [Jump functions and network synchronization](network-jump-synchronization.md#cause-4-a-not-taken-branchs-own-side-effects-still-execute-on-every-client-verified-a_jumpif)
+   and its "The Death-state variant" subsection.
+6. **Same wasted-roll shape as #2 above, outside the jump-function family: an attack action function
    with no `NETWORK_InClientMode()` guard of its own, whose per-shot spread/damage RNG rolls
    (`Random2()`/`%`-based rolls on a *named* `FRandom` stream, not just the shared `pr_exrandom`)
    execute unconditionally on both server and client before ever reaching the engine call that
@@ -188,10 +222,29 @@ DECORATE review doesn't need to open a second file to be reminded of them.
    `NETWORK_InClientMode()` guard and silently returns `NULL` on a client (aside from the
    `cl_hitscandecalhack`/puff-prediction exceptions) — so the attack itself never double-applies,
    but the client has still burned rolls from those named streams that the server didn't need to
-   make identically. Same low-severity shape as jump-function item #1 (no crash, no hard desync,
+   make identically. Same low-severity shape as jump-function item #2 (no crash, no hard desync,
    just a quietly-diverged RNG stream on that client) but worth checking for on any action function
    that rolls RNG before an engine call, not only on jump/branch functions. See
    [A_CustomBulletAttack](../actions/a_custombulletattack.md)'s "Behavior" section.
+
+## Actions that silently never run
+
+1. **An action on an actor's first `Spawn:` state with no `NoDelay` keyword.** Spawning sets that
+   state without calling its action, and without `NoDelay` the first tick just advances past it,
+   on both engines. A 0-tic first state that nothing re-enters is dead code with no warning. The
+   classic case is a random picker like `A_Jump(256, "A", "B", "C")` that always falls through to
+   the first branch. One-shot `A_SetUserVar`/`A_SetArg` setup, spawns and script calls are
+   silently skipped the same way. A first state re-entered by `Loop`/`Goto Spawn` only loses its
+   first run. Grep every `Spawn:` label's first frame for an action without `NoDelay`. Fix with
+   `NoDelay` on that state, or with a blank 0-tic state (`TNT1 A 0`, no action) ahead of it. Re-test
+   after either, since both switch on behavior that never ran before. See
+   [The first Spawn state's action and `NoDelay`](spawn-state-nodelay.md).
+2. **The same, behind a `Spawn:` label that is only `Goto Death` (or any `Goto`).** The target
+   label's first state becomes the spawn state, so its action never runs on spawn either, and
+   `NoDelay` there is rejected with a non-fatal "NODELAY may only be used immediately after
+   Spawn:" console line. Fix with a blank 0-tic first state under the target label, or a real
+   `NoDelay` state under `Spawn:` before the `Goto`. See
+   [The first Spawn state's action and `NoDelay`](spawn-state-nodelay.md#a-spawn-label-that-is-only-a-goto).
 
 ## Position changes inside a pickup's touch handler get silently discarded
 

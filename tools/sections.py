@@ -50,6 +50,9 @@ CONCEPT = "concept"             # prose; same header block as CALLABLE, no signa
 HEADER_BLOCK_ARCHETYPES = (CALLABLE, TABLE_NOTES, CONCEPT)
 
 # key -> {"index": "<section>/INDEX.md", "agents": "<section>/AGENTS.md", "dirs": {dir: archetype}}
+# Optional "lumps": {LUMP NAME: "<rel path>"} maps a lump/format name to its entry concept page
+# (lookup.py resolves it ahead of every other tier; lint_docs.py checks the target). LANGUAGE is
+# deliberately absent: it would shadow the `language` console cvar row.
 SECTIONS = {
     "acs": {
         "index": "acs/INDEX.md",
@@ -58,6 +61,10 @@ SECTIONS = {
             "acs/functions": CALLABLE,
             "acs/families": CALLABLE,
             "acs/concepts": CONCEPT,
+        },
+        "lumps": {
+            "BEHAVIOR": "acs/concepts/acse-object-format.md",
+            "LOADACS": "acs/concepts/libraries.md",
         },
         # acs/INDEX.md predates the multi-section split and has its own alphabetical-order
         # convention for these three headings; other sections don't require this (yet) since
@@ -79,6 +86,7 @@ SECTIONS = {
             "decorate/notes": TABLE_NOTES,
             "decorate/concepts": CONCEPT,
         },
+        "lumps": {"DECORATE": "decorate/concepts/actor-definition-syntax.md"},
     },
     "zscript": {
         "index": "zscript/INDEX.md",
@@ -88,6 +96,7 @@ SECTIONS = {
             "zscript/families": CALLABLE,
             "zscript/concepts": CONCEPT,
         },
+        "lumps": {"ZSCRIPT": "zscript/concepts/zscript-load-and-compile-order.md"},
     },
     "mapinfo": {
         "index": "mapinfo/INDEX.md",
@@ -97,6 +106,7 @@ SECTIONS = {
             "mapinfo/notes": TABLE_NOTES,
             "mapinfo/concepts": CONCEPT,
         },
+        "lumps": {"MAPINFO": "mapinfo/concepts/mapinfo-format.md"},
     },
     "gldefs": {
         "index": "gldefs/INDEX.md",
@@ -106,6 +116,7 @@ SECTIONS = {
             "gldefs/notes": TABLE_NOTES,
             "gldefs/concepts": CONCEPT,
         },
+        "lumps": {"GLDEFS": "gldefs/concepts/gldefs-overview.md"},
     },
     "sbarinfo": {
         "index": "sbarinfo/INDEX.md",
@@ -115,6 +126,7 @@ SECTIONS = {
             "sbarinfo/notes": TABLE_NOTES,
             "sbarinfo/concepts": CONCEPT,
         },
+        "lumps": {"SBARINFO": "sbarinfo/concepts/sbarinfo-lump-overview.md"},
     },
     "cvarinfo": {
         "index": "cvarinfo/INDEX.md",
@@ -124,6 +136,7 @@ SECTIONS = {
             "cvarinfo/notes": TABLE_NOTES,
             "cvarinfo/concepts": CONCEPT,
         },
+        "lumps": {"CVARINFO": "cvarinfo/concepts/declaration-syntax.md"},
     },
     "console": {
         "index": "console/INDEX.md",
@@ -149,6 +162,7 @@ SECTIONS = {
             "bots/notes": TABLE_NOTES,
             "bots/concepts": CONCEPT,
         },
+        "lumps": {"BOTINFO": "bots/concepts/botinfo-lump.md"},
     },
     "zandronum-lumps": {
         "index": "zandronum-lumps/INDEX.md",
@@ -157,6 +171,18 @@ SECTIONS = {
             "zandronum-lumps/concepts": CONCEPT,
             "zandronum-lumps/inventory": TABLE_INVENTORY,
             "zandronum-lumps/notes": TABLE_NOTES,
+        },
+        "lumps": {
+            "ANCRINFO": "zandronum-lumps/concepts/ancrinfo.md",
+            "AUTHINFO": "zandronum-lumps/concepts/authinfo.md",
+            "CMPGNINF": "zandronum-lumps/concepts/cmpgninf.md",
+            "GAMEMODE": "zandronum-lumps/concepts/gamemode.md",
+            "MEDALDEF": "zandronum-lumps/concepts/medaldef.md",
+            "SCORINFO": "zandronum-lumps/concepts/scorinfo.md",
+            "SECTINFO": "zandronum-lumps/concepts/sectinfo.md",
+            "SKININFO": "zandronum-lumps/concepts/skininfo.md",
+            "TEAMINFO": "zandronum-lumps/concepts/teaminfo.md",
+            "VOTEINFO": "zandronum-lumps/concepts/voteinfo.md",
         },
     },
     "menudef": {
@@ -167,12 +193,95 @@ SECTIONS = {
             "menudef/notes": TABLE_NOTES,
             "menudef/concepts": CONCEPT,
         },
+        "lumps": {"MENUDEF": "menudef/concepts/item-dispatch-model.md"},
     },
     "netcode": {
         "index": "netcode/INDEX.md",
         "agents": "netcode/AGENTS.md",
         "dirs": {
             "netcode/concepts": CONCEPT,
+        },
+    },
+    "keyconf": {
+        "index": "keyconf/INDEX.md",
+        "agents": "keyconf/AGENTS.md",
+        "dirs": {
+            "keyconf/concepts": CONCEPT,
+        },
+        "lumps": {"KEYCONF": "keyconf/concepts/keyconf-lump.md"},
+    },
+    "lockdefs": {
+        "index": "lockdefs/INDEX.md",
+        "agents": "lockdefs/AGENTS.md",
+        "dirs": {
+            "lockdefs/concepts": CONCEPT,
+        },
+        "lumps": {"LOCKDEFS": "lockdefs/concepts/lockdefs-lump.md"},
+    },
+    "gameinfo-lump": {
+        "index": "gameinfo-lump/INDEX.md",
+        "agents": "gameinfo-lump/AGENTS.md",
+        "dirs": {
+            "gameinfo-lump/concepts": CONCEPT,
+        },
+        "lumps": {"GAMEINFO": "gameinfo-lump/concepts/gameinfo-lump.md"},
+    },
+    "sndinfo": {
+        "index": "sndinfo/INDEX.md",
+        "agents": "sndinfo/AGENTS.md",
+        "dirs": {
+            "sndinfo/concepts": CONCEPT,
+        },
+        "lumps": {"SNDINFO": "sndinfo/concepts/sndinfo-lump.md"},
+    },
+    "textures": {
+        "index": "textures/INDEX.md",
+        "agents": "textures/AGENTS.md",
+        "dirs": {
+            "textures/concepts": CONCEPT,
+        },
+        "lumps": {"TEXTURES": "textures/concepts/textures-lump.md"},
+    },
+    "language": {
+        "index": "language/INDEX.md",
+        "agents": "language/AGENTS.md",
+        "dirs": {
+            "language/concepts": CONCEPT,
+        },
+    },
+    "terrain": {
+        "index": "terrain/INDEX.md",
+        "agents": "terrain/AGENTS.md",
+        "dirs": {
+            "terrain/concepts": CONCEPT,
+        },
+        "lumps": {"TERRAIN": "terrain/concepts/terrain-lump.md"},
+    },
+    "decaldef": {
+        "index": "decaldef/INDEX.md",
+        "agents": "decaldef/AGENTS.md",
+        "dirs": {
+            "decaldef/concepts": CONCEPT,
+        },
+        "lumps": {"DECALDEF": "decaldef/concepts/decaldef-lump.md"},
+    },
+    "animdefs": {
+        "index": "animdefs/INDEX.md",
+        "agents": "animdefs/AGENTS.md",
+        "dirs": {
+            "animdefs/concepts": CONCEPT,
+        },
+        "lumps": {"ANIMDEFS": "animdefs/concepts/animdefs-lump.md"},
+    },
+    "fonts": {
+        "index": "fonts/INDEX.md",
+        "agents": "fonts/AGENTS.md",
+        "dirs": {
+            "fonts/concepts": CONCEPT,
+        },
+        "lumps": {
+            "FONTDEFS": "fonts/concepts/fontdefs-lump.md",
+            "TEXTCOLO": "fonts/concepts/textcolo-lump.md",
         },
     },
 }

@@ -49,9 +49,13 @@ it always renders — see "Activator resolution" below) shares this same signatu
   the script, the script's own `id` value is unaffected).
 - **`color`** — a `CR_*` enum value (`zcommon.bcs:190-220`) by default, clamped by the engine via
   `CLAMPCOLOR` (`p_acs.cpp:189`: any value `>= NUM_TEXT_COLORS` collapses to `CR_UNTRANSLATED`
-  rather than erroring or reading out of bounds). If `type` has `HUDMSG_COLORSTRING` OR'd in,
-  `color` is instead read as a **string** (a color name, including a custom one from a `TEXTCOLO`
-  lump) via `V_FindFontColor` (`p_acs.cpp:11014-11021`) — matches the wiki's documented
+  rather than erroring or reading out of bounds). On Zandronum `NUM_TEXT_COLORS` is 22
+  (`v_font.h:70`), so `CR_ICE`, `CR_FIRE`, `CR_SAPPHIRE` and `CR_TEAL` (22-25) all draw as
+  `CR_UNTRANSLATED` there. The matching `\cW`-`\cZ` escapes inside the text are swallowed and
+  leave the color unchanged (`v_font.cpp:2668`, `v_text.cpp:221`); see
+  [TEXTCOLO](../../fonts/concepts/textcolo-lump.md). If `type` has `HUDMSG_COLORSTRING` OR'd in,
+  `color` is instead read as a **string** (a color name, including a custom one from a
+  [`TEXTCOLO`](../../fonts/concepts/textcolo-lump.md) lump) via `V_FindFontColor` (`p_acs.cpp:11014-11021`) — matches the wiki's documented
   `HUDMSG_COLORSTRING` usage.
 - **`x`, `y`** (fixed) — screen-space position, interpreted one of two structurally different ways
   depending on whether [`SetHudSize`](sethudsize.md) has been called with a nonzero width/height on

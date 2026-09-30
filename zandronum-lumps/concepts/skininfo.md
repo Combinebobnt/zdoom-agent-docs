@@ -4,7 +4,9 @@
 **Applies to:** UZDoom=no, Zandronum=yes
 **Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
 **Provenance:** Zandronum Wiki [SKININFO](https://wiki.zandronum.com/w/index.php?title=SKININFO&oldid=2216)
-(retrieved 2026-09-09) + verified against the Zandronum source's `src/r_data/sprites.cpp:509-1023` (`R_InitSkins`), `src/r_data/sprites.cpp:1075-1096` (`R_CreateSkin`), `src/d_netinfo.cpp:315-334` (`D_PlayerClassToInt`), `src/s_advsound.cpp:460-472` (`S_FindSoundNoHash`).
+(retrieved 2026-09-09) + verified against the Zandronum source's `src/r_data/sprites.cpp:509-1023` (`R_InitSkins`), `src/r_data/sprites.cpp:1075-1096` (`R_CreateSkin`), `src/d_netinfo.cpp:315-334` (`D_PlayerClassToInt`), `src/s_advsound.cpp:460-472` (`S_FindSoundNoHash`). The reveal-persistence section was also
+traced through `src/bots.cpp`, `src/d_main.cpp`, `src/gameconfigfile.cpp`, `src/m_misc.cpp` and
+`src/p_setup.cpp`, and observed live on Zandronum.
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0
 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 
@@ -191,9 +193,55 @@ A key matching none of the above (not one of the 11 general keys, not a `*`-pref
 not one of the nine legacy sound-alias names) is stored as a free-form custom property on the
 skin instead of causing an error. Its value is auto-typed: an integer-looking string becomes an
 int, a float-looking string becomes a float, `true`/`false` (case-insensitive) become a bool, and
-anything else is kept as a string. This is a later addition layered onto the original parser and
+anything else is kept as a string. A value can also be a comma-separated list (`tags = 1, 2, 3`):
+each item is typed on its own and stored in order under the same key (`src/r_data/sprites.cpp:790-820`),
+and `GetSkinProperty()`'s fourth argument picks one by position (see
+[getskinproperty.md](../../acs/functions/getskinproperty.md)). This is a later addition layered onto the original parser and
 gives a skin an open-ended metadata bag beyond the fixed key set above, without needing engine
 changes to add a new named property.
+
+## Revealing a hidden skin lasts only the session
+
+A hidden skin is revealed at runtime by the `reveal <name>` console command (`bots.cpp:3884-3930`,
+exact case-insensitive name match), by a player selecting it (`d_netinfo.cpp:1414-1422`), or by a
+bot whose `BOTINFO` `skin` names it (`bots.cpp:1793-1799`). Each prints `Hidden skin "<name>" has
+now been revealed!`. The config has a `[<game>.RevealedBotsAndSkins]` section (e.g.
+`[Doom.RevealedBotsAndSkins]`) meant to carry reveals across restarts, but no skin reveal ever
+survives one. Three independent defects each lose it on their own:
+
+- **It is never written.** `BOTS_ArchiveRevealedBotsAndSkins` (`bots.cpp:863-890`) skips any skin
+  whose `bRevealedByDefault` is set. `R_CreateSkin` sets it to true for every skin
+  (`sprites.cpp:1090-1091`), and the `hidden` key only changes `bRevealed` (`sprites.cpp:714-721`),
+  so a hidden skin still counts as revealed by default. Bots don't have this defect: `BOTINFO`'s
+  `revealed` key copies its value into the bot's `bRevealedByDefault` (`bots.cpp:1308-1317`).
+- **It is never read back.** `ReadRevealedBotsAndSkins` runs at `d_main.cpp:3068`, right after
+  `BOTINFO` is parsed but before `P_Init` (`:3076`). The skin list is built only inside `P_Init`
+  (`R_InitSprites` clears it and runs `R_InitSkins`, `p_setup.cpp:4777`,
+  `sprites.cpp:1217-1226`), so the restore loop (`bots.cpp:897-935`) finds no skins to match.
+  Saved bot names do match, since the bot list already exists.
+- **The exit save erases the section.** The config is written at exit by `M_SaveDefaultsFinal`,
+  registered with `atterm` in `M_LoadDefaults` (`m_misc.cpp:444-448`). Exit functions run in
+  reverse order of registration (`sdl/i_main.cpp:133-138`), so `P_Init`'s `P_Shutdown` (which
+  clears the skin list, `sprites.cpp:1431-1435`) and `BOTS_Destruct` (which clears the bot list,
+  `bots.cpp:404`, `:448-453`) have both run first. The save clears the section
+  (`gameconfigfile.cpp:611-614`) and writes it back empty. This also loses bot reveals: a revealed
+  hidden bot survives a restart only if the config was written mid-session (`writeini`) and the
+  process was then killed outright (SIGKILL). A fatal error still runs the exit functions
+  (`exit()` reaches `call_terms` via `atexit`, `sdl/i_main.cpp:369`, `:391-396`), so it wipes the
+  section too.
+
+Observed live (2026-09-29, Zandronum local test build, DOOM2 MAP01, a throwaway `-config`, and a
+test pk3 whose `SKININFO` declares one skin `HidSkin` with `hidden = "false"`; the stock hidden bot
+`Romero` as the control):
+
+1. At start, `skins` listed `2 skins; 1 remains hidden`. `reveal HidSkin` and `reveal Romero` both
+   printed their "has now been revealed!" line, and `skins` then reported all hidden skins
+   unlocked.
+2. `writeini` wrote `"Romero"=1` to `[Doom.RevealedBotsAndSkins]` and no line for `HidSkin`.
+3. After a normal quit the section was empty, `Romero` included.
+4. With `"Romero"=1` and `"HidSkin"=1` added to the section by hand, the next launch with the same
+   `-config` still reported `1 remains hidden`. `reveal Romero` printed nothing (already revealed
+   from the config), while `reveal HidSkin` printed the reveal line again.
 
 ## Wiki/engine divergence
 

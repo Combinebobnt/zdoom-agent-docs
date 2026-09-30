@@ -38,6 +38,15 @@ botscript interpreter.
   (and how far a "beside the target" goal must sit, plus a floor check, when the target stands on a
   grid corner), and a neighbour-expansion bug that never tries the north-west diagonal.
 
+- [The bot chat file / chat lump format](concepts/bot-chat-file.md) — tier B. The sectioned text
+  format the chat bot commands read: `chatfile` is a disk path beside the executable that no
+  archive can carry, while `chatlump` resolves by short name or full archive path; two parsers
+  (line-based for files, token-based for lumps, where unquoted words split into separate entries
+  and `#` comments leak words); silent 64-section/64-entry limits and unbounded buffer copies;
+  random line choice and the `NULL` sentinel; the eleven `$` placeholders and their prefix-match
+  fall-through; the engine never starts chat itself (`chatfrequency` is script-read only); four
+  stock `chatlump` targets absent from the source tree.
+
 ## Inventory tables (generated)
 
 - [Bot commands](inventory/bot-commands.md) — every entry in `g_BotCommands[]`, 114 total.

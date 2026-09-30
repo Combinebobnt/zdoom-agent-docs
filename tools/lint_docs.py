@@ -23,7 +23,10 @@ Checks, per section with an existing INDEX.md:
   - acs/INDEX.md's Families/Prose/Signature-only subsections stay alphabetically ordered (the one
     section with an established convention for this -- see sections.py's "ordered_headings")
   - every generated subagent adapter under agents/ matches a fresh tools/gen_agents.py run from
-    its agents/procedures/ source (the same check as `gen_agents.py --check`)
+    its agents/*.md source, with no stray files under agents/ (the same check as
+    `gen_agents.py --check`)
+  - every sections.py "lumps" target exists in a CONCEPT dir of its own section, and no lump name
+    is mapped by two sections
 
 Run after hand-editing any doc file, or after regenerating an inventory.
 
@@ -33,7 +36,9 @@ Usage:
 import contextlib
 import io
 import re
+import shutil
 import sys
+import tempfile
 from datetime import date
 from pathlib import Path
 
@@ -97,8 +102,12 @@ TIER_START_RE = re.compile(r'^(?:\*\*)?Tier:')
 # The co-occurrence rule (Phase 3 step 3.7): `Applies to: UZDoom=no` must be backed by a real
 # divergence writeup, not just the claim. Either heading form is accepted -- `## Engine-family
 # divergence` for a file where the whole page is the divergence, `## Zandronum-specific: ...`
-# (with or without a trailing description) for one where it's a subsection of a larger page.
+# for one where it's a subsection of a larger page. A bare or no-colon `## Zandronum-specific ...`
+# still satisfies this match, but BARE_ZANDRONUM_SPECIFIC_RE below errors on it separately.
 DIVERGENCE_HEADING_RE = re.compile(r'^## (?:Engine-family divergence|Zandronum-specific)\b', re.M)
+# AUTHORING requires `## Zandronum-specific: <topic>`, always suffixed. Catches bare, empty-suffix
+# and no-colon (`## Zandronum-specific notes`) forms. H2 only; H3 is free-form.
+BARE_ZANDRONUM_SPECIFIC_RE = re.compile(r'^## Zandronum-specific\b(?!:[ \t]+\S)', re.M)
 # Phase 4 step 4.5: the canonical H2 divergence-heading vocabulary is now fixed (see
 # shared/AUTHORING.md's "Engine scope") -- DIVERGENCE_HEADING_RE's two forms above, plus
 # `## Wiki/engine divergence[: <suffix>]` for the distinct wiki-vs-engine axis.
@@ -441,6 +450,9 @@ def check_divergence_heading_forms(rel, text, ok_list):
                   "`## Engine-family divergence[: <suffix>]`, `## Zandronum-specific: <suffix>`, "
                   "or `## Wiki/engine divergence[: <suffix>]` instead (see shared/AUTHORING.md's "
                   "\"Engine scope\")", ok_list)
+    if BARE_ZANDRONUM_SPECIFIC_RE.search(text):
+        _err(rel, "'s `## Zandronum-specific` heading needs a `: <topic>` suffix "
+                  "(see shared/AUTHORING.md's \"Engine scope\")", ok_list)
 
 
 def check_header_block(path, text, ok_list):
@@ -908,11 +920,31 @@ def lint_section(section_key, section, ok_list, total_files):
                 check_wiki_license(path, text, ok_list)
 
 
+def check_lump_targets(sections, ok_list, root=ROOT):
+    """Every sections.py "lumps" target exists in a CONCEPT dir of its own section, and no lump
+    name is mapped twice (lookup.py would silently take the first section's)."""
+    seen = {}
+    for key, section in sections.items():
+        concept_dirs = {d for d, a in section["dirs"].items() if a == S.CONCEPT}
+        for name, rel in section.get("lumps", {}).items():
+            if name.lower() in seen:
+                print(f"LINT: sections.py maps lump {name} in both {seen[name.lower()]} and {key}", file=sys.stderr)
+                ok_list.append(False)
+            seen[name.lower()] = key
+            if Path(rel).parent.as_posix() not in concept_dirs:
+                print(f"LINT: sections.py lump {name} -> {rel} is not in a concept dir of {key}", file=sys.stderr)
+                ok_list.append(False)
+            elif not (root / rel).is_file():
+                print(f"LINT: sections.py lump {name} -> {rel} does not exist", file=sys.stderr)
+                ok_list.append(False)
+
+
 def lint():
     ok_list = []
     total_files = [0]
     for section_key, section in S.SECTIONS.items():
         lint_section(section_key, section, ok_list, total_files)
+    check_lump_targets(S.SECTIONS, ok_list)
 
     # shared/concepts/ isn't owned by any one section, so it's linked from the root INDEX.md
     # instead of a section index -- check its files exist and pass the header-block checks, but
@@ -1195,6 +1227,19 @@ _SELF_TESTS = [
         _PAIR, "Prose.\n\n## Engine-family divergence: dmflags3\n\nDetail.\n"), [], True),
     ("canonical '## Zandronum-specific: X' heading passes", _fixture(
         _PAIR, "Prose.\n\n## Zandronum-specific: netcode note\n\nDetail.\n"), [], True),
+    # AUTHORING's "always suffixed" rule; getplayerskin.md shipped a bare one that lint missed.
+    ("bare '## Zandronum-specific' heading errors", _fixture(
+        _PAIR, "Prose.\n\n## Zandronum-specific\n\nDetail.\n"), ["needs a `: <topic>` suffix"],
+     False),
+    ("'## Zandronum-specific:' with an empty suffix errors", _fixture(
+        _PAIR, "Prose.\n\n## Zandronum-specific:  \n\nDetail.\n"), ["needs a `: <topic>` suffix"],
+     False),
+    # Nine docs shipped `## Zandronum-specific notes`-style headings the bare-only regex missed.
+    ("no-colon '## Zandronum-specific notes' heading errors", _fixture(
+        _PAIR, "Prose.\n\n## Zandronum-specific notes\n\nDetail.\n"),
+     ["needs a `: <topic>` suffix"], False),
+    ("bare H3 '### Zandronum-specific' is not checked", _fixture(
+        _PAIR, "Prose.\n\n### Zandronum-specific\n\nDetail.\n"), [], True),
     ("canonical '## Wiki/engine divergence' heading passes", _fixture(
         _PAIR, "Prose.\n\n## Wiki/engine divergence\n\nDetail.\n"), [], True),
     ("canonical '## Wiki/engine divergence: X' heading passes", _fixture(
@@ -1252,6 +1297,75 @@ def _self_test_gen_agents():
     return 1 if problems else 0
 
 
+def _self_test_gen_agents_strays():
+    """A file under agents/ that is neither a procedure nor a rendered adapter must be reported,
+    through check() itself, on a scratch copy of agents/."""
+    problems = []
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        shutil.copytree(ROOT / gen_agents.PROCEDURES_DIR, root / gen_agents.PROCEDURES_DIR)
+        if gen_agents.check(root):
+            problems.append(f"clean agents/ copy reported {gen_agents.check(root)}")
+        (root / "agents" / ".DS_Store").write_text("")
+        if gen_agents.check(root):
+            problems.append("OS junk file reported as a stray")
+        leftovers = ["agents/codex/leftover.toml", "agents/procedures/old.md"]
+        for rel in leftovers:
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (root / rel).write_text("x\n")
+        msgs = gen_agents.check(root)
+        for rel in leftovers:
+            if not any(rel in m for m in msgs):
+                problems.append(f"stray {rel} not reported")
+    for p in problems:
+        print(f"SELF-TEST FAIL [gen_agents strays]: {p}", file=sys.stderr)
+    return 1 if problems else 0
+
+
+def _self_test_lump_targets():
+    """A lump target that is missing, outside a concept dir, or in another section's dir, and a
+    name mapped by two sections, must each be reported."""
+    problems = []
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "a" / "concepts").mkdir(parents=True)
+        (root / "a" / "notes").mkdir(parents=True)
+        (root / "b" / "concepts").mkdir(parents=True)
+        for rel in ("a/concepts/good.md", "a/notes/note.md", "b/concepts/other.md"):
+            (root / rel).write_text("# x\n")
+        a_dirs = {"a/concepts": S.CONCEPT, "a/notes": S.TABLE_NOTES}
+        b_dirs = {"b/concepts": S.CONCEPT}
+        cases = [
+            ("valid target", {"a": {"dirs": a_dirs, "lumps": {"GOOD": "a/concepts/good.md"}}}, None),
+            ("missing target", {"a": {"dirs": a_dirs, "lumps": {"GONE": "a/concepts/gone.md"}}},
+             "does not exist"),
+            ("non-concept dir", {"a": {"dirs": a_dirs, "lumps": {"NOTE": "a/notes/note.md"}}},
+             "not in a concept dir"),
+            ("other section's dir", {"a": {"dirs": a_dirs, "lumps": {"OTHER": "b/concepts/other.md"}},
+                                     "b": {"dirs": b_dirs}}, "not in a concept dir"),
+            ("name mapped twice", {"a": {"dirs": a_dirs, "lumps": {"DUP": "a/concepts/good.md"}},
+                                   "b": {"dirs": b_dirs, "lumps": {"dup": "b/concepts/other.md"}}},
+             "in both"),
+        ]
+        for name, sections, expected in cases:
+            ok_list, buf = [], io.StringIO()
+            with contextlib.redirect_stderr(buf):
+                check_lump_targets(sections, ok_list, root)
+            if expected is None and (ok_list or buf.getvalue().strip()):
+                problems.append(f"{name}: expected clean, got {buf.getvalue().strip()[:80]!r}")
+            elif expected is not None and (not ok_list or expected not in buf.getvalue()):
+                problems.append(f"{name}: expected {expected!r}, got {buf.getvalue().strip()[:80]!r}")
+    # The live tree: the pre-pass must beat weak-inline prose matches and honour --section.
+    import lookup as L
+    if getattr(L.resolve("MAPINFO")[0], "kind", None) != "concept":
+        problems.append("lookup.py MAPINFO did not resolve to its concept page")
+    if L.resolve("KEYCONF", "acs")[0] is not None:
+        problems.append("lookup.py --section acs KEYCONF resolved")
+    for p in problems:
+        print(f"SELF-TEST FAIL [lump targets]: {p}", file=sys.stderr)
+    return 1 if problems else 0
+
+
 def _run_self_test():
     """Fixtures for rules the tree does not yet exercise. Every rule the schema split adds is
     dormant until the marking pass stamps a real file, so without these the only evidence they
@@ -1280,7 +1394,9 @@ def _run_self_test():
             if out.strip():
                 print(f"    output: {out.strip()[:300]}", file=sys.stderr)
     failures += _self_test_gen_agents()
-    total = len(_SELF_TESTS) + 1
+    failures += _self_test_gen_agents_strays()
+    failures += _self_test_lump_targets()
+    total = len(_SELF_TESTS) + 3
     if failures:
         print(f"lint_docs.py --self-test: {failures} of {total} failed", file=sys.stderr)
         return 1

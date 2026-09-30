@@ -10,7 +10,7 @@ DECORATE allows you to define custom damage types for projectiles, attacks, and 
 
 ## Overview
 
-Damage types are names (like `Fire`, `Ice`, `Poison`) that you assign to a projectile or attack and then use to trigger corresponding state sequences in receiving actors. The engine itself inflicts or special-cases a handful of built-in names (`Fire`, `Ice`, `Poison`, `Electric`, `Extreme`, `Drowning`, `Slime`, `Crush`, `Telefrag`, `Falling`, `Massacre`, among others). There is no built-in `Spike` type, and a TERRAIN `damagetype lava` is read as `Fire`. Any other name works too, and you can declare custom ones with their own default damage-reduction factors and armor-bypass rules.
+Damage types are names (like `Fire`, `Ice`, `Poison`) that you assign to a projectile or attack and then use to trigger corresponding state sequences in receiving actors. The engine itself inflicts or special-cases a handful of built-in names (`Fire`, `Ice`, `Poison`, `Electric`, `Extreme`, `Drowning`, `Slime`, `Crush`, `Telefrag`, `Falling`, `Massacre`, among others). There is no built-in `Spike` type, and a [TERRAIN](../../terrain/concepts/terrain-lump.md) `damagetype lava` is read as `Fire`. Any other name works too, and you can declare custom ones with their own default damage-reduction factors and armor-bypass rules.
 
 ## Assigning damage types to attacks
 

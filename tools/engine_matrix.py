@@ -841,6 +841,16 @@ BUCKET_PATHS = {
     ("menudef", "notes"): ("src/", "wadsrc/static/zscript/"),
     ("menudef", "concepts"): ("src/",),
     ("netcode", "concepts"): ("src/",),
+    ("keyconf", "concepts"): ("src/",),
+    ("lockdefs", "concepts"): ("src/",),
+    ("gameinfo-lump", "concepts"): ("src/",),
+    ("sndinfo", "concepts"): ("src/",),
+    ("textures", "concepts"): ("src/",),
+    ("language", "concepts"): ("src/",),
+    ("terrain", "concepts"): ("src/",),
+    ("decaldef", "concepts"): ("src/",),
+    ("animdefs", "concepts"): ("src/",),
+    ("fonts", "concepts"): ("src/",),
     ("shared", "concepts"): ("src/",),
 }
 
@@ -871,6 +881,16 @@ ZAN_BUCKET_PATHS = {
     ("menudef", "notes"): ("src/", "wadsrc/static/"),
     ("menudef", "concepts"): ("src/",),
     ("netcode", "concepts"): ("src/",),
+    ("keyconf", "concepts"): ("src/",),
+    ("lockdefs", "concepts"): ("src/",),
+    ("gameinfo-lump", "concepts"): ("src/",),
+    ("sndinfo", "concepts"): ("src/",),
+    ("textures", "concepts"): ("src/",),
+    ("language", "concepts"): ("src/",),
+    ("terrain", "concepts"): ("src/",),
+    ("decaldef", "concepts"): ("src/",),
+    ("animdefs", "concepts"): ("src/",),
+    ("fonts", "concepts"): ("src/",),
     ("shared", "concepts"): ("src/",),
 }
 
@@ -1181,8 +1201,17 @@ def _run_check():
     # Updated 2026-09-22: 518->591, all 73 files added since the 1d5f742 pin (see the cohort-count
     # comment below for the per-cohort reconciliation). Then 591->588: four map-rotation function
     # files merged into acs/families/map-rotation.md. 2026-09-24: 588->601, 13 new files since
-    # the 32c6a14 pin (see the cohort-count comment below).
-    assert_eq("--files total doc files", len(plan1), 601)
+    # the 32c6a14 pin (see the cohort-count comment below). 2026-09-28: 601->627, 26 new v4 files.
+    # Then 627->633: 6 new mapinfo/concepts block files from the MAPINFO wiki intake.
+    # Then 633->634: language/ pilot (v4 lump sections). Then 634->635: terrain/ pilot.
+    # Then 635->636: decaldef/ pilot. Then 636->637: animdefs/ pilot.
+    # Then 637->639: fonts/ pilots (FONTDEFS, TEXTCOLO).
+    # Then 639->649: Phase B wave 1 (animdefs 6, decaldef 3, language 1 concept files).
+    # Then 649->653: Phase B wave 2 (terrain 3, language/concepts/csv-format.md).
+    # 2026-09-29: 653->657, lump-sweep follow-ups (acs families animated-doors and sector-terrain,
+    # console/notes/cl_hitscandecalhack.md, decorate/notes/forcedecal.md).
+    # 2026-09-30: 657->658, decorate/concepts/spawn-state-nodelay.md (outer 6f08879).
+    assert_eq("--files total doc files", len(plan1), 658)
     uncategorized = [e for e in plan1 if e["kind"] == "uncategorized"]
     assert_eq("--files uncategorized files", [str(e['path']) for e in uncategorized], [])
     stamped_now = sum(1 for e in plan1 if e["kind"] == "scripted" and not e["deferred"])
@@ -1191,7 +1220,9 @@ def _run_check():
     # Updated 2026-09-22: 412->441 and judgment 103->147 below, from the same 73 new files.
     # Then 441->438 from the map-rotation merge. 2026-09-24: 438->435 and judgment 147->163, from
     # the 32c6a14 reconciliation below (new kill.md scripted, 5 flag notes -> judgment, 1 back).
-    assert_eq("--files scripted+stamped-now", stamped_now, 435)
+    # 2026-09-28 (v4): 435->446 and judgment 163->178, new files only (see cohort comment).
+    # 2026-09-29: 446->447, decorate/notes/forcedecal.md.
+    assert_eq("--files scripted+stamped-now", stamped_now, 447)
     # Updated 2026-08-16 (C4 wave 1): 3 files (acs-old-object-format.md, integer-arithmetic.md,
     # operators.md) gained a real Zandronum verification date this wave, moving them out of
     # "deferred" -- expected drift per this function's own doc-tree-changed case above, not a
@@ -1238,8 +1269,18 @@ def _run_check():
     # purpose" (deferred_set.txt membership), which IS now 0, meaning Phase 5's C5 cohort is fully
     # closed even though these 3 files still show up here for legitimate, already-documented
     # reasons.
-    assert_eq("--files deferred (no recoverable Zandronum date)", deferred, 3)
-    assert_eq("--files judgment/uncategorized", judgment, 163)
+    # 2026-09-28: 3->4, language/concepts/csv-format.md (UZDoom-only stamp, no Zandronum date by
+    # design, same as acse-object-format.md).
+    # 2026-09-29: 4->5, acs/families/sector-terrain.md (UZDoom-only stamp, same reason).
+    assert_eq("--files deferred (no recoverable Zandronum date)", deferred, 5)
+    # 2026-09-28: 178->184, the 6 new mapinfo concept files (judgment-kind by archetype).
+    # Then 184->185, the language/ pilot concept. Then 185->186, the terrain/ pilot concept.
+    # Then 186->187, the decaldef/ pilot concept. Then 187->188, the animdefs/ pilot concept.
+    # Then 188->190, the two fonts/ pilot concepts. Then 190->200, Phase B wave 1 concepts.
+    # Then 200->203, Phase B wave 2's terrain concepts (csv-format.md counts as deferred above).
+    # 2026-09-29: 203->205, acs/families/animated-doors.md and console/notes/cl_hitscandecalhack.md.
+    # 2026-09-30: 205->206, decorate/concepts/spawn-state-nodelay.md.
+    assert_eq("--files judgment/uncategorized", judgment, 206)
     by_cohort = {}
     for e in plan1:
         by_cohort[e["cohort"]] = by_cohort.get(e["cohort"], 0) + 1
@@ -1266,14 +1307,29 @@ def _run_check():
     # (zandronum-weapon-sway.md), decorate_notes_joined_dash +8 (sway/bob/pitch properties),
     # console_notes_dash +3 (cl_usecustom*), console_notes_yes +1 (kill.md). Moves: 680bd9a's
     # no-op UZD cell took 5 flag notes joined -> joined_dash, and NOAUTOFIRE went back the other way.
+    # 2026-09-28 (v4 milestone), new files only, no moves: acs_zandronum_only +2 (getskinproperty,
+    # setcurrentgamemode), console_notes_yes +9 (KEYCONF commands), concepts_judgment +15 (keyconf 4,
+    # sndinfo 5, textures 2, lockdefs 1, gameinfo-lump 1, bot-chat-file 1, acc-compiler 1).
+    # Then concepts_judgment +6 (MAPINFO intake: automap, intermission, damagetype, doomednums,
+    # spawnnums, conversationids block files), new files only. Then concepts_judgment +1
+    # (language/concepts/language-lump.md, the lump-sections pilot), new files only. Then
+    # concepts_judgment +1 (terrain/concepts/terrain-lump.md), new files only. Then
+    # concepts_judgment +1 (decaldef/concepts/decaldef-lump.md), new files only. Then
+    # concepts_judgment +1 (animdefs/concepts/animdefs-lump.md), new files only. Then
+    # concepts_judgment +2 (fonts/concepts/{fontdefs,textcolo}-lump.md), new files only. Then
+    # concepts_judgment +10 (Phase B wave 1: animdefs 6, decaldef 3, language 1), new files only.
+    # Then concepts_judgment +4 (Phase B wave 2: terrain 3, language csv-format), new files only.
+    # 2026-09-29, new files only: acs_family_unresolved +2 (animated-doors, sector-terrain),
+    # console_notes_dash +1 (cl_hitscandecalhack), decorate_notes_joined +1 (forcedecal).
+    # 2026-09-30, new file only: concepts_judgment +1 (decorate/concepts/spawn-state-nodelay.md).
     expected_cohorts = {
-        "acs_both": 149, "acs_compiler_only": 10, "acs_family_unresolved": 1,
-        "acs_unresolved": 4, "acs_uzdoom_only": 9, "acs_zandronum_only": 50,
+        "acs_both": 149, "acs_compiler_only": 10, "acs_family_unresolved": 3,
+        "acs_unresolved": 4, "acs_uzdoom_only": 9, "acs_zandronum_only": 52,
         "acs_zandronum_only_loud": 2, "bots_notes_blanket": 11,
-        "concepts_judgment": 79, "console_notes_dash": 39, "console_notes_yes": 32,
+        "concepts_judgment": 121, "console_notes_dash": 40, "console_notes_yes": 41,
         "decorate_actions_joined": 116, "decorate_actions_unjoined_uzdoom_only": 13,
         "decorate_classes_unjoined": 15, "decorate_families_unjoined": 5,
-        "decorate_notes_joined": 7, "decorate_notes_joined_dash": 16,
+        "decorate_notes_joined": 8, "decorate_notes_joined_dash": 16,
         "decorate_notes_unjoined": 3, "menudef_notes_unjoined": 4, "zscript_blanket": 36,
     }
     assert_eq("--files cohort counts", by_cohort, expected_cohorts)

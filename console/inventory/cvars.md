@@ -146,7 +146,7 @@
 | cl_hideaccount | Bool | custom | CVAR_ARCHIVE | yes | — | C |  |
 | cl_hidecountry | Flag | plain | CCF_HIDECOUNTRY | yes | — | C |  |
 | cl_hidevotescreen | Bool | plain | CVAR_ARCHIVE | yes | — | C |  |
-| cl_hitscandecalhack | Bool | plain | CVAR_ARCHIVE | yes | — | C |  |
+| cl_hitscandecalhack | Bool | plain | CVAR_ARCHIVE | yes | — | B | [notes](../notes/cl_hitscandecalhack.md) |
 | cl_icons | Bool | plain | CVAR_ARCHIVE | yes | — | C |  |
 | cl_identifymonsters | Int | plain | CVAR_ARCHIVE | yes | — | C |  |
 | cl_identifytarget | Int | plain | CVAR_ARCHIVE | yes | — | C |  |

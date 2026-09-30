@@ -188,8 +188,10 @@ the two engines, i.e. corrections to those bullets rather than divergences:
 `PCD_TAGSTRING` marks the value on top of the stack as a string-table index (technically:
 resolves it into the runtime global string table and rewrites the stack slot with that resolved
 handle — `Stack[sp-1] = GlobalACSStrings.AddString(activeBehavior->LookupString(Stack[sp-1]))`).
-It shows up after a `PUSHNUMBER`/`PUSHBYTE` whose value is a literal string-table index, e.g.
+It shows up after a `PUSHNUMBER`/`PUSHBYTE` whose value is a literal string-table index, and
+only in a module compiled as `#library` (`zt-bcc` `src/codegen/expr.c:2179-2181`), e.g. there
 `GetCvar("some_name")` compiles to `PUSHNUMBER <strtab index>; TAGSTRING; CALLFUNC GetCvar`.
+Outside `#library` the same call has no `TAGSTRING`.
 
 **Not every string consumer requires it, and assuming one does causes a real misdecode.**
 `PCD_PRINTSTRING`/`PCD_PRINTLOCALIZED` (the `Log`/`Print`/`HudMessage`-family string-part

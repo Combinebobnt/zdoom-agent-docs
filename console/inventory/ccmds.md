@@ -10,14 +10,14 @@
 | addban | yes | — | A | [notes](../notes/addban.md) |
 | addbanexemption | yes | — | C |  |
 | addbot | yes | yes | C |  |
-| addkeysection | yes | yes | C |  |
+| addkeysection | yes | yes | B | [notes](../notes/addkeysection.md) |
 | addmap | yes | — | A | [notes](../notes/addmap.md) |
 | addmapsilent | yes | — | C |  |
-| addmenukey | yes | yes | C |  |
-| addplayerclass | yes | yes | C |  |
+| addmenukey | yes | yes | B | [notes](../notes/addmenukey.md) |
+| addplayerclass | yes | yes | B | [notes](../notes/addplayerclass.md) |
 | addslot | yes | yes | C |  |
-| addslotdefault | yes | yes | C |  |
-| alias | yes | yes | C |  |
+| addslotdefault | yes | yes | B | [notes](../notes/addslotdefault.md) |
+| alias | yes | yes | B | [notes](../notes/alias.md) |
 | am_clearmarks | yes | yes | C |  |
 | am_gobig | yes | yes | C |  |
 | am_restorecolors | yes | yes | C |  |
@@ -56,7 +56,7 @@
 | clearaliases | yes | yes | C |  |
 | clearbans | yes | — | C |  |
 | clearmaplist | yes | — | C |  |
-| clearplayerclasses | yes | yes | C |  |
+| clearplayerclasses | yes | yes | B | [notes](../notes/clearplayerclasses.md) |
 | clearscancycles | yes | — | C |  |
 | cleartrafficmeasure | yes | — | A | [notes](../notes/cleartrafficmeasure.md) |
 | clearwallcycles | yes | — | C |  |
@@ -72,7 +72,7 @@
 | cvarlistplain | yes | yes | C |  |
 | db_disable_wal | yes | — | C |  |
 | db_enable_wal | yes | — | C |  |
-| defaultbind | yes | yes | C |  |
+| defaultbind | yes | yes | B | [notes](../notes/defaultbind.md) |
 | delban | yes | — | C |  |
 | delbanexemption | yes | — | C |  |
 | delmap | yes | — | C |  |
@@ -293,7 +293,7 @@
 | select | yes | yes | C |  |
 | send_password | yes | — | C |  |
 | set | yes | yes | C |  |
-| setslot | yes | yes | C |  |
+| setslot | yes | yes | B | [notes](../notes/setslot.md) |
 | showpop | yes | yes | C |  |
 | showrngs | yes | yes | C |  |
 | showweaponstates | yes | — | C |  |
@@ -383,7 +383,7 @@
 | wdir | yes | — | C |  |
 | weapdrop | yes | yes | C |  |
 | weapnext | yes | yes | C |  |
-| weaponsection | yes | yes | C |  |
+| weaponsection | yes | yes | B | [notes](../notes/weaponsection.md) |
 | weapprev | yes | yes | C |  |
 | weapswap | yes | — | C |  |
 | whereisini | yes | yes | C |  |

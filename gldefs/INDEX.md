@@ -5,7 +5,7 @@ Router only. See `AGENTS.md` for where GLDEFS parsing lives in engine source,
 
 ## Concepts
 
-- [GLDEFS lump format overview](concepts/gldefs-overview.md) — tier B. Block-support matrix
+- [GLDEFS lump format overview](concepts/gldefs-overview.md) — tier A. Block-support matrix
   (Zandronum vs GZDoom family), dynamic light properties with behavioral quirks, skybox/brightmap/
   glow/shader syntax and divergences.
 

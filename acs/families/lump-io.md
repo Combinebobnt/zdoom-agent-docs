@@ -272,6 +272,26 @@ returns a real handle under UZDoom, so every subsequent `LumpRead`/`LumpReadStri
 never-issued-vs-freed mismatch documented on the [Database family](database.md)'s result-handle
 pair. `LumpRead`/`LumpGetInfo` (raw-typed) and `LumpReadString` (str-typed) both get a `0`
 indistinguishable from this family's own documented failure returns for those types.
-`LumpReadArray` (see its own section above) is unaffected by this claim in either direction — it
+
+**A `LumpOpen(...) >= 0` success check is always true under UZDoom**, since `0` looks like a valid
+lump number. That makes the usual miss test into a runtime engine probe:
+
+```acs
+// true on Zandronum (miss returns -1), false on UZDoom (every Lump* call returns 0)
+bool lumpApi = LumpOpen("ZZQXNOPE", 0) < 0;
+```
+
+- **Keep the probe name 8 characters or shorter.** The short-name lookup compares only the first
+  8 characters (`FindLump` copies the name into an 8-byte buffer with `uppercopy`,
+  `w_wad.cpp:945-953`), so a longer "impossible" name can truncate into a real lump.
+- **A miss opens nothing.** `LumpOpen` returns `-1` before creating a handle
+  (`p_acs.cpp:8281-8282`), so no `LumpClose` is owed. `startIndex` `0` or `-1` makes no difference
+  for a name that doesn't exist.
+- **Evidence:** UZDoom's `0` is from source (the ACSF dispatcher's `default: break;` followed by
+  `return 0`, the UZDoom source's `src/playsim/p_acs.cpp:6874-6877`, read at UZDoom 5.1.0-pre
+  @98b16b78fc on 2026-09-29). The Zandronum side was reported confirmed live on 2026-09-29 in a
+  driven session: the miss returned `-1` and a real lump returned its lump number.
+
+`LumpReadArray` (see its own section above) is unaffected by the UZDoom `0` claim in either direction — it
 is unreachable from `zt-bcc` source on both engines, a compiler-toolchain limitation, not an
 engine one.

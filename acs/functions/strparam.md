@@ -105,9 +105,10 @@ case PCD_SAVESTRING:
 grammar and opcode sequence up to the terminator opcode — a future doc for any of them should
 cross-reference this one rather than re-deriving the cast-type table.
 
-**Comparing a `StrParam` result against a literal:** don't use `==`/`!=` — a pool-origin string
-like this one can never numerically equal a compiled literal even with identical content, by
-construction of the string-index space. See
+**Comparing a `StrParam` result against a literal:** don't use `==`/`!=` outside a `#library`
+module. There a literal is a raw table index, and a pool-origin string like this one can never
+numerically equal it even with identical content. Inside `#library` the literal is pooled by
+`PCD_TAGSTRING` and the comparison works, but `StrCmp` is correct in both. See
 [String literal vs. pool equality](../concepts/string-literal-vs-pool-equality.md) for the full
 mechanism; use [`StrCmp`/`StrIcmp`](strcmp.md) instead.
 

@@ -106,6 +106,30 @@ found here: both branches funnel through the same "did we end up with a non-NULL
 `NULL` origin into `COPY_AAPTR` falls through every tier and returns `NULL` unchanged — no crash,
 verified in [Actor pointer selectors](../concepts/actor-pointers.md)).
 
+**A failed call has already overwritten the activator.** The assignment happens before the return
+test, on both branches, so a `0` return means the activator *is now* NULL, not "unchanged". The
+common hop-and-return idiom therefore has to restore unconditionally:
+
+```acs
+if (SetActivator(0, AAPTR_PLAYER_GETTARGET))
+{
+    // ... read the aim target through TID 0 ...
+}
+// Restore here, not inside the if: a miss already left the activator NULL.
+if (!SetActivator(my_tid)) { terminate; }
+```
+
+A restore nested inside the success block runs only on a hit. On a miss the rest of the script
+runs as the world (`PlayerNumber()` -1, `ActivatorTID()` 0, TID-0 calls hit nothing), and so does
+every script it launches afterwards, since `ACS_Execute`/`ACS_ExecuteAlways`/`ACS_ExecuteWithResult`
+and their `Named` forms hand the child the caller's *current* activator (see
+[ACS_ExecuteWithResult](acs_executewithresult.md)'s "Activator context"). This is a checklist
+pattern: [Crash-and-bug checklist](../concepts/crash-and-bug-checklist.md)'s "Activator hops that
+silently leave the script running as the world". `SetActivatorToTarget` differs: its failure paths
+return `0` without assigning, so the old activator survives (see
+[SetActivatorToTarget](setactivatortotarget.md)). Same shape on UZDoom (its `ACSF_SetActivator` and
+`ACSF_SetActivatorToTarget` cases, at the stamped revision).
+
 ## Scope of the change
 
 The reassignment is a plain local-variable write to the running script instance's own `activator`

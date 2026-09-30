@@ -28,6 +28,11 @@ argument, `RETURNVAL_INT`.
   argument, and it only takes a numbered script).
 - Runs with `ACS_ALWAYS|ACS_WANTRESULT`, identically to `ACS_ExecuteWithResult`: an already-running
   instance never blocks a new call, and the script's result value becomes this command's return.
+- **Activator: the bot's own pawn.** The command calls `P_StartScript` with the bot player's `mo`
+  as the activator, so the started script's `PlayerNumber()`/`ActivatorTID()` identify the bot.
+  Scripts *that* script launches in turn (`ACS_*Execute*` from ACS) inherit whatever its activator
+  is at that moment, so a failed `SetActivator` hop earlier in it hands them a NULL activator (see
+  [SetActivator](../../acs/functions/setactivator.md)'s "Return value / failure behavior").
 
 ## Related
 

@@ -2,7 +2,7 @@
 
 **Tier:** A.
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
+**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-28)
 **Provenance:** `SetFont - ZDoom Wiki.html`
 (`https://zdoom.org/w/index.php?title=SetFont&oldid=43079`), verified against
 the Zandronum source's `src/p_acs.cpp` (`PCD_SETFONT`/`PCD_SETFONTDIRECT` at lines 11146-11154,
@@ -10,7 +10,8 @@ the Zandronum source's `src/p_acs.cpp` (`PCD_SETFONT`/`PCD_SETFONTDIRECT` at lin
 `p_acs.h:1073`, `Serialize`/constructor at `p_acs.cpp:3765-3794`), the Zandronum source's `src/v_font.cpp`
 (`V_GetFont` at lines 313-345, the built-in font table around lines 2685-2766), and
 the Zandronum source's `src/sv_commands.cpp` (`SERVERCOMMANDS_PrintHUDMessage`, lines 2452-2455) on
-2026-07-29.
+2026-07-29; netcode section re-verified 2026-09-28 against `src/r_utility.cpp:544`,
+`src/d_main.cpp:3012`, `src/p_acs.cpp:4363` and `src/cl_main.cpp:6038-6041`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** compiler builtin — `zt-bcc/src/builtin.c:91`: `{ "setfont", ";s" }`, compiling to
 `PCD_SETFONT` (or, for a compile-time-constant string literal argument, the folded
@@ -62,7 +63,8 @@ needs to tell "my font loaded" from "silently fell back."
 
 `V_GetFont` (`v_font.cpp:313-345`) tries, in order:
 
-1. An already-registered `FFont` by name (`FFont::FindFont`) — covers every `FONTDEFS`-defined
+1. An already-registered `FFont` by name (`FFont::FindFont`) — covers every
+   [FONTDEFS](../../fonts/concepts/fontdefs-lump.md)-defined
    font and the engine's built-ins: `SmallFont`, `SmallFont2` (aliases to `SmallFont` outside
    Strife, confirmed at `v_font.cpp:2703-2711`), `BigFont`, and `ConFont` (registered under the
    lump name `CONFONT` but the wiki's engine-internal name `ConsoleFont`, confirmed at
@@ -78,16 +80,25 @@ engine fork's behavior.
 
 ## Zandronum-only netcode note (absent from the ZDoom wiki, which predates Zandronum's client/server split)
 
-The server process has no screen and can't actually build an `FFont` — `V_GetFont` returns `NULL`
-there, so `DoSetFont` always falls through to `activefont = SmallFont` on the server side
-regardless of what name was requested. To still tell clients which font a HUD message should
-render in, the server separately tracks the **name string** (`activefontname`, set unconditionally
-in `DoSetFont` before the `NULL` check collapses `activefont`) and includes it in the
-`HUDMESSAGE_SEND_FONT`-flagged replication payload whenever `activefont != SmallFont` would have
-been true on a client (`sv_commands.cpp:2452-2455`) — i.e. the flag is really keyed off "was a
-non-default font requested," reconstructed from the name rather than from the (always-`SmallFont`
-on the server) pointer. Not something a script author needs to act on, but explains why
-`activefontname` exists as a separate field at all.
+The server builds fonts like a client does. It skips video setup, but `R_Init` runs `V_InitFonts`
+(`r_utility.cpp:544`) and is called ungated from `D_DoomMain` (`d_main.cpp:3012`). A comment in
+`r_main.cpp:467` about the server needing fonts sits inside commented-out code, so it only records
+intent. `SetFont` therefore resolves the name against the **server's** loaded files, with the same
+`V_GetFont` order as above.
+
+`DoSetFont` also keeps the name as a string, `activefontname`: the requested name if it resolved,
+otherwise `"SmallFont"` (`p_acs.cpp:4363`). When the server sends a HUD message, it sets the
+`HUDMESSAGE_SEND_FONT` flag if `activefont != SmallFont` and sends that name
+(`sv_commands.cpp:2452-2455`). Each client then looks the name up in its own files, and drops the
+message entirely if the lookup fails (`cl_main.cpp:6038-6041`).
+
+For a script running on the server, this means:
+
+- **The font must be loaded on the server.** A font only the clients have fails on the server, so
+  the message goes out as `SmallFont` with no error.
+- **A client missing the font shows nothing.** The server found it, but a client that can't resolve
+  the name skips the message rather than falling back to `SmallFont`.
+- **`CheckFont` on the server** answers for the server's files, not any client's.
 
 ## Engine-family divergence: unresolved-name fallback and default font
 

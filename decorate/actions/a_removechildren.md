@@ -32,7 +32,7 @@ Removal is performed via `P_RemoveThing`, which handles:
 - Network broadcasting to clients in multiplayer (server-side only)
 - Safe hiding or destruction depending on map-reset requirements
 
-## Zandronum-specific behavior
+## Zandronum-specific: single removeall parameter, no filter flags
 
 **Parameter count differs significantly from the ZDoom wiki.** The wiki describes an advanced version with optional `flags` (bitfield), `filter` (class name), and `species` parameters that **do not exist in Zandronum**. Attempting to pass any of these parameters will result in a **parse error** at compile time, since the DECORATE function signature declares only the `removeall` boolean.
 

@@ -27,7 +27,7 @@ Removal is performed via `P_RemoveThing`, which handles:
 - Network broadcasting to clients in multiplayer (server-side only)
 - Safe hiding or destruction depending on map-reset requirements
 
-## Zandronum-specific behavior
+## Zandronum-specific: no parameters, no filter flags
 
 **No parameters exist.** The ZDoom wiki describes an advanced version with optional `flags` (bitfield), `filter` (class name), and `species` parameters that **do not exist in Zandronum**. The Zandronum implementation is a simple no-argument function that removes the master actor if it exists, with no filtering beyond `P_RemoveThing`'s live-player guard.
 

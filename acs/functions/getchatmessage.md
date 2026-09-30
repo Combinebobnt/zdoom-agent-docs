@@ -55,7 +55,7 @@ This function does not exist in UZDoom, GZDoom, or any ZDoom-family engine varia
 
 ## String comparison caveat
 
-The returned string is a pooled ACS string (allocated via `GlobalACSStrings.AddString()`), never a compiled string literal. Direct comparison with a literal (`GetChatMessage(player, offset) == "hello"`) will **always** return `false` regardless of matching text — the two strings live in permanently disjoint index ranges by construction. Use `StrCmp()` or `StrIcmp()` for safe equality checks, or convert one side explicitly using `StrParam("%s", literal)`.
+The returned string is a pooled ACS string (allocated via `GlobalACSStrings.AddString()`), never a compiled string literal. Direct comparison with a literal (`GetChatMessage(player, offset) == "hello"`) is **always** `false` regardless of matching text in a module compiled without `#library`, where the literal is a raw table index and pool indices carry a reserved library-ID tag. Inside a `#library` module the literal is pooled by `PCD_TAGSTRING` and the comparison works (see [String literal vs. pool equality](../concepts/string-literal-vs-pool-equality.md)). Use `StrCmp()` or `StrIcmp()` for safe equality checks, or convert one side explicitly using `StrParam("%s", literal)`.
 
 ---
 

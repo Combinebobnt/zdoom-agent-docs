@@ -996,7 +996,15 @@ def _actionspecials_names(root, rel_path):
         sys.exit(1)
     text = path.read_text()
     names = {m.group(1) for m in re.finditer(r'DEFINE_SPECIAL\(\s*(\w+)\s*,', text)}
-    return _require_names(path, names)
+    # Zandronum's LineSpecials[] dispatches Player_SetTeam/Team_Score/Team_GivePoints with no
+    # DEFINE_SPECIAL line, so union in every named `/* N */ LS_<name>` entry from p_lnspec.cpp too.
+    lnspec = path.parent / "p_lnspec.cpp"
+    if not lnspec.is_file():
+        print(f"gen_inventory.py: expected {lnspec} -- has the engine source moved?", file=sys.stderr)
+        sys.exit(1)
+    ls_names = {m.group(1) for m in re.finditer(r'/\*\s*\d+\s*\*/\s*LS_(\w+)', lnspec.read_text())}
+    _require_names(lnspec, ls_names)
+    return _require_names(path, names | (ls_names - {"NOP"}))
 
 
 # (?:ACSF|ASCF) -- Zandronum's own EACSFunctions enum misspells three entries ASCF_ (GetControlPointInfo,
@@ -1095,17 +1103,24 @@ def gen_acs_signatures(check):
 
     # Deliberately NOT the same set as casing_map's keys: that includes existing tier-C names
     # too (which must stay eligible for regeneration), whereas "documented" here means
-    # lookup.py's full resolution stack finds a real doc -- a dedicated functions/*.md, a
-    # families/*.md heading, OR a weak inline mention (e.g. "NamedExecuteClientScript" is only
-    # ever mentioned in prose inside executeclientscript.md, never its own heading) -- any of
-    # which means the name is promoted out of tier C for good. Only a bare `_try_tier_c` hit
-    # (or no hit at all) leaves a name eligible for (re)generation here.
+    # lookup.py's resolution stack finds a dedicated functions/*.md or a families/*.md heading,
+    # either of which promotes the name out of tier C for good. A weak inline mention only counts
+    # if the name is also backticked in INDEX.md's hand-written part (e.g. NamedExecuteClientScript
+    # on ExecuteClientScript's line); otherwise a "See also" mention like GetSkinProperty's dropped
+    # the name from INDEX.md entirely. Such names keep a tier-C bullet pointing at the mentioning file.
+    index_text = (ROOT / "acs" / "INDEX.md").read_text()
+    hand_written = index_text[:index_text.index("### Signature-only (tier C)")].lower()
     all_candidate_names = set(gfuncs) | set(special)
     documented = set()
+    mentioned_in = {}
     for raw_name in all_candidate_names:
         display = casing_map.get(raw_name.lower(), raw_name)
         result, _ = lookup.resolve(display, "acs")
-        if result is not None and result.kind != "tier-c":
+        if result is None or result.kind in ("tier-c", "concept"):
+            continue
+        if result.kind == "weak" and f"`{raw_name.lower()}`" not in hand_written:
+            mentioned_in[raw_name.lower()] = result.file.relative_to(ROOT / "acs").as_posix()
+        else:
             documented.add(raw_name.lower())
 
     bullets = {}
@@ -1122,6 +1137,8 @@ def gen_acs_signatures(check):
         if pcd is not None:
             zan_hit, uzd_hit = pcd in zan_pcd_cases, pcd in uzd_pcd_cases
             bucket += f"; Zan: {'yes' if zan_hit else 'no'}, UZD: {'yes' if uzd_hit else 'no'}"
+        if name.lower() in mentioned_in:
+            bucket += f"; mentioned in `{mentioned_in[name.lower()]}`"
         bullets[display] = f"- `{display}` ({bucket}) — Tier C (signature only, auto-generated): `{sig}`"
     for raw_name, entry in special.items():
         if raw_name.lower() in documented:
@@ -1137,6 +1154,8 @@ def gen_acs_signatures(check):
         else:
             zan_hit, uzd_hit = raw_name.lower() in acsf_names, raw_name.lower() in uzd_acsf_names
             bucket = f"extension function, index {idx}; Zan: {'yes' if zan_hit else 'no'}, UZD: {'yes' if uzd_hit else 'no'}"
+        if raw_name.lower() in mentioned_in:
+            bucket += f"; mentioned in `{mentioned_in[raw_name.lower()]}`"
         bullets[name] = f"- `{name}` ({bucket}) — Tier C (signature only, auto-generated): `{entry['sig']}`"
 
     index_path = ROOT / "acs" / "INDEX.md"

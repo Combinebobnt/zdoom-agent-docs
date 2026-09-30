@@ -1,9 +1,9 @@
 # GLDEFS lump format overview
 
-**Tier:** B
+**Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
-**Provenance:** ZDoom Wiki `GLDEFS` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=GLDEFS&oldid=55416), verified against Zandronum source's `src/gl/dynlights/gl_dynlight.cpp`, `src/gl/dynlights/gl_glow.cpp`, `src/gl/textures/gl_texture.cpp`, and `src/gl/textures/gl_skyboxtexture.cpp`; light runtime (offset, `sectorlight` scale) against `src/gl/dynlights/a_dynlight.cpp:316,354-357`; `HardwareShader` parsing against `src/gl/shaders/gl_shader.cpp:648-706`. GZDoom-family keyword presence verified via UZDoom 4.15pre source's `src/r_data/gldefs.cpp` but behavior beyond keyword existence not exhaustively traced.
+**Verified against:** UZDoom 5.1.0-pre @98b16b78fc (2026-09-28); Zandronum 3.3-alpha @bdd0f7beb (2026-09-28)
+**Provenance:** ZDoom Wiki `GLDEFS` (retrieved 2026-09-28, https://zdoom.org/w/index.php?title=GLDEFS&oldid=55416), verified against UZDoom source's `src/r_data/gldefs.cpp` and `src/playsim/a_dynlight.cpp`; and Zandronum source's `src/gl/dynlights/gl_dynlight.cpp`, `src/gl/dynlights/gl_glow.cpp`, `src/gl/textures/gl_texture.cpp`, `src/gl/textures/gl_skyboxtexture.cpp`, light runtime (offset, `sectorlight` scale, flicker timing) against `src/gl/dynlights/a_dynlight.cpp`, and `HardwareShader` parsing against `src/gl/shaders/gl_shader.cpp:648-706`. On UZDoom, light blocks and flicker timing are traced; skybox, brightmap, glow and shader sections are checked for keyword presence only.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 GLDEFS lumps define graphical effects supported only by the OpenGL renderer: dynamic lights (point/pulse/flicker lights bound to actors), skyboxes, brightmaps (brightness masks for sprites/textures/flats), glowing flats, and hardware shaders. The lump supports `#include` directives. Both engines also read the current game's own defs lump (`DOOMDEFS`, `HTICDEFS`, `HEXNDEFS`, `STRFDEFS` or `CHEXDEFS`) with the same syntax. Zandronum parses every game defs lump first, then every `GLDEFS` lump; UZDoom walks both names together in load order.
@@ -12,7 +12,7 @@ GLDEFS lumps define graphical effects supported only by the OpenGL renderer: dyn
 
 Zandronum and GZDoom-family diverge significantly in GLDEFS scope. The following table enumerates which top-level blocks parse in each engine. On Zandronum, any other top-level keyword is a fatal parse error ("Error parsing defs. Unknown tag"), not silently skipped.
 
-| Block | Zandronum 3.2.1 | GZDoom family | Notes |
+| Block | Zandronum | GZDoom family | Notes |
 |---|---|---|---|
 | `#include` | yes | yes | Supports both WAD lump names and PK3 file paths |
 | `pointlight` | yes | yes | Dynamic light type |
@@ -56,7 +56,7 @@ All five dynamic light types accept the same core property keywords except `addi
 | `pointlight` | yes (0-255) | — | — | — | — |
 | `pulselight` | yes (0-255) | yes (0-255) | yes (seconds) | — | — |
 | `flickerlight` | yes (0-255) | yes (0-255) | — | yes (0.0-1.0) | — |
-| `flickerlight2` | yes (0-255 lower bound) | yes (0-255 upper bound) | yes (0.1 = 1 sec) | — | — |
+| `flickerlight2` | yes (0-255 lower bound) | yes (0-255 upper bound) | yes (x360 tics; 0.1 is about 1 sec) | — | — |
 | `sectorlight` | — | — | — | — | yes (0.0-1.0 of sector light) |
 
 **Behavioral notes:**
@@ -65,6 +65,13 @@ All five dynamic light types accept the same core property keywords except `addi
   - Zandronum: `size` and `secondarySize` are clamped to 0-255 during parsing.
   - UZDoom/GZDoom: `size` and `secondarySize` are clamped to 1-1024 during parsing.
 - **`flickerlight2` auto-swap:** If `secondarySize < size`, the engine silently swaps them at parse time. The wiki's "SECSIZE must be greater than SIZE" describes the intended design, not an error condition; incorrect orderings are corrected, not rejected.
+- **Offset order is the same for every light type.** The ZDoom Wiki's syntax blocks label the
+  `flickerlight2` and `sectorlight` offsets `<X> <Z> <Y>`, unlike the other types. Both engines
+  parse every type's `offset` with the same code, so the second value is always height.
+- **`flickerlight2` interval is stored as a tic count.** UZDoom multiplies it by 360
+  (`src/r_data/gldefs.cpp:813`), Zandronum by `ANGLE_MAX` and converts back to degrees at runtime,
+  which is the same x360. A new random size is picked every `interval x 360` tics, so the wiki's
+  "0.1 is one second" is close (36 tics). `pulselight`'s interval is instead x`TICRATE`.
 - `pointlight` does not accept `secondarySize` or `interval`/`chance` (they will error as unknown tags).
 - `sectorlight` does not accept `size` or secondary properties; `scale` is meant as its intensity control instead. On Zandronum the parsed `scale` never reaches the spawned light (only the color bytes are copied to it), so a GLDEFS-bound `sectorlight`'s size always tracks the sector's full light level.
 

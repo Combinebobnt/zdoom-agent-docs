@@ -27,5 +27,6 @@ bucket convention.
 
 ## Status
 
-Scaffolded, no content yet. A tier-B prose source already exists locally for when someone picks
-this up: `sources.local.md`'s `udb` key → `Build/Scripting/ZDoom_MAPINFO.cfg`.
+Concept files cover the lump format and every top-level block type (see `INDEX.md`); no
+`notes/` or `inventory/` files yet. A tier-B prose source exists locally for per-key work:
+`sources.local.md`'s `udb` key → `Build/Scripting/ZDoom_MAPINFO.cfg`.

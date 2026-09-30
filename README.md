@@ -2,7 +2,8 @@
 
 A hand/agent-maintained documentation tree for the ZDoom-family Doom-engine modding surface —
 ACS/BCS, DECORATE, ZScript, and lump formats like MAPINFO/GLDEFS/SBARINFO/CVARINFO/MENUDEF/
-Zandronum's own native lumps, plus Zandronum's launcher/master-server/RCON protocols — targeting
+KEYCONF/LOCKDEFS/GAMEINFO/SNDINFO/TEXTURES/LANGUAGE/TERRAIN/DECALDEF/ANIMDEFS/FONTDEFS/TEXTCOLO
+and Zandronum's own native lumps, plus Zandronum's launcher/master-server/RCON protocols — targeting
 **UZDoom/GZDoom-family** (primary) and **Zandronum** engines, co-equal and fully verified rather
 than grandfathered (most notably ZScript, which doesn't exist in Zandronum at all). It exists to
 answer one recurring question cheaply, generalized past its original ACS-only scope: *given a
@@ -26,15 +27,16 @@ See `AGENTS.md`'s routing table for the full scope.
   the right section, and to the shared rule files. Read this first.
 - **`INDEX.md`** — the full top-level map: every section, its coverage stats, and what's not
   covered yet.
-- **`shared/AUTHORING.md`** — every rule that applies across sections: tiers, the `Engine:` field
-  and multi-engine handling, licensing (including the GPL-3.0 paraphrase-only rule for
+- **`shared/AUTHORING.md`** — every rule that applies across sections: tiers, the
+  `Applies to:`/`Verified against:` engine claim and multi-engine handling, licensing (including the GPL-3.0 paraphrase-only rule for
   UZDoom/GZDoom/ZScript source), and the Authoring rule for when an entry earns its own file.
 - **`shared/ARCHETYPES.md`** — the three doc schemas every section is built from (Callable /
   Table-of-entries / Concept), with the exact header-block format for each.
-- **`agents/`** — ready-made `zdoom-docs-lookup` (retrieval) subagent definitions for Claude
-  Code, Codex, Gemini CLI, OpenCode and Copilot, plus a harness-neutral procedure they're all
-  generated from. `zdoom-docs-intake` (wiki-page processing) lives at `maintainer/agents/`
-  instead, since it's inert without that gitignored directory.
+- **`agents/`** — the harness-neutral `zdoom-docs-lookup` (retrieval) procedure at
+  `agents/zdoom-docs-lookup.md`, plus ready-made subagent definitions generated from it, one
+  folder per harness: Claude Code, Codex, Gemini CLI, OpenCode and Copilot.
+  `zdoom-docs-intake` (wiki-page processing) lives at `maintainer/agents/` instead, since it's
+  inert without that gitignored directory.
 
 ### Using it from an AI agent
 
@@ -46,13 +48,20 @@ for your harness, or how to use the procedure without one.
 ```text
 acs/       decorate/   zscript/            -- major sections (Callable + Concept archetypes)
 mapinfo/   gldefs/     sbarinfo/  cvarinfo/  menudef/ -- lump formats (Table-of-entries + Concept)
-zandronum-lumps/                           -- 8 more Zandronum-native lumps (Zandronum-only)
+keyconf/   lockdefs/   gameinfo-lump/  sndinfo/  textures/ -- more lump formats (Concept only)
+language/                                  -- LANGUAGE string table (Concept only)
+terrain/                                   -- TERRAIN splashes/terrains (Concept only)
+decaldef/                                  -- DECALDEF wall decals (Concept only)
+animdefs/                                  -- ANIMDEFS texture animations/switches (Concept only)
+fonts/                                     -- FONTDEFS fonts + TEXTCOLO text colors (Concept only)
+zandronum-lumps/                           -- 10 more Zandronum-native lumps (Zandronum-only bar TEAMINFO)
 console/   sprites/    bots/               -- runtime & assets (bots/ is Zandronum-only)
 netcode/                                   -- launcher/master-server/RCON protocols (Zandronum-only)
 shared/    -- AUTHORING.md, ARCHETYPES.md, concepts/ (cross-section only)
-tools/     -- sections.py, lint_docs.py, gen_inventory.py, gen_agents.py, lookup.py, browse.py
-agents/    -- procedures/ (harness-neutral source), zdoom-docs-lookup.md (Claude Code),
-              codex/ gemini/ opencode/ copilot/ (generated per-harness adapters)
+tools/     -- sections.py, lint_docs.py, gen_inventory.py, gen_agents.py, lookup.py, browse.py,
+              engine_matrix.py, engine_claim_progress.py, zscript_paste_audit.py
+agents/    -- zdoom-docs-lookup.md (harness-neutral procedure),
+              claude/ codex/ gemini/ opencode/ copilot/ (generated per-harness adapters)
 maintainer/ -- gitignored, maintainer-only wiki-intake pipeline (absent in a plain clone);
               its own agents/zdoom-docs-intake.md lives there too
 ```
@@ -81,6 +90,7 @@ no external consumer referenced the old name):
 python3 tools/lookup.py CheckFlag                  # ACS, searches every section
 python3 tools/lookup.py --section decorate SOLID    # scope to one section
 python3 tools/lookup.py GetActorProperty --long     # signature + parameter info
+python3 tools/lookup.py KEYCONF                    # lump/format name -> its concept page
 ```
 
 Fails loudly with a "did you mean" suggestion for typos — it never silently falls back to
@@ -116,8 +126,8 @@ After hand-editing any doc file, or regenerating an inventory:
 
 ```text
 python3 tools/lint_docs.py
-python3 tools/gen_inventory.py --check   # confirms committed inventories match a fresh extraction
-python3 tools/gen_agents.py --check      # confirms subagent adapters match agents/procedures/
+python3 tools/gen_inventory.py all --check  # confirms committed inventories match a fresh extraction
+python3 tools/gen_agents.py --check        # confirms subagent adapters match agents/*.md, no strays
 ```
 
 `lint_docs.py` checks every section's `INDEX.md` links resolve, every doc file is linked and

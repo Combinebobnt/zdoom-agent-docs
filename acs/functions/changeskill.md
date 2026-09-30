@@ -10,9 +10,10 @@ introduction history wasn't traced this pass).
 (`p_lnspec.cpp:3276-3287`, `g_level.cpp:1337-1342`, `doomstat.cpp:NextSkill declaration`,
 `g_level.cpp:NextSkill initialization`). The wiki correctly describes the skill-index parameters
 (0–4 are the defaults) and that skill changes take effect "at the next map change." The wiki's
-statement "you can also use the following (defined in zdefs.acs)" applies to ZDoom; Zandronum
-defines skill constants in `zcommon.bcs` rather than `zdefs.acs`, but the names (`SKILL_VERY_EASY`,
-etc.) are identical.
+statement "you can also use the following (defined in zdefs.acs)" applies to the ACC compiler;
+zt-bcc defines the skill constants in `zcommon.bcs` rather than `zdefs.acs`, but the names
+(`SKILL_VERY_EASY`, etc.) are identical. The split is by compiler, not engine (see
+[`acc-compiler.md`](../concepts/acc-compiler.md)).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 **Bucket:** action special.
 

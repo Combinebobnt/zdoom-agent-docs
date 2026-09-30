@@ -159,7 +159,7 @@ drive field decoding from the echoed `Flags`/`Flags2`:
 | Byte | 1 if a true spectator (not a dead player waiting to respawn) |
 | Byte | 1 if a bot |
 | Byte | Team index, or 255 if not on a team. **Present only when the mode has `PLAYERSONTEAMS`**; absent entirely otherwise, so every later field shifts |
-| Byte | Time on the server, in **minutes** |
+| Byte | Time on the server, in **minutes**, truncated to a Byte (wraps past 255, `sv_master.cpp:317`) |
 
 ### Fields (`Flags2`)
 
@@ -217,7 +217,8 @@ Independently of any query, a server with `sv_broadcast` on (the default) and wi
 (`DEFAULT_BROADCAST_PORT`). It is a normal unsegmented 5660023 reply with every `SQF_*` and
 `SQF2_*` flag requested (then corrected as above) and `Time` = 0, and it skips the ignore-list and
 ban checks. On Windows it goes to `255.255.255.255`; elsewhere the server derives a classful
-broadcast address (A/B/C by the first octet) from its own local address.
+broadcast address (A/B/C by the first octet) from its own local address, and keeps
+`255.255.255.255` for a first octet of 0 or 224 and above (`sv_master.cpp:654`, `677-688`).
 
 ## Wiki/engine divergence
 

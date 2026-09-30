@@ -45,10 +45,11 @@ No other wiki/fork divergence found — the two-overload signature (with/without
 and comparison semantics match the wiki as described.
 
 **Why this function exists instead of `==`:** `==`/`!=` on `str` is a raw integer comparison of
-the string's table index, not its content — safe between two runtime-built (`StrParam`/
-concatenation/pool-origin) strings, but **always false/true respectively** when one side is a
-compiled literal and the other is pool-origin, regardless of matching text. See
+the string's table index, not its content. It is safe between two runtime-built (`StrParam`/
+concatenation/pool-origin) strings and for literals inside a `#library` module (pooled there by
+`PCD_TAGSTRING`), but **always false/true respectively** when one side is a literal compiled
+without `#library` and the other is pool-origin, regardless of matching text. See
 [String literal vs. pool equality](../concepts/string-literal-vs-pool-equality.md) for the full
 mechanism. `StrCmp`/`StrIcmp` resolve both sides to actual characters first, so they're correct
-across that boundary — use them (`StrCmp(a, b) == 0`) whenever either operand might not be a
-literal from the same compiled module as the other.
+across that boundary. Use them (`StrCmp(a, b) == 0`) whenever the code might be compiled
+without `#library` or compares a string handed in from another module.

@@ -2,10 +2,10 @@
 
 **This file is the one copy of every rule that applies across all sections** (`acs/`,
 `decorate/`, `zscript/`, `mapinfo/`, `gldefs/`, `sbarinfo/`, `cvarinfo/`, `menudef/`, `console/`,
-`sprites/`, `bots/`, `zandronum-lumps/`, `netcode/`, and any lump-format section added later). Every section's own `AGENTS.md` points here instead of
+`sprites/`, `bots/`, `zandronum-lumps/`, `netcode/`, `keyconf/`, `lockdefs/`, `gameinfo-lump/`, `sndinfo/`, `textures/`, `language/`, `terrain/`, `decaldef/`, `animdefs/`, `fonts/`, and any lump-format section added later). Every section's own `AGENTS.md` points here instead of
 restating these rules — the original repo split `maintainer/PROCESS_INTAKE_FILE.md` out of
 `maintainer/CLAUDE.md` for the same reason ("so there's only one copy to keep in sync"); the same
-logic applies with more force across thirteen sections than it did across one. A section's `AGENTS.md`
+logic applies with more force across twenty-three sections than it did across one. A section's `AGENTS.md`
 only covers what's specific to that section: its own layout, its own engine-source buckets or
 inventory extractor, its own worked examples.
 
@@ -89,7 +89,9 @@ narrower reasons (see the script's own comments), not files still on the legacy 
 before this was written down — `5.0.0-pre` is both the majority form already in use and the
 `trunk` checkout's actual current `VERSIONSTR` (see the caveats below). A file's *existing*
 `4.15pre` stamp is a real historical claim, not an error, and is not worth mass-rewriting for its
-own sake — this only governs what a new stamp writes.
+own sake — this only governs what a new stamp writes. **Update 2026-09-28:** the checkout's
+`VERSIONSTR` now reads `5.1.0-pre`, and new stamps use that. The rule is to stamp whatever the
+checkout you read reports, not a fixed string.
 
 **UZDoom/GZDoom-family engines are documented in full; Zandronum is documented where UZDoom's
 ZScript-first codebase doesn't apply** — most importantly ZScript itself, which does not exist in

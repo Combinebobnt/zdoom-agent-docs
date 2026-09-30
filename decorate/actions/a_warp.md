@@ -9,7 +9,7 @@
 
 Warps the calling actor to the position of another actor (typically specified via an actor pointer constant like `AAPTR_TARGET`). Originally designed as a more versatile analog to `A_Fire` (used by the Arch-Vile's flame attack).
 
-**IMPORTANT: Engine-family divergence.** The ZDoom Wiki describes a more recent version of `A_Warp` with additional parameters and flags not present in Zandronum 3.2.1. See "Zandronum-specific notes" below for what is actually available in Zandronum.
+**IMPORTANT: Engine-family divergence.** The ZDoom Wiki describes a more recent version of `A_Warp` with additional parameters and flags not present in Zandronum 3.2.1. See "Signature", "Parameters" and "Additional parameters in the wiki (not in Zandronum)" below for what is actually available in Zandronum.
 
 (Verified directly against UZDoom's own `A_Warp` implementation, not just the wiki: every flag and parameter listed below as wiki-only/GZDoom-UZDoom-only does in fact exist in UZDoom's `DEFINE_ACTION_FUNCTION(AActor, A_Warp)` and the shared `P_Thing_Warp()` helper it calls — see the further divergence below for a behavioral specific the wiki page doesn't otherwise surface.)
 

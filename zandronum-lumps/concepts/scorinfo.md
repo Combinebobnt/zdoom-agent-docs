@@ -3,7 +3,7 @@
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
 **Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
-**Provenance:** Zandronum Wiki `SCORINFO` (https://wiki.zandronum.com/w/index.php?title=SCORINFO&oldid=1803, retrieved 2026-09-09); verified against Zandronum source's `src/scoreboard.cpp`, `src/scoreboard_margin.cpp`, and `src/scoreboard_enums.h`; custom-data ACS argument order from `src/p_acs.cpp:8176-8255`.
+**Provenance:** Zandronum Wiki `SCORINFO` (https://wiki.zandronum.com/w/index.php?title=SCORINFO&oldid=1803, retrieved 2026-09-09); verified against Zandronum source's `src/scoreboard.cpp`, `src/scoreboard_margin.cpp`, and `src/scoreboard_enums.h`; custom-data ACS argument order from `src/p_acs.cpp:8176-8255`; `$` lookup timing from `src/scoreboard.cpp:908`, `:1988`, `src/scoreboard_margin.cpp:838-853`, `:1068-1074`, `src/d_main.cpp:3085` and `src/doomstat.cpp:63-68` (re-read 2026-09-29, same checkout).
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0
 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 **Source excerpt:** This file quotes Zandronum engine source verbatim; reproduced under
@@ -168,6 +168,16 @@ ENUM_ELEMENT( COLUMNCMD_SHORTNAME ),
 // How the contents inside the column are aligned (left, center, or right).
 ENUM_ELEMENT( COLUMNCMD_ALIGNMENT ),
 ```
+
+**`$` names are looked up at parse time.** A `displayname`, `shortname`, `truetext` or
+`falsetext` value starting with `$` is looked up in the string table while SCORINFO is parsed at
+startup (`src/scoreboard.cpp:908`, `:1988`, called from `src/d_main.cpp:3085`) and stored as plain
+text. Changing the `language` cvar later reloads the string table (`src/doomstat.cpp:63-68`) but
+not SCORINFO, so column headers and boolean texts stay in the startup language. A margin
+`drawstring`'s `$` text is different: it is looked up each time the margin is refreshed
+(`src/scoreboard_margin.cpp:838-853`, `:1068-1074`), so it follows a language change. (On non-Windows
+builds the cvar doesn't change the language at all: see
+[the LANGUAGE lump](../../language/concepts/language-lump.md).)
 
 The enum's own trailing sentinel, `NUM_COLUMNCMDS`, is not a real command. It exists purely as
 the array-bound marker `EnumToString`-style enums in this codebase always end with. A naive count

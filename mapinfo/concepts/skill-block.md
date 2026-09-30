@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
-**Provenance:** ZDoom Wiki `MAPINFO/Skill_definition` (retrieved 2026-08-01, https://zdoom.org/w/index.php?title=MAPINFO%2FSkill_definition&oldid=54710) + verified against Zandronum source (`src/g_skill.cpp:56-314`; corrections from `src/p_enemy.cpp:395-396,3405-3450`, `src/p_mobj.cpp:6003-6007,7830-7847`, `src/p_interaction.cpp:1266-1271,1771-1772`, `src/p_setup.cpp:1807-1814`, `src/p_udmf.cpp:558-559`, `src/p_acs.cpp:11174`, `src/menu/menudef.cpp:1656-1667`, `wadsrc/static/mapinfo/doomcommon.txt:97`) and UZDoom source (`src/gamedata/g_skill.cpp:55-357`).
+**Verified against:** UZDoom 5.1.0-pre @98b16b78fc (2026-09-28); Zandronum 3.3-alpha @bdd0f7beb (2026-09-28)
+**Provenance:** ZDoom Wiki `MAPINFO/Skill_definition` (retrieved 2026-09-28, same revision as the 2026-08-01 intake, https://zdoom.org/w/index.php?title=MAPINFO%2FSkill_definition&oldid=54710) + re-verified against Zandronum source (`src/g_skill.cpp:56-314`; corrections from `src/p_enemy.cpp:395-396,3405-3450`, `src/p_mobj.cpp:6003-6007,7830-7847`, `src/p_interaction.cpp:1266-1271,1771-1772`, `src/p_setup.cpp:1807-1814`, `src/p_udmf.cpp:558-559`, `src/p_acs.cpp:11174`, `src/menu/menudef.cpp:1656-1667`, `wadsrc/static/mapinfo/doomcommon.txt:97`) and UZDoom source (`src/gamedata/g_skill.cpp:55-357`; consumers in `src/playsim/p_mobj.cpp:5474,8514`, `src/playsim/p_interaction.cpp:1176`, `src/menu/doommenu.cpp:1349`, `wadsrc/static/zscript/actors/inventory/ammo.zs:191`).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 A `skill` block in MAPINFO defines a single difficulty level, setting monster health/damage scaling, ammo/pickup multipliers, respawn behavior, and actor replacement rules specific to that skill. Skill definitions are used to populate the difficulty selection menu and affect gameplay behavior when the skill is selected.

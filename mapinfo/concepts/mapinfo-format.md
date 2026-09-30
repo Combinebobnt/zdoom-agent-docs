@@ -2,8 +2,8 @@
 
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
-**Provenance:** ZDoom Wiki `MAPINFO` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=MAPINFO&oldid=52570) + verified against the Zandronum source's `src/g_mapinfo.cpp` (`FMapInfoParser::ParseMapInfo`, `G_ParseMapInfo`, `FMapInfoParser::ParseOpenBrace`, `FMapInfoParser::ParseEpisodeInfo`) and `src/sc_man_scanner.re` (comment handling per scanner mode), and the UZDoom source's `src/gamedata/g_mapinfo.cpp`.
+**Verified against:** UZDoom 5.1.0-pre @98b16b78fc (2026-09-28); Zandronum 3.3-alpha @bdd0f7beb (2026-09-28)
+**Provenance:** ZDoom Wiki `MAPINFO` (retrieved 2026-09-28, https://zdoom.org/w/index.php?title=MAPINFO&oldid=52570) + verified against the Zandronum source's `src/g_mapinfo.cpp` (`FMapInfoParser::ParseMapInfo`, `G_ParseMapInfo`, `FMapInfoParser::ParseOpenBrace`, `FMapInfoParser::ParseEpisodeInfo`, lines 2053-2072 for ZMAPINFO override behavior) and `src/sc_man_scanner.re` (comment handling per scanner mode), and the UZDoom source's `src/gamedata/g_mapinfo.cpp` (G_ParseMapInfo lines 2764-2798 for MAPINFO/ZMAPINFO/UMAPINFO precedence).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 ## Overview
@@ -16,7 +16,7 @@ Both lumps use identical parsing; the distinction is format enforcement:
 - **MAPINFO**: format is auto-detected at parse time (old or new; see "Format variants" below).
 - **ZMAPINFO**: format is forced to the new syntax; old-style (Hexen) MAPINFO syntax is not permitted.
 
-**Per-WAD override rule:** When multiple MAPINFO-style lumps exist in the same WAD, they are prioritized by load order: MAPINFO/ZMAPINFO suppress earlier UMAPINFO (UZDoom only), and ZMAPINFO suppresses any MAPINFO in the same WAD. In Zandronum (which lacks UMAPINFO), if a WAD contains both MAPINFO and ZMAPINFO, the MAPINFO is skipped entirely (source `src/g_mapinfo.cpp:2059-2067`).
+**Per-WAD override rule:** When multiple MAPINFO-style lumps exist in the same WAD, a MAPINFO or ZMAPINFO suppresses any UMAPINFO in the same WAD regardless of order (UZDoom only, `src/gamedata/g_mapinfo.cpp:2764-2798`), and ZMAPINFO suppresses any MAPINFO in the same WAD. In Zandronum (which lacks UMAPINFO), if a WAD contains both MAPINFO and ZMAPINFO, the MAPINFO is skipped entirely (source `src/g_mapinfo.cpp:2059-2067`).
 
 ## Format variants
 
@@ -35,9 +35,9 @@ Block types available depend on format:
 These are rejected with a script error once the lump has been detected as old format. Encountering `gameinfo`, `intermission`, `automap` or `automap_overlay` while the format is still undetermined promotes the lump to new format; `cluster` does not promote it.
 - `cluster <number> { ... }` — define cluster properties (see separate "MAPINFO_Cluster definition" page). Old format uses `clusterdef` instead.
 - `gameinfo { ... }` — configure engine-level properties like title screen, credit sequence, intermission defaults (see separate "MAPINFO_GameInfo definition" page).
-- `intermission <name> { ... }` — define a custom intermission sequence.
-- `automap { ... }` — set automap color scheme; only applied if `am_customcolors` cvar is enabled.
-- `automap_overlay { ... }` — like `automap`, but overlays settings on the default scheme instead of replacing it.
+- `intermission <name> { ... }` — define a custom intermission sequence. See [intermission-block.md](intermission-block.md).
+- `automap { ... }` — set automap color scheme; only applied if `am_customcolors` cvar is enabled. See [automap-block.md](automap-block.md).
+- `automap_overlay { ... }` — same keys as `automap`, but sets the separate colorset used when the automap is shown as an overlay on the game view.
 
 ### Both formats
 In the new format the blocks here that take properties are brace-delimited; in the old format a block ends at the first word that isn't one of its properties, normally the next top-level keyword.
@@ -65,18 +65,18 @@ These are not top-level blocks. The three bot properties go inside an `episode` 
 
 ### UZDoom-specific lump types
 
-UZDoom supports a third lump type, **UMAPINFO**, alongside MAPINFO and ZMAPINFO. UMAPINFO is a community-authored format with its own syntax; its key difference is that MAPINFO and ZMAPINFO in the same WAD take precedence over it. UMAPINFO lumps are batched until a regular MAPINFO/ZMAPINFO block appears, allowing modders to provide a fallback configuration for engines that lack the newer lumps.
+UZDoom supports a third lump type, **UMAPINFO**, alongside MAPINFO and ZMAPINFO. UMAPINFO is a community-authored format with its own syntax; its key difference is that MAPINFO and ZMAPINFO in the same WAD take precedence over it. UMAPINFO lumps are collected and only committed when the next regular MAPINFO/ZMAPINFO lump is reached (or at the end), so they are applied on top of the base settings as they stood at that point.
 
-### GZDoom-family only (not in Zandronum 3.2.1)
+### GZDoom-family only (not in Zandronum)
 
 The following blocks exist in UZDoom/GZDoom but have no Zandronum implementation:
 
-- `doomednums { ... }` — map editor thing numbers to actor classes. Replaces older external `DOOMEDNUMS` lump mechanism.
-- `damagetype { ... }` — define custom damage types with associated properties.
-- `spawnnums { ... }` — map spawn numbers to actor classes.
-- `conversationids { ... }` — map conversation IDs to actor classes.
+- `doomednums { ... }` — map editor thing numbers to actor classes. See [doomednums-block.md](doomednums-block.md).
+- `damagetype { ... }` — define custom damage types with associated properties. See [damagetype-block.md](damagetype-block.md).
+- `spawnnums { ... }` — map spawn numbers to actor classes. See [spawnnums-block.md](spawnnums-block.md).
+- `conversationids { ... }` — map conversation IDs to actor classes. See [conversationids-block.md](conversationids-block.md).
 
-These are new-format-only and documented in the UZDoom/GZDoom MAPINFO reference, but **do not parse in Zandronum and should not be used in a Zandronum-compatible MAPINFO**. Zandronum reads ZMAPINFO too (and prefers it over a MAPINFO in the same WAD, `src/g_mapinfo.cpp:2053-2069`), so moving these blocks into ZMAPINFO does not hide them from Zandronum. A modder targeting both engines should keep them out of every MAPINFO/ZMAPINFO lump that Zandronum loads, for example in a separate file loaded only on UZDoom.
+These are new-format-only and documented in the UZDoom/GZDoom MAPINFO reference, but **do not parse in Zandronum and should not be used in a Zandronum-compatible MAPINFO**. Zandronum reads ZMAPINFO too (and prefers it over a MAPINFO in the same WAD, `src/g_mapinfo.cpp:2053-2069`), so moving these blocks into ZMAPINFO does not hide them from Zandronum. A modder targeting both engines should keep them out of every MAPINFO/ZMAPINFO lump that Zandronum loads (for example in a separate PWAD that is only loaded on UZDoom), or use the actor-level equivalents where one exists (DECORATE `damagetype`, and the `SpawnID`/`ConversationID` properties and editor number in the actor header).
 
 ### Per-lump defaults behavior
 

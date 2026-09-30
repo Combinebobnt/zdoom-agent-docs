@@ -32,13 +32,18 @@ case ACSF_GetCurrentGamemode:
   the Zandronum source's `src/gamemode_enums.h:82-104`, in the same order, each with `GAMEMODE_`
   stripped: `Cooperative`, `Survival`, `Invasion`, `Deathmatch`, `Teamplay`, `Duel`, `Terminator`,
   `LastManStanding`, `TeamLMS`, `Possession`, `TeamPossession`, `TeamGame`, `CTF`, `OneFlagCTF`,
-  `Skulltag`, `Domination` — confirmed 1:1, nothing added or missing.
+  `Skulltag`, `Domination` — confirmed 1:1, nothing added or missing. The engine returns them
+  upper-case, though: the enum elements are spelled `GAMEMODE_INVASION` and so on, and the name
+  table stringifies the identifier (`src/EnumToString.h:51`), so the result is `"INVASION"`, not
+  `"Invasion"`. Compare with `StrIcmp`, never `==` (a pool string, see
+  [String literal vs. pool equality](../concepts/string-literal-vs-pool-equality.md)) or a
+  case-sensitive `StrCmp`.
 - Pairs with `SetCurrentGamemode(str)` (`-132`, `p_acs.cpp:7516-7580`), which does the reverse
   lookup (`GetValueGAMEMODE_e` on `"GAMEMODE_" + name`, case-insensitive via `ToUpper()`) and has
   several failure/refusal conditions of its own (client-mode call, mid-result-sequence, no
   matching starts for the target mode, a level locked to a different `MAPINFO gamemode` since
-  `7aa633182` (added after 3.2.1, not an ancestor of `28f736fb3`), etc.) — not covered here since
-  this file is scoped to the getter; see that function's own doc if/when written.
+  `7aa633182` (added after 3.2.1, not an ancestor of `28f736fb3`), etc.). See
+  [SetCurrentGamemode](setcurrentgamemode.md) for the full refusal list and what a switch does.
 - This function and its `Set` counterpart were both added in the same commit, `c487ff0a5`
   ("Added new ACS functions: SetGamemodeLimit()... SetCurrentGamemode()... GetCurrentGamemode()
   ..."), which **is an ancestor of** the 3.2.1 version-bump commit `28f736fb3` (verified via
@@ -49,7 +54,7 @@ case ACSF_GetCurrentGamemode:
 
 ```text
 str mode = GetCurrentGamemode();
-if (mode == "Invasion")
+if (StrIcmp(mode, "Invasion") == 0)
 {
     Log(s:"Playing Invasion");
 }

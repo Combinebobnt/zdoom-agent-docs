@@ -20,7 +20,8 @@ bots do not conflict. There is no need to restate the stock bots.
 The one replace form is a bare `CLEARBOTS` token placed outside any braces. While looking for the
 next `{`, the parser checks each token against `CLEARBOTS` (case-insensitive) and, on a match,
 calls `BOTS_Destruct`, which empties every bot defined so far: the stock bots and any earlier
-lump's alike. Bots declared after it in the same lump, and in later-loaded lumps, are added as
+lump's alike. It also deletes the skull-bot state of any player that currently has one and clears
+that player's bot flag (`bots.cpp:455-467`). Bots declared after it in the same lump, and in later-loaded lumps, are added as
 usual. Any other stray token outside braces is skipped silently.
 
 ## Keys
@@ -45,9 +46,9 @@ borrowed from a newer Zandronum version will be politely ignored by an older one
 | `skin` | Skin name. | 31 chars |
 | `railcolor` | A name (`blue`, `red`, `yellow`, `black`, `silver`, `gold`, `green`, `white`, `purple`, `orange`, `rainbow`) or a raw number. | — |
 | `chatfrequency` | `0` to `100`. | hard error above 100 or below 0 |
-| `revealed` | `true`/`false`, or any number (nonzero is true). | — |
-| `chatfile` | Chat file path. | 127 chars |
-| `chatlump` | Chat lump name. | 31 chars, hard error |
+| `revealed` | `true`/`false`, or any number (nonzero is true). A runtime `reveal` is lost at a normal quit; see [skininfo.md](../../zandronum-lumps/concepts/skininfo.md#revealing-a-hidden-skin-lasts-only-the-session). | — |
+| `chatfile` | Chat file path, on disk beside the executable (not in an archive). Format: [bot-chat-file.md](bot-chat-file.md). | 127 chars |
+| `chatlump` | Chat lump name or full archive path. Format: [bot-chat-file.md](bot-chat-file.md). | 31 chars, hard error |
 
 Any value token is truncated to 127 characters before the per-key cap is applied.
 
@@ -112,7 +113,7 @@ The Zandronum Wiki page cites several ranges that do not match the actual parser
 
 **`script` property.** The wiki lists five specific allowed values: `CRASHBOT`, `DFULTBOT`, `FATBOT`, `HUMANBOT`, `SAUSGBOT`. The parser actually accepts any lump name up to 8 characters — those five are simply the stock botscript lumps in the Zandronum source's `wadsrc/static/`, not a closed set. Custom botscripts with other names work identically.
 
-**`chatfile` long-filename caveat.** The wiki mentions "long filenames may cause a crash"; the parser clamps the path to 127 characters via `strncpy` before any downstream processing, so any crash would originate in the chat-file loader, not the parser itself.
+**`chatfile` long-filename caveat.** The wiki mentions "long filenames may cause a crash"; the parser clamps the path to 127 characters via `strncpy` before any downstream processing. Current source has no crash path for a long name after that either: the chat-file loader copies it into 1024-byte buffers (`src/botcommands.cpp:2143`, `:2210`) and prefixes the executable's directory in another 1024-byte buffer (`:372-377`). The warning likely predates the clamp.
 
 ## Engine-family divergence: no counterpart outside Zandronum
 

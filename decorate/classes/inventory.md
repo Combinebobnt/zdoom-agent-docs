@@ -75,7 +75,7 @@ See [decorate/inventory/actor-properties.md](../inventory/actor-properties.md) f
 - `Inventory.MaxAmount` — Maximum the owner can carry.
 - `Inventory.InterHubAmount` — Amount kept between hubs.
 - `Inventory.Icon` — Sprite for the status bar icon.
-- `Inventory.PickupMessage` — String printed when picked up (supports LANGUAGE lump `$` prefix).
+- `Inventory.PickupMessage` — String printed when picked up (supports [LANGUAGE](../../language/concepts/language-lump.md) lump `$` prefix).
 - `Inventory.PickupSound` — Sound played on pickup.
 - `Inventory.UseSound` — Sound played when the item is used.
 - `Inventory.PickupFlash` — Actor to spawn on pickup (e.g., `PickupFlash`).

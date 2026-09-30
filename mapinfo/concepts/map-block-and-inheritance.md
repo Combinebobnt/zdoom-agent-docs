@@ -1,9 +1,9 @@
 # Map block definitions and inheritance
 
-**Tier:** B
+**Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
-**Provenance:** ZDoom Wiki `MAPINFO/Map_definition` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=MAPINFO%2FMap_definition&oldid=55486) + verified against Zandronum engine source and spot-checked against UZDoom for engine-family divergence. The `include` baseline behavior under "Block forms and scoping" is from `FMapInfoParser::ParseMapInfo` in both engines' `g_mapinfo.cpp`.
+**Verified against:** UZDoom 5.1.0-pre @98b16b78fc (2026-09-28); Zandronum 3.3-alpha @bdd0f7beb (2026-09-28)
+**Provenance:** ZDoom Wiki `MAPINFO/Map_definition` (retrieved 2026-09-28, same revision as the 2026-07-31 intake, https://zdoom.org/w/index.php?title=MAPINFO%2FMap_definition&oldid=55486) + verified against both engines' `g_mapinfo.cpp`: the per-engine key-existence list against each parser's `DEFINE_MAP_OPTION`/flag tables, `ParseMapHeader` (UZDoom `src/gamedata/g_mapinfo.cpp:2180-2215`, Zandronum `src/g_mapinfo.cpp:1595-1632`), `ParseMapInfo`'s lump-start reset, `include` and `gamedefaults` handling (UZDoom `:2475-2520`, Zandronum `:1880-1920`), and the unknown-property path (UZDoom `:928-932`, Zandronum `:1543-1547,583-593`). The `include` baseline behavior under "Block forms and scoping" is from `FMapInfoParser::ParseMapInfo` in both engines' `g_mapinfo.cpp`.
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 The `map` definition block and its related default-setting variants (`defaultmap`, `adddefaultmap`, `gamedefaults`) form a hierarchical inheritance system. A map definition specifies per-level behavior (sky texture, music, next map, flags, etc.); the default blocks establish shared baseline properties to avoid repetition across many maps.
@@ -12,7 +12,7 @@ The `map` definition block and its related default-setting variants (`defaultmap
 
 **`map <lump> <nicename> { properties }`** — or **`map <lump> lookup <keyword> { properties }`**
 
-Defines a single level. The `<lump>` is the map marker name (conventionally `MAP##` or `E#M#`, but any valid lump name works). The `<nicename>` is displayed on the automap; the `lookup` variant retrieves it from the `LANGUAGE` lump instead. Properties inherit from the current `defaultmap` baseline, then apply overrides specific to this map.
+Defines a single level. The `<lump>` is the map marker name (conventionally `MAP##` or `E#M#`, but any valid lump name works). The `<nicename>` is displayed on the automap; the `lookup` variant retrieves it from the [LANGUAGE](../../language/concepts/language-lump.md) lump instead. Properties inherit from the current `defaultmap` baseline, then apply overrides specific to this map.
 
 **`defaultmap { properties }`**
 
@@ -28,7 +28,7 @@ Resets the global default baseline (used when loading PWADs that define their ow
 
 ## Property surface and engine-family availability
 
-A map definition accepts approximately 150 properties total, covering:
+A map definition accepts well over a hundred properties (the exact count depends on the engine and on whether compatibility flags are counted), covering:
 - **Rendering:** sky textures (`Sky1`, `Sky2`), fog color and density, lighting models (lighting shading, fake contrast)
 - **Audio:** level music, custom sound sequences, intermission music
 - **Flow:** next map on normal/secret exit, cluster assignment, par time, exit/enter screen animation
@@ -41,8 +41,8 @@ A map definition accepts approximately 150 properties total, covering:
 
 - **Renderer features:** `EnableShadowmap`, `DisableShadowmap`, `AttenuateLights`, `EnableSkyboxAO`, `DisableSkyboxAO`, `NoFogOfWar`, `SkyMist`, `UseSkyMist`, `SkyMistYScale`, `ThickFogDistance`, `ThickFogMultiplier`, `ForceFakeContrast`, `ForceWorldPanning` — these are absent in Zandronum and will generate an "Unknown property" script warning.
 - **ZScript integration:** `EventHandlers` (assigns ZScript event handlers to a map) — not applicable in Zandronum, which does not support ZScript.
-- **Cutscenes:** `Intro` and `Outro` blocks (video/function/intermission cutscenes) — UZDoom supports these; Zandronum does not.
-- **Metadata:** `Author`, `Label` — GZDoom-family properties for automap display; Zandronum lacks these.
+- **Cutscenes:** `Intro` and `Outro` blocks (video/function/intermission cutscenes) — UZDoom supports these; Zandronum does not, and on Zandronum they are **fatal**, not a warning: the unknown-property skip only consumes an `= value` tail, so the block's closing `}` ends the map definition early and the map's own `}` reaches the top level as an unknown keyword (`src/g_mapinfo.cpp:583-593,1543-1547,1999`).
+- **Metadata:** `Author`, `Label` — GZDoom-family only; Zandronum lacks these.
 - **Precaching:** `PrecacheClasses` (precaches actor sprites) — GZDoom-family only; Zandronum has `PrecacheSounds` but not `PrecacheTextures` or actor precaching.
 - **Monster behavior:** `ProperMonsterFallingDamage` (corrects monster falling-damage formula) — UZDoom supports this; Zandronum does not. Zandronum's monster falling damage is gated by a separate, older mechanism (the `monsterfallingdamage`/`nomonsterfallingdamage` keys below), not by this property.
 
@@ -86,12 +86,12 @@ block silently discards every other global default property that isn't restated 
 
 ## Engine-family divergence: HexenHack format-type gating
 
-Zandronum and UZDoom differ in how strictly they trigger the HexenHack retraction, with an important caveat about the HexenHack flag's persistence within a lump. When a numeric map name is encountered, Zandronum sets the HexenHack flag unconditionally; UZDoom gates it based on MAPINFO format — the flag is only set when the lump uses old-style (non-braced) syntax. UZDoom detects format by testing for an opening brace when beginning to parse each definition. In new-format (braced) MAPINFO, numeric map names in UZDoom are accepted literally and do not trigger HexenHack.
+Zandronum and UZDoom differ in how strictly they trigger the HexenHack retraction, with an important caveat about the HexenHack flag's persistence within a lump. When a numeric map name is encountered, Zandronum sets the HexenHack flag unconditionally (even in ZMAPINFO). UZDoom skips it only if the lump's format is **already settled as new** at that point: in ZMAPINFO (always new), or after an earlier `{`-bearing definition in the same lump; the number is then taken literally as the map name. If the format is still undetermined (a MAPINFO whose first map header is numeric), UZDoom sets HexenHack, renames the map to `MAP%02d`, and forces the lump to old format, so a brace after that header is not treated as new-format syntax (UZDoom `src/gamedata/g_mapinfo.cpp:2184-2197,472-490`; Zandronum `src/g_mapinfo.cpp:1599-1604`).
 
-**Critical limitation:** The HexenHack flag is set to false only when a new MAPINFO lump begins parsing (`ParseMapInfo` entry), not between individual map headers within the same lump. Once a numeric map name sets the flag to true in either engine, it remains true for all subsequent map definitions in that lump — including maps declared with named lumps rather than bare numbers. One Zandronum exception: an `include` reuses the same parser object, so the included file's parse resets the flag and the including file resumes with whatever value the included file left. UZDoom parses an include with a separate parser object, so the including file's flag survives it. This means the practical mitigation from the HexenHack retraction section (declaring new maps with named lumps) works on Zandronum only if no preceding map in that lump used a numeric name. UZDoom's format gating provides better isolation: maps in new-format (braced) MAPINFO are never affected by HexenHack, regardless of what came before in the same lump.
+**Critical limitation:** The HexenHack flag is set to false only when a new MAPINFO lump begins parsing (`ParseMapInfo` entry), not between individual map headers within the same lump. Once a numeric map name sets the flag to true in either engine, it remains true for all subsequent map definitions in that lump — including maps declared with named lumps rather than bare numbers. One Zandronum exception: an `include` reuses the same parser object, so the included file's parse resets the flag and the including file resumes with whatever value the included file left. UZDoom parses an include with a separate parser object, so the including file's flag survives it. This means the practical mitigation from the HexenHack retraction section (declaring new maps with named lumps) works on Zandronum only if no preceding map in that lump used a numeric name. UZDoom's format gating isolates new-format lumps: once a lump is settled as new format, no later numeric header in it can set HexenHack, and in ZMAPINFO it can never be set. On both engines, `ParseMapInfo` resets the flag at the start of every lump, including an included file (UZDoom's copy of the flag into the include's parser is overwritten by that reset).
 
-Zandronum's less-strict triggering means the gap described above can affect any map following a numeric-named map, even if declared with a named lump. UZDoom's limitation to old-format lumps means the gap is specific to legacy (non-braced) MAPINFO files, not a general property mechanism.
+Zandronum's less-strict triggering means the gap described above can affect any map following a numeric-named map, even if declared with a named lump. On UZDoom the gap is specific to legacy (old-format) MAPINFO, not a general property mechanism.
 
 ## Note on archival
 
-This page's underlying property list (~150 entries, each with semantics, parameter formats, and interaction notes) represents archetype-2 material (Table-of-entries) and should eventually populate `mapinfo/inventory/map.md`. As of this writing, no `tools/gen_inventory.py` generator exists for MAPINFO keys, and no hand-maintained inventory file exists. The detailed property descriptions from the ZDoom wiki remain unindexed in this documentation tree; see the source wiki page for the complete reference until an inventory table is written.
+This page's underlying property list (each entry with semantics, parameter formats, and interaction notes) represents archetype-2 material (Table-of-entries) and should eventually populate `mapinfo/inventory/map.md`. As of this writing, no `tools/gen_inventory.py` generator exists for MAPINFO keys, and no hand-maintained inventory file exists. The detailed property descriptions from the ZDoom wiki remain unindexed in this documentation tree; see the source wiki page for the complete reference until an inventory table is written.

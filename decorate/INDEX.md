@@ -94,6 +94,11 @@ AUTHORING.md` for tiers/engine-scope/licensing.
   silently overwritten when the touch was triggered by walking into the item — `P_TryMove` caches
   its destination coordinates before the nested touch runs and unconditionally restores them
   afterward, independent of whether the pickup succeeds or fails. Does not apply to `Use:`.
+- [The first Spawn state's action and `NoDelay`](concepts/spawn-state-nodelay.md) — tier B. A
+  new actor's first `Spawn:` state is entered without running its action, which runs only with
+  `NoDelay`; without it a 0-tic first state (a random `A_Jump` picker, one-shot setup) is silently
+  dead. Source trace for both engines, what it breaks, the two fixes (`NoDelay`, or a blank 0-tic
+  first state), and UZDoom's `CheckNoDelay` in `Tick`.
 - [Using a `Powerup` subclass as an inert countdown timer](concepts/powerup-as-inert-timer.md) —
   tier B. The `Speed 1.0` `PowerSpeed`-as-timer trick for gating `A_JumpIfInventory` checks on a
   self-expiring duration with zero gameplay side effects; the three side-effect channels (speed
@@ -820,6 +825,7 @@ promotes it out.
   wrong guess). `APowerSpeed::DoEffect` never reads `Speed`, so even a `Speed 1.0` no-op subclass
   spawns trails without this flag, even when no genuine speed powerup is held. No
   `cl_speedtrails`-style cvar exists as an alternative.
+- [FORCEDECAL](notes/forcedecal.md) — puff flag: its `Decal` beats the shooter's or weapon's on hitscan and rail wall hits (hitscan only when a puff actor spawned). Rails also need `ALWAYSPUFF` on Zandronum only (UZDoom fixed this in 2019); without it, Zandronum online shows a shooter with unlagged on the weapon's decal and everyone else the puff's.
 - [NOAUTOFIRE](notes/noautofire.md) — weapon flag. Suppresses **continuous** firing while fire is
   held through consecutive tics in which the weapon is already ready, but does **not** suppress a
   single shot fired the instant the weapon transitions into its ready state with fire already

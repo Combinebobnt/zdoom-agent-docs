@@ -2,11 +2,11 @@
 
 **Tier:** B
 **Applies to:** UZDoom=yes, Zandronum=yes
-**Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-27)
-**Provenance:** ZDoom Wiki `MAPINFO/GameInfo_definition` (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=MAPINFO%2FGameInfo_definition&oldid=54708) + verified against Zandronum source (`src/gi.cpp:202-406`, unknown-key skipping `src/g_mapinfo.cpp:583-593`, color parsing `src/v_video.cpp:442-532`, `player5start` use `src/p_mobj.cpp:5973-5977`) and UZDoom source (`src/gamedata/gi.cpp:272-481`).
+**Verified against:** UZDoom 5.1.0-pre @98b16b78fc (2026-09-28); Zandronum 3.3-alpha @bdd0f7beb (2026-09-28)
+**Provenance:** ZDoom Wiki `MAPINFO/GameInfo_definition` (retrieved 2026-09-28, https://zdoom.org/w/index.php?title=MAPINFO%2FGameInfo_definition&oldid=54708) + verified against Zandronum source (`src/gi.cpp:202-430`, unknown-key skipping `src/g_mapinfo.cpp:583-593`, color parsing `src/v_video.cpp:442-532`, `player5start` use `src/p_mobj.cpp:5973-5977`) and UZDoom source (`src/gamedata/gi.cpp:261-470`).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
-The `GameInfo` definition block in MAPINFO is distinct from the separate `GAMEINFO` lump — this page describes the former. It sets global game-wide settings and defaults used throughout a session, including UI/menu configuration, default music and graphics, weapon slots, and gameplay defaults (the fallback monster respawn time for skills that set none, the spawn-health multiplier for default gib health, teleport fog height, etc.).
+The `GameInfo` definition block in MAPINFO is distinct from the separate `GAMEINFO` lump ([gameinfo-lump/concepts/gameinfo-lump.md](../../gameinfo-lump/concepts/gameinfo-lump.md)) — this page describes the former. It sets global game-wide settings and defaults used throughout a session, including UI/menu configuration, default music and graphics, weapon slots, and gameplay defaults (the fallback monster respawn time for skills that set none, the spawn-health multiplier for default gib health, teleport fog height, etc.).
 
 ## Block structure and parsing
 
@@ -27,7 +27,7 @@ Unknown keys (keys not recognized by either parser) are handled differently per 
 
 **The wiki page describes upstream ZDoom/GZDoom-family features.** Zandronum implements a subset of the keys listed below; all keys in this section that **do not appear in the table below** exist only in UZDoom/GZDoom-family engines (the primary target). Zandronum projects may include them in a MAPINFO source file and Zandronum's parser silently skips them. The exception is the `intro` block, which is a fatal parse error on Zandronum (see above).
 
-### Zandronum 3.2.1 (verified, exhaustive)
+### Zandronum 3.3-alpha (verified)
 
 **Common to both engines:**
 `advisoryTime`, `armorIcons`, `backpacktype`, `border`, `borderflat`, `chatSound`, `creditPage` / `addCreditPage`, `cursorPic`, `defKickback`, `defaultBloodColor`, `defaultBloodParticleColor`, `defaultEndSequence`, `defaultRespawnTime`, `definventoryMaxAmount`, `defaultDropStyle`, `dimColor`, `dimAmount`, `drawReadThis`, `endoom`, `finaleFlat`, `finaleMusic`, `finalePage`, `forceKillScripts`, `gibFactor`, `infoPage` / `addInfoPage`, `intermissionCounter`, `intermissionMusic`, `mapArrow`, `nightmareFast`, `noLoopFinaleMusic`, `noRandomPlayerClass`, `pageTime`, `pauseSign`, `pickupColor`, `playerClasses` / `addPlayerClasses`, `quitMessages` / `addQuitMessages`, `quitSound`, `skyFlatName`, `statusbar`, `swapMenu`, `telefogHeight`, `textScreenX`, `textScreenY`, `titleMusic`, `titlePage`, `titleTime`, `translator`, `weaponSlot`.
@@ -82,6 +82,10 @@ Unknown keys (keys not recognized by either parser) are handled differently per 
 - **Color values** (`pickupColor`, `defaultBloodColor`, `defaultBloodParticleColor`, `dimColor`): accept `"#RRGGBB"`, `"#RGB"`, `"RRGGBB"`, a space-separated `"RR GG BB"` where each component is hexadecimal (only its first two characters count), or a color name from the `X11R6RGB` lump such as `"red"`. `"255 0 0"` is therefore not red: it reads as hex `25 00 00`.
 - **String arrays** (`creditPage`, `infoPage`, `playerClasses`, `quitMessages`): the `addXxx` variant appends; the non-prefixed variant replaces the list. `finalePage` has only the replacing form. UZDoom's `precacheSounds`, `precacheTextures` and `precacheClasses` have no `add` form and always append.
 - **Weapon slots** (`weaponSlot = <slot>, "<weapon1>", "<weapon2>", ...`): slot indices 0-9; an index outside that range is a fatal script error. Each `weaponSlot` line clears that slot first, so a later line for the same slot replaces its list rather than adding to it.
+
+## Wiki/source divergence
+
+The wiki example in the source page contains `mapinfo = "mapinfo/doom2.txt"`, which is not recognized by either Zandronum or UZDoom parsers. Neither engine implements it: Zandronum skips it silently (per unknown-key handling above), and UZDoom skips it with an "Unknown GAMEINFO key" message that only prints when the `developer` cvar is on (`src/gamedata/gi.cpp:460-465`).
 
 ## Known gaps
 

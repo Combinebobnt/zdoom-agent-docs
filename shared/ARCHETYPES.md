@@ -1,10 +1,10 @@
 # Doc archetypes
 
 Every section (`acs/`, `decorate/`, `zscript/`, `mapinfo/`, `gldefs/`, `sbarinfo/`, `cvarinfo/`,
-`menudef/`, `console/`, `sprites/`, `bots/`, `zandronum-lumps/`, `netcode/`, and any lump-format section added
+`menudef/`, `console/`, `sprites/`, `bots/`, `zandronum-lumps/`, `netcode/`, `keyconf/`, `lockdefs/`, `gameinfo-lump/`, `sndinfo/`, `textures/`, `language/`, `terrain/`, `decaldef/`, `animdefs/`, `fonts/`, and any lump-format section added
 later) is built from three archetypes.
 Assigning a knowledge area to an archetype — rather than inventing a bespoke layout per section —
-is what keeps thirteen sections maintainable as one system. A section's own `AGENTS.md` says which of
+is what keeps twenty-three sections maintainable as one system. A section's own `AGENTS.md` says which of
 its directories map to which archetype; this file is the schema each archetype follows, shared
 everywhere. See `shared/AUTHORING.md` for the rules (tiers, engine scope, licensing, project-
 agnosticism) that apply to content in every archetype below.

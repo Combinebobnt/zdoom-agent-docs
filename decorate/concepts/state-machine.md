@@ -75,7 +75,9 @@ TROO AB 4 BRIGHT A_FaceTarget
   cleared on every expanded state after the first — it is never carried past the first frame of a
   multi-frame line. (The wiki additionally frames `NODELAY`'s purpose as "an actor's `Spawn:`
   sequence doesn't run its first frame's action on the tic it spawns unless told to" — consistent
-  with, and a useful gloss on, the parser-level restriction above.)
+  with, and a useful gloss on, the parser-level restriction above. The runtime mechanism, what
+  a missing `NODELAY` silently breaks, and the engine differences are source-traced in
+  [The first Spawn state's action and `NoDelay`](spawn-state-nodelay.md).)
 - **Action function call**: optional and always trailing. If a token isn't a flag and isn't a
   resolvable action-function name, the parser just ungets it and the state gets no action —
   there's no explicit "no action" keyword needed, an omitted call is simply legal.

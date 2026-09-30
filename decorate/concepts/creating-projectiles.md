@@ -3,7 +3,7 @@
 **Tier:** A
 **Applies to:** UZDoom=yes, Zandronum=yes
 **Verified against:** UZDoom 5.0.0-pre @5a9b0ec511 (2026-08-15); Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
-**Provenance:** ZDoom Wiki "Creating new projectiles" (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=Creating_new_projectiles&oldid=52213), cross-checked against the Zandronum source's `Projectile` property definition (`src/thingdef/thingdef_properties.cpp:1351-1357`), missile explosion logic (`src/p_mobj.cpp:1536-1562`), missile damage calculation (`src/p_mobj.cpp:3715-3733`), and action function implementations (`src/g_strife/a_spectral.cpp:101` for `A_Tracer2`; `src/g_doom/a_doomweaps.cpp:982` for `A_BFGSpray`). Zandronum corrections re-read at 3.3-alpha @bdd0f7beb: flag meanings (`src/actor.h:184,187`), damage multipliers per impact kind (`src/p_map.cpp:1246,1278`) and expression damage (`src/thingdef/thingdef_properties.cpp:550-561`), seeker `tracer` assignment (`src/thingdef/thingdef_codeptr.cpp:391,1270,1454,1719`), and `P_AproxDistance` (`src/p_maputl.cpp:59-64`).
+**Provenance:** ZDoom Wiki "Creating new projectiles" (retrieved 2026-07-31, https://zdoom.org/w/index.php?title=Creating_new_projectiles&oldid=52213), cross-checked against the Zandronum source's `Projectile` property definition (`src/thingdef/thingdef_properties.cpp:1351-1357`), missile explosion logic (`src/p_mobj.cpp:1536-1562`), missile damage calculation (`src/p_mobj.cpp:3715-3733`), and action function implementations (`src/g_strife/a_spectral.cpp:101` for `A_Tracer2`; `src/g_doom/a_doomweaps.cpp:982` for `A_BFGSpray`). Zandronum corrections re-read at 3.3-alpha @bdd0f7beb: flag meanings (`src/actor.h:184,187`), damage multipliers per impact kind (`src/p_map.cpp:1246,1278`) and expression damage (`src/thingdef/thingdef_properties.cpp:550-561`), seeker `tracer` assignment (`src/thingdef/thingdef_codeptr.cpp:391,1270,1454,1719`), and `P_AproxDistance` (`src/p_maputl.cpp:59-64`). Sky/horizon removal read 2026-09-29 at Zandronum 3.3-alpha @bdd0f7beb and UZDoom 5.1.0-pre @98b16b78fc (see "Sky and horizon hits skip the cascade" for the lines).
 **Wiki license:** Derived from the ZDoom Wiki; this file as a whole is GNU Free Documentation License 1.2 — see [LICENSE](../../LICENSE) §2.
 
 This page covers the essential properties and state setup for creating a basic projectile (including homing variants), and the state selection logic when a projectile impacts its target. It does not cover action-function semantics in depth — see the `actions/` directory for those — or advanced behaviors like explosion trails or multi-damage-type handling.
@@ -59,6 +59,38 @@ Here a "damageable target" is an actor that is `SHOOTABLE`, a corpse (`CORPSE`),
 3. **If no `XDeath:`/`Death.Extreme:` state exists, or the projectile hits a wall, floor, or an actor that is not a damageable target:** the engine uses the standard `Death:` state.
 
 If none of these states are defined, the projectile is removed with no visible animation.
+
+### Sky and horizon hits skip the cascade
+
+A projectile without the `SKYEXPLODE` flag that is blocked by a sky wall (a two-sided line whose
+back sector has a sky ceiling, with the projectile at or above that ceiling), hits a sky floor or
+sky ceiling, or is blocked by a `Line_Horizon` line is removed with `Destroy()` on the spot. No
+`Death` (or any other) state is entered, so no action on a death state runs. A projectile spawned
+already overlapping a `Line_Horizon` line is removed the same way, and that spawn-time check has
+no `SKYEXPLODE` exception on either engine, so it removes the projectile regardless of the flag.
+
+- **Plain and fast projectiles are removed the same way.** Zandronum: `P_XYMovement`
+  (`src/p_mobj.cpp:2429-2465`), `P_ZMovement` floor and ceiling (`:3109-3118`, `:3251-3258`),
+  `P_ExplodeMissile`'s horizon check (`:1579-1584`), `P_CheckMissileSpawn` (`:7131-7134`), and
+  `AFastProjectile::Tick` (`src/g_shared/a_fastprojectile.cpp:78-97`, `:112-119`, `:132-138`).
+  UZDoom: `P_XYMovement` (`src/playsim/p_mobj.cpp:2723-2743`), `P_ZMovement` (`:3071-3080`,
+  `:3181-3188`), `P_ExplodeMissile` (`:1973-1981`), `P_CheckMissileSpawn` (`:7698-7702`), and
+  `FastProjectile.Tick`
+  (`wadsrc/static/zscript/actors/shared/fastprojectile.zs`, same checks).
+- **Anything tied to the projectile as an actor sees it vanish.** A pointer to it goes NULL, and
+  an ACS script it started from its `Spawn:` state keeps running with a NULL activator, so
+  `GetActorX/Y/Z(0)` after a `Delay` reads `0`. Guard with `IsPointerEqual(AAPTR_DEFAULT,
+  AAPTR_NULL, 0, 0)`; see pattern 7 in the
+  [ACS crash-and-bug checklist](../../acs/concepts/crash-and-bug-checklist.md).
+- **With `SKYEXPLODE`** the projectile explodes through the normal cascade above on Zandronum,
+  which has no `Death.Sky` lookup. On UZDoom, `P_ExplodeMissile` replaces that choice with
+  `Death.Sky` (falling back to plain `Death` when there is none, so `Crash`/`XDeath` are never
+  picked) when it is told the hit was on sky or the blocking line is a `Line_Horizon`
+  (`src/playsim/p_mobj.cpp:1972-1981`). A plain projectile passes the sky flag from its wall,
+  floor and ceiling paths (`:2752`, `:3085`, `:3193`), so all its sky and horizon hits get
+  `Death.Sky`. `FastProjectile.Tick` never passes it (`fastprojectile.zs` calls `ExplodeMissile`
+  with the flag at its default of false), so a fast projectile gets `Death.Sky` only from a
+  `Line_Horizon` line. Its sky wall, floor and ceiling hits take the normal cascade.
 
 ## Damage randomization
 

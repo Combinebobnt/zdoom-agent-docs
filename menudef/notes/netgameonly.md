@@ -25,6 +25,6 @@ When a menu is marked with `NetgameOnly`, the engine checks the network state wh
 
 This gate is applied at menu-open time, not at descriptor parse time, so a modder can conditionally create a different menu in single-player and apply `NetgameOnly` only to the multiplayer-specific version.
 
-## Zandronum-specific notes
+## Zandronum-specific: multiplayer-only menus
 
 This flag does not exist in UZDoom. It was introduced to support multiplayer-specific menus (such as team and player selection) without requiring duplicate menu definitions for single-player contexts.

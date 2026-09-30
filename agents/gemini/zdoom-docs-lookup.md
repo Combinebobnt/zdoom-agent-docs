@@ -9,7 +9,7 @@ tools:
   - grep_search
 ---
 
-<!-- Generated from agents/procedures/zdoom-docs-lookup.md by tools/gen_agents.py. Edit that file instead, then rerun the script. -->
+<!-- Generated from agents/zdoom-docs-lookup.md by tools/gen_agents.py. Edit that file instead, then rerun the script. -->
 
 ## Role
 
@@ -17,7 +17,7 @@ You answer ACS/BCS/zt-bcc/UZDoom-GZDoom-family/Zandronum lookup questions for wh
 
 ## Capabilities needed
 
-Reading files and searching text are required. Running a shell is optional; it only unlocks step 0 below. You never write anything. A small, fast model is enough for this job.
+Reading files and searching text are required. Running a shell is optional; it only unlocks step 0 below. You never write anything. No model is pinned. The lookup runs on whatever model the caller's harness gives a subagent, and the source-reading steps (4 to 6) benefit from a capable one.
 
 ## Locating the docs tree
 
@@ -27,7 +27,7 @@ You may be running from inside another project, so don't assume where `zdoom-age
 
 ## Search order (stop as soon as you have a confident answer)
 
-0. **If you can run a shell, try `python3 tools/lookup.py <name>` first**, from the tree's root (add `--long` for parameter-level prose). It prints a callable's signature or a Table-of-entries row, but not which file it came from, so continue to step 1 whenever you need a citation or more than the signature. If you can't run a shell, skip to step 1.
+0. **If you can run a shell, try `python3 tools/lookup.py <name>` first**, from the tree's root (add `--long` for parameter-level prose). For a lump/format name (`KEYCONF`, `MAPINFO`, ...) it prints the path of that format's entry concept page; read it from there. `LANGUAGE` is the exception: it prints the `language` console cvar row, so for the lump go to `language/INDEX.md`. For anything else it prints a callable's signature or a Table-of-entries row, but not which file it came from, so continue to step 1 whenever you need a citation or more than the signature. If you can't run a shell, skip to step 1.
 1. **The zdoom-agent-docs repo's root `AGENTS.md`** — routes by knowledge area to the right section (`acs/`, `decorate/`, `zscript/`, `mapinfo/`, `console/`, ...). Most ACS/BCS-project questions resolve in `acs/INDEX.md`, but don't assume that's the only section if the question is actually about a DECORATE flag, a console cvar, etc. Treat a tier-C (signature-only, or a Table-of-entries row with no `notes/` file) entry as "not really answered yet" — keep going.
 2. **The calling project's own generated local-function index, if it maintains one** (e.g. a `LOCALFUNCS.md` in its root — check the calling project's instruction file (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, ...) for whether one exists and where). Use it to check whether a helper already exists before the calling agent writes a new one. Matching is case-insensitive per ACS/BCS convention. If the calling project doesn't maintain one, skip this step.
 3. **The zt-bcc wiki** — BCS language reference (Grammar, Declarations, Types, Functions, Statements, Namespaces, Preprocessor). Use for language-level questions: is this construct base ACS or a BCS extension, what's the exact syntax/semantics.

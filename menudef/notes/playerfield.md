@@ -28,6 +28,6 @@ If the current CVar value points to an invalid player (one that has left, or nev
 
 Returns `false` (no sound, no CVar write) if the seek operation cannot find any valid player other than the starting selection (e.g., the local player is the only valid choice and `notself` is set).
 
-## Zandronum-specific notes
+## Zandronum-specific: team and player-selection menus
 
 This item type does not exist in UZDoom. It was introduced to support Zandronum's team and player-selection menus for join-in-progress gameplay; custom menus may use it for similar purposes.

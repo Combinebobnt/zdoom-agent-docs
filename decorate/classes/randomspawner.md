@@ -248,7 +248,7 @@ declare it with the DECORATE `replaces` clause naming the boss class, e.g.
 RandomSpawner subclass its own, unrelated DoomEd number does not establish this relationship —
 `replaces` is the only mechanism that does.
 
-## Zandronum-specific networking notes
+## Zandronum-specific: server-side-only spawning
 
 The spawner itself is **server-side only** in networked games, via two separate branches in
 `BeginPlay()` for the client and server roles, not one path doing both:

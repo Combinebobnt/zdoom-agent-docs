@@ -49,7 +49,7 @@ Beyond the basic actor properties (`Health`, `Radius`, `Height`, `Speed`, etc.),
 - **`Player.JumpZ <units>`** — Jump force; higher values allow higher jumps (only used if jumping is enabled via server flags or MAPINFO).
 
 **Audio and miscellaneous:**
-- **`Player.SoundClass "<classname>"`** — The sound class used for player damage sounds, footsteps, etc. (e.g., `"marine"`, `"baby"`). Must match one of the sound classes defined in `SNDINFO` lump. Not directly visible to the player but affects audio playback.
+- **`Player.SoundClass "<classname>"`** — The sound class used for player damage sounds, footsteps, etc. (e.g., `"marine"`, `"baby"`). Should match a player sound class defined in `SNDINFO` (`$playersound`); an unknown class falls back to the default one rather than failing (see `sndinfo/concepts/random-and-player-sounds.md`). Not directly visible to the player but affects audio playback.
 - **`Player.CrouchSprite "<spritename>"`** — The 4-character sprite name to use while crouching (e.g., `"PLYC"` for the crouching Doom player); any other length is a fatal error. There is no actor flag that enables crouching. Whether players can crouch is decided by the `DF_NO_CROUCH`/`DF_YES_CROUCH` dmflags and otherwise by the map's MAPINFO crouch setting.
 - **`Player.SpawnClass <Fighter|Cleric|Mage|Any>` or `Player.SpawnClass <number>`** — Sets the class spawn mask used to filter map things by their Hexen-style class flags: a map thing restricted to other classes does not spawn for this class. A number sets the 1-based class bit; `Any` clears the mask so every thing spawns. On Zandronum the filter only runs in a single-player (non-network) game, so class-filtered things always spawn in network games. Rarely needed outside Hexen-style class setups.
 
@@ -73,7 +73,7 @@ The `PlayerClasses` key accepts a comma-separated list of actor class names. The
 
 The `PlayerClasses` key lives in the **`GameInfo` block of the MAPINFO lump**, not in any specific map's `Map` block — it is a global game-configuration setting, not per-map.
 
-**MAPINFO parsing:** The key is registered as `playerclasses` (case-insensitive) in the MAPINFO parser's `GameInfo` keyword table (`src/gi.cpp:331`). Both `playerclasses` and the deprecated `addplayerclasses` keyword are accepted; the parser converts them to entries in the `gameinfo.PlayerClasses` string array, which is read at startup by `SetupPlayerClasses()` (`src/p_user.cpp:212`).
+**MAPINFO parsing:** The key is registered as `playerclasses` (case-insensitive) in the MAPINFO parser's `GameInfo` keyword table (`src/gi.cpp:331`). Both `playerclasses` (replaces the list) and `addplayerclasses` (appends to it; not deprecated in source) are accepted; the parser converts them to entries in the `gameinfo.PlayerClasses` string array, which is read at startup by `SetupPlayerClasses()` (`src/p_user.cpp:212`).
 
 **Shipped default:** The Doom game definition (`wadsrc/static/mapinfo/doomcommon.txt`) sets `playerclasses = "DoomPlayer"` as the default; Heretic, Hexen, and Strife define their own respective defaults in their MAPINFO files.
 
@@ -89,7 +89,7 @@ actor HiddenClass : DoomPlayer
 }
 ```
 
-When `+NOMENU` is set, the class is technically available but does not appear in any player-class selection menu. It can only be assigned via console commands (e.g., `set playerclass <name>`; on Zandronum the value is matched against each class's `Player.DisplayName`, not its actor class name, `src/d_netinfo.cpp:315-334`) or programmatically. This is useful for special modes, debug classes, or classes that should only be selectable in specific game configurations.
+When `+NOMENU` is set, the class is hidden from the new-game class menu only. It still appears in the Player Setup menu and can be picked by random class selection (see [`keyconf/concepts/player-classes.md`](../../keyconf/concepts/player-classes.md)). It can also be assigned via console commands (e.g., `set playerclass <name>`; on Zandronum the value is matched against each class's `Player.DisplayName`, not its actor class name, `src/d_netinfo.cpp:315-334`) or programmatically. This is useful for special modes, debug classes, or classes that should only be selectable in specific game configurations.
 
 The shipped code checks this flag and applies the `PCF_NOMENU` per-class flag when setting up the player-class list (`src/p_user.cpp:224-226`).
 
@@ -103,7 +103,7 @@ addplayerclass DoomPlayer
 addplayerclass MyCustomPlayer
 ```
 
-These commands (`clearplayerclasses`, `addplayerclass`) are still supported in Zandronum for backward compatibility and work only when parsing KEYCONF (`src/p_user.cpp:233-262`). On Zandronum, `addplayerclass <class> nomenu` also marks the class `PCF_NOMENU` (`src/p_user.cpp:257-259`). **The MAPINFO approach is preferred** and is the method all shipped game definitions use; the KEYCONF method is deprecated in the sense that no new projects should rely on it, though it is not removed from the engine.
+These commands (`clearplayerclasses`, `addplayerclass`) are still supported on both engines and work only when parsing KEYCONF (Zandronum `src/p_user.cpp:233-272`). `addplayerclass <class> nomenu` marks the class `PCF_NOMENU` (`src/p_user.cpp:257-259`); without that argument KEYCONF does not copy the actor's `+NOMENU`, unlike the MAPINFO route. Full detail and UZDoom differences: [`keyconf/concepts/player-classes.md`](../../keyconf/concepts/player-classes.md). **The MAPINFO approach is preferred** and is the method all shipped game definitions use; the KEYCONF method is deprecated in the sense that no new projects should rely on it, though it is not removed from the engine.
 
 ## Single-player vs. multiplayer player-class selection
 
@@ -130,5 +130,5 @@ This design allows multiplayer servers to enforce player-class restrictions, tra
 ## Open questions (unverified in this checkout — don't guess past these)
 
 - **How exactly is a class changed mid-game in multiplayer?** The code path from menu selection or console `set playerclass` to the next respawn with the new class is not fully traced in either engine. Specifically: does the new class take effect immediately if the player is already alive, or only on the next respawn? Is there a server-side throttle or validation of class changes during active play?
-- **Does the shipped class-selection menu support `+NOMENU` classes?** Both engines check the `PCF_NOMENU` flag and exclude such classes from the menu, but whether this flag is separately settable in DECORATE (beyond automatically inheriting from the actor's `MF6_NOMENU` flag) is not verified.
+- **Does the shipped class-selection menu support `+NOMENU` classes?** Both engines check the `PCF_NOMENU` flag and exclude such classes from the menu, but whether this flag is separately settable in DECORATE (beyond automatically inheriting from the actor's `MF6_NOMENU` flag) is not verified. **Answered 2026-09-28:** outside DECORATE it is, via KEYCONF `addplayerclass <class> nomenu`; see `keyconf/concepts/player-classes.md`.
 - **Zandronum-fork-specific class-handling cvars?** This checkout has `sv_forcerandomclass` and `gameinfo.norandomplayerclass` visible. There may be other server-side cvars affecting class selection or availability that aren't documented here.

@@ -51,7 +51,7 @@ Both engines can suppress health-item spawning in deathmatch via a dmflag, but t
 
 Practical consequence for a modder: on UZDoom, a *non*-`Health`-derived custom item can opt into `sv_nohealth` gating by adding `+INVENTORY.ISHEALTH` to its own `Default` block; on Zandronum, only an `AHealth`/`AMaxHealth` descendant (or the three hardcoded class names) is ever affected — there is no equivalent per-item opt-in flag.
 
-## Zandronum-specific note
+## Zandronum-specific: DECORATE-only subclassing
 
 The wiki page shown (a ZDoom wiki page) describes the GZDoom/UZDoom variant using ZScript syntax and UZDoom-specific features like `+INVENTORY.ISHEALTH` flag and `property` declarations. These do not exist in Zandronum's DECORATE system. Zandronum uses DECORATE actor inheritance only — define a class as `ACTOR YourHealthItem : Health { ... }`.
 

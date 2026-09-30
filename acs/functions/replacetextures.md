@@ -90,14 +90,20 @@ silent and easy to trigger by accident (e.g. an empty string literal, or a strin
 expression that can evaluate to `""`), and is functionally very different from the NULL-pointer
 no-op case above despite both stemming from "the old texture name didn't really name a texture."
 
-## Unresolvable `newtexturename` falls back to the default texture, with a console print — asymmetric with `oldtexturename`'s NULL case
+## Unresolvable texture names fall back to the default texture, with a console print
 
 `GetTexture` on a non-empty name that still doesn't match any loaded texture doesn't return the
 `0` dummy; it prints `Unknown texture: "<name>"` to the console and returns
 `FTextureManager::DefaultTexture` (the `-NOFLAT-` checkered/missing texture, set up once at
-`texturemanager.cpp:988`). So a typo'd `newtexturename` is not silent like a typo'd
-`oldtexturename` lookup-miss — it visibly reports itself in the console, and every matched
-old-texture surface becomes the missing-texture placeholder rather than staying unchanged.
+`texturemanager.cpp:988`). This applies to both names, and each pass looks them up separately
+(wall type, then flat type, `p_acs.cpp:4119-4120, 4145-4146`), so a bad name can print once per
+pass that runs.
+
+- A typo'd `newtexturename` makes every matched old-texture surface become the missing-texture
+  placeholder rather than staying unchanged.
+- A typo'd `oldtexturename` is not a silent no-op either. It resolves to the default texture, so
+  the call replaces any surface currently showing that placeholder and leaves everything else
+  unchanged.
 
 ## Zandronum-specific: netcode replication for client/server sync
 
@@ -137,9 +143,9 @@ the late-join updates described above.
 ## Engine-family divergence: no change-tracking bookkeeping on UZDoom
 
 UZDoom's equivalent (`FLevelLocals::ReplaceTextures`, `src/playsim/p_sectors.cpp:1457-1491`) runs
-the same two-pass wall/flat replacement described above: matching flag semantics (the wall pass and
-flat pass are each skipped outright only when every bit in that pass's group is set, otherwise every
-sidedef/sector is walked and each bit checked individually), the same `fromname == nullptr`
+the same two-pass wall/flat replacement described above: matching flag semantics (the same XOR
+test, so each pass is skipped outright only when `flags` is exactly that pass's group, otherwise
+every sidedef/sector is walked and each bit checked individually), the same `fromname == nullptr`
 early-return before anything else runs, and — via its own texture manager's name-to-ID lookup
 (`src/common/textures/texturemanager.cpp:327-345`) — the same empty-string-resolves-to-the
 reserved "no texture" index-0 sentinel and unresolved-name-falls-back-to-the-default-texture-with-

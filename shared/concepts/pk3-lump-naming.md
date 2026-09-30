@@ -38,6 +38,7 @@ while ((remapLump = Wads.FindLump(lumpname, &lastLump)) != -1)
 The distinction matters: a format the engine reads with a single `CheckNumForName` gets
 only one winner (the last loaded), so splitting it across suffixed files silently discards
 the rest. Check which access pattern a given format uses before assuming the split is safe.
+For the order several `TEXTURES` lumps run in, see [The TEXTURES lump](../../textures/concepts/textures-lump.md).
 
 ## 2. Searching for an exact lump name gives false negatives
 

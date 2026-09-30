@@ -32,7 +32,9 @@ engine. The exception is `TEAMINFO`, which UZDoom also parses (most keys only ac
 - [The `SKININFO` lump](concepts/skininfo.md) — tier A. Player skin declarations, sharing a parser
   with the older flat `S_SKIN` lump: the two-dialect detection flag, the legacy
   eat-everything-before-`{` quirk, per-dialect error recovery, the 11 general keys, and the two
-  overlapping sound-key mechanisms (`*`-prefixed events plus nine legacy `dsXXX` aliases).
+  overlapping sound-key mechanisms (`*`-prefixed events plus nine legacy `dsXXX` aliases). Also
+  why a revealed hidden skin never survives a restart (three config-save/load defects, observed
+  live).
 - [The `MEDALDEF` lump](concepts/medaldef.md) — tier A. Named, re-openable `MedalName { ... }`
   blocks; floaty-icon awards spawned above players' heads with text, sound, announcer entries, and
   scoreboard icons; the twelve command set (`icon`, `class`, `state`, `text`, `sound`,

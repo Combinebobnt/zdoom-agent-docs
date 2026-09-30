@@ -3,7 +3,7 @@
 **Tier:** A
 **Applies to:** UZDoom=no, Zandronum=yes
 **Verified against:** Zandronum 3.3-alpha @bdd0f7beb (2026-09-25)
-**Provenance:** Zandronum Wiki `MEDALDEF` (https://wiki.zandronum.com/w/index.php?title=MEDALDEF&oldid=2286, retrieved 2026-09-09); verified against the Zandronum source's `src/medal.cpp` (MEDAL_Construct, lines 142-269) and `scoreboard_margin.cpp`; semicolon handling from `src/sc_man.cpp` (`ScanString`'s `AlreadyGot` path, lines 394-402; `TokenMustBe`, lines 540-548; `CheckToken`, lines 571-581) and `src/sc_man_scanner.re` (classic-scanner `;` comment rule, line 241).
+**Provenance:** Zandronum Wiki `MEDALDEF` (https://wiki.zandronum.com/w/index.php?title=MEDALDEF&oldid=2286, retrieved 2026-09-09); verified against the Zandronum source's `src/medal.cpp` (MEDAL_Construct, lines 142-269) and `scoreboard_margin.cpp`; semicolon handling from `src/sc_man.cpp` (`ScanString`'s `AlreadyGot` path, lines 394-402; `TokenMustBe`, lines 540-548; `CheckToken`, lines 571-581); `$` lookup timing from `src/medal.cpp:222`, `src/d_main.cpp:3049`, `src/doomstat.cpp:63-68` and `src/stringtable.cpp:352-356` (re-read 2026-09-29, same checkout) and `src/sc_man_scanner.re` (classic-scanner `;` comment rule, line 241).
 **Wiki license:** Derived from the Zandronum Wiki; this file as a whole is CC BY-NC-SA 4.0
 (NonCommercial) — see [LICENSE](../../LICENSE) §2.
 
@@ -61,6 +61,12 @@ uppercases the result before the enum lookup, so `AddFlag KeepBetweenLevels` (an
   on it. Every medal must have a valid state by the time its block closes.
 - **`text = "string"`**, the text shown under the medal icon when it displays on-screen. A value
   starting with `$` is treated as a string-table lookup (`GStrings`) rather than literal text.
+  **The lookup happens once, while MEDALDEF is parsed at startup** (`src/medal.cpp:222`, called
+  from `src/d_main.cpp:3049`), and the result is stored as plain text. Changing the `language`
+  cvar later reloads the string table (`src/doomstat.cpp:63-68`) but not MEDALDEF, so medal text
+  stays in the startup language. A missing label shows the bare label name. (On non-Windows
+  builds the cvar doesn't change the language at all: see
+  [the LANGUAGE lump](../../language/concepts/language-lump.md).)
 - **`textcolor = "name"`**, the color name used to draw `text` on-screen, resolved through
   `V_FindFontColor`.
 - **`quantitycolor = "name"`**, the color name used to draw the "x N" quantity suffix on-screen

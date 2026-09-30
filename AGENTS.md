@@ -2,15 +2,16 @@
 
 **This folder is first-party, not vendored.** It is a hand/agent-maintained documentation tree
 covering the ZDoom-family Doom-engine modding surface — ACS/BCS, DECORATE, ZScript, and the
-smaller lump formats (MAPINFO, GLDEFS, SBARINFO, CVARINFO, MENUDEF, console cvars/cmds, sprites,
+smaller lump formats (MAPINFO, GLDEFS, SBARINFO, CVARINFO, MENUDEF, KEYCONF, LOCKDEFS, GAMEINFO,
+SNDINFO, TEXTURES, LANGUAGE, TERRAIN, DECALDEF, ANIMDEFS, FONTDEFS, TEXTCOLO, console cvars/cmds, sprites,
 Zandronum/Skulltag-native lumps, Zandronum's launcher/master-server/RCON protocols, and more) — created for and edited by AI agents working across
 Zandronum and GZDoom-family mod projects. Unlike a vendored/foreign upstream checkout (an engine or compiler fork you'd treat
 conservatively and leave to its own conventions), you should freely create, edit, and correct
 files here.
 
 **This file is a router, not a rulebook.** It exists so an agent asking about one knowledge area
-never has to load another's index. Every rule that applies across sections (tiers, the `Engine:`
-field, licensing, the Authoring rule, project-agnosticism) lives in exactly one place —
+never has to load another's index. Every rule that applies across sections (tiers, the
+`Applies to:`/`Verified against:` engine claim, licensing, the Authoring rule, project-agnosticism) lives in exactly one place —
 `shared/AUTHORING.md` — read that before writing anything, and `shared/ARCHETYPES.md` for the
 three doc schemas every section is built from.
 
@@ -20,7 +21,7 @@ This tree ships a ready-made read-only retrieval subagent, **`zdoom-docs-lookup`
 ACS/BCS/DECORATE/ZScript/lump-format questions by walking this tree with the same routing this
 file describes. Delegate a lookup question to it instead of working through the "Where to go"
 table and section `INDEX.md`s by hand. Its harness-neutral source is
-[`agents/procedures/zdoom-docs-lookup.md`](agents/procedures/zdoom-docs-lookup.md). The
+[`agents/zdoom-docs-lookup.md`](agents/zdoom-docs-lookup.md). The
 per-harness adapters below are generated from it by `tools/gen_agents.py`, so edit the procedure,
 never an adapter.
 
@@ -33,13 +34,16 @@ Take the first rung that fits your harness:
 
    | Harness | Adapter in this repo | Register into (project / user) | Read-only via |
    |---|---|---|---|
-   | Claude Code | `agents/zdoom-docs-lookup.md` | `.claude/agents/` / `~/.claude/agents/` | `tools: Read, Grep, Glob` |
+   | Claude Code | `agents/claude/zdoom-docs-lookup.md` | `.claude/agents/` / `~/.claude/agents/` | `tools: Read, Grep, Glob` |
    | Codex CLI | `agents/codex/zdoom-docs-lookup.toml` | `.codex/agents/` / `~/.codex/agents/` | Instructions only. A role file can't set `sandbox_mode`, so the subagent inherits the parent session's sandbox. Start Codex with `--sandbox read-only` if you need a hard guarantee. |
    | Gemini CLI | `agents/gemini/zdoom-docs-lookup.md` | `.gemini/agents/` / `~/.gemini/agents/` | read/search-only `tools` list |
    | OpenCode | `agents/opencode/zdoom-docs-lookup.md` | `.opencode/agents/` / `~/.config/opencode/agents/` | `permission` denies everything except read, grep, glob, list |
    | GitHub Copilot | `agents/copilot/zdoom-docs-lookup.agent.md` | `.github/agents/` / `~/.copilot/agents/` | `tools: ["read", "search"]` |
 
    Harness-specific caveats:
+   - **Claude Code:** the adapter moved from `agents/zdoom-docs-lookup.md` to `agents/claude/` on
+     2026-09-29. Re-point any older symlink or copy. The old path is now the
+     frontmatter-less procedure, so Claude Code gets no working `zdoom-docs-lookup` from it.
    - **Codex** only spawns a subagent when the user or an `AGENTS.md` explicitly asks for it, so
      the calling project's own `AGENTS.md` has to name `zdoom-docs-lookup` and say to delegate to
      it. Project-level `.codex/agents/` is read only for trusted projects.
@@ -77,6 +81,16 @@ land directly in a subdirectory without reading this file first.
 | An SBARINFO key/command | [sbarinfo/INDEX.md](sbarinfo/INDEX.md) |
 | A CVARINFO declaration | [cvarinfo/INDEX.md](cvarinfo/INDEX.md) |
 | A MENUDEF block or menu-item type | [menudef/INDEX.md](menudef/INDEX.md) |
+| The KEYCONF lump (its command allowlist, weapon slots, player classes, unsafe aliases) | [keyconf/INDEX.md](keyconf/INDEX.md) |
+| A LOCKDEFS lock definition | [lockdefs/INDEX.md](lockdefs/INDEX.md) |
+| The standalone GAMEINFO lump (not MAPINFO's `GameInfo` block, which is under mapinfo/) | [gameinfo-lump/INDEX.md](gameinfo-lump/INDEX.md) |
+| An SNDINFO sound definition or `$`-command | [sndinfo/INDEX.md](sndinfo/INDEX.md) |
+| A TEXTURES lump definition (texture/sprite/graphic/walltexture/flat, patches) | [textures/INDEX.md](textures/INDEX.md) |
+| The LANGUAGE lump (localized strings, `$LABEL` lookups, `[default]`/`[*]` sections, UZDoom's CSV format) | [language/INDEX.md](language/INDEX.md) |
+| The TERRAIN lump (splashes, terrain damage/footclip/friction, floor-to-terrain assignment, UZDoom footsteps) | [terrain/INDEX.md](terrain/INDEX.md) |
+| The DECALDEF lump (wall decals, decal groups, `generator` lines, fader/stretcher/slider/colorchanger/combiner animators) | [decaldef/INDEX.md](decaldef/INDEX.md) |
+| The ANIMDEFS lump (texture/flat animations, switches, warps, camera textures, animated doors, sky offsets) | [animdefs/INDEX.md](animdefs/INDEX.md) |
+| The FONTDEFS or TEXTCOLO lump (custom fonts, named text colors, `\c` color escapes, UZDoom folder/TrueType fonts) | [fonts/INDEX.md](fonts/INDEX.md) |
 | A console cvar or console command (CCMD) | [console/INDEX.md](console/INDEX.md) |
 | Sprite naming/rotation conventions | [sprites/INDEX.md](sprites/INDEX.md) |
 | The BOTINFO lump or the compiled botscript format — **Zandronum only, neither exists on UZDoom/GZDoom-family** | [bots/INDEX.md](bots/INDEX.md) |
@@ -92,7 +106,7 @@ read a *section's* `INDEX.md` speculatively; go straight to the one you need.
 
 ## Engine scope, in brief
 
-**UZDoom is the primary target** (current: UZDoom 5.0.0-pre). Zandronum stays co-equal and fully
+**UZDoom is the primary target** (current: UZDoom 5.1.0-pre; older stamps say 5.0.0-pre). Zandronum stays co-equal and fully
 verified, not grandfathered — the consuming projects still ship on it. ZScript and some
 DECORATE/MAPINFO/GLDEFS/SBARINFO/CVARINFO behavior only exists on UZDoom/GZDoom-family engines;
 some Zandronum-side behavior has no UZDoom counterpart either, most sweepingly the `bots/`,

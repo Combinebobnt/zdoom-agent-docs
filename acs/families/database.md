@@ -50,9 +50,9 @@ server-config question, invisible from ACS:
 
 ## Data retrieval and saving
 
-### `void SetDBEntry(str namespace, str key, int value)` / `void IncrementDBEntry(str namespace, str key, int value)`
+### `void SetDBEntry(str namespace, str key, int value)` / `void SetDBEntryString(str namespace, str key, str value)` / `void IncrementDBEntry(str namespace, str key, int value)`
 
-Both funnel through `DATABASE_SaveSetEntry`/`DATABASE_SaveIncrementEntryInt`
+All three funnel through `DATABASE_SaveSetEntry`/`DATABASE_SaveIncrementEntryInt`
 (`za_database.cpp:447-509`), which store the value as `CAST(... AS INTEGER)`-compatible text in a
 single SQLite table (`Namespace text, KeyName text, Value text, Timestamp text, PRIMARY KEY
 (Namespace, KeyName)`, `DATABASE_CreateTable`) — there is exactly one physical table for the
@@ -68,7 +68,7 @@ scanning a namespace is a `WHERE Namespace=?` scan, not a per-namespace table lo
 - `IncrementDBEntry` on a key that doesn't exist yet creates it with value `value` (not
   `0 + value` via a separate insert-then-update — same net effect, just note there's no implicit
   zero-row read).
-- Both return `1` in the engine (`p_acs.cpp:7225-7255`) despite `zcommon.bcs` declaring them
+- All three return `1` in the engine (`p_acs.cpp:7225-7255`) despite `zcommon.bcs` declaring them
   `void` — irrelevant to BCS callers since a `void`-declared call can't read a return value
   anyway.
 
@@ -101,6 +101,10 @@ order SQLite's table scan yields (**not sorted by value**); use `SortDBEntries` 
 `SortDBEntries`'s `offset` is a plain SQL `OFFSET` — the wiki's "a value of 1 will cause the
 returned database to start at the second highest value" phrasing is just describing standard
 `LIMIT n OFFSET m` semantics, not a family-specific quirk.
+
+### `void FreeDBResults(int handle)`
+
+Releases a handle from `GetDBEntries`/`SortDBEntries`.
 
 **Handle lifetime gotcha, not on the wiki:** `FreeDBResults` (`p_acs.cpp:7296-7306`) only shrinks
 `g_dbQueries` when you free the **most-recently-allocated** (highest-index) handle still live —

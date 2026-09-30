@@ -102,8 +102,22 @@ know what to look for in a diff; read the linked file before acting on a hit, si
    sufficient:** `IsPointerEqual(AAPTR_DEFAULT, AAPTR_NULL, 0, 0)` resolves the `tid=0`/
    `AAPTR_DEFAULT` pointer and compares it against `AAPTR_NULL` — wrap any activator-touching call
    after a `Delay`/`Suspend`/polling loop with `if (!IsPointerEqual(AAPTR_DEFAULT, AAPTR_NULL, 0,
-   0)) { ... }`, and re-check every iteration of a polling loop, not just once at the top. See
+   0)) { ... }`, and re-check every iteration of a polling loop, not just once at the top.
+   **A common trigger is a projectile activator:** a script started from a projectile's `Spawn:`
+   state that reads `GetActorX/Y/Z(0)` after a `Delay` gets `0, 0, 0` if the projectile flew into
+   a sky wall, sky floor or ceiling, or a `Line_Horizon` line meanwhile, because those remove it
+   with `Destroy()` and no `Death` state unless it has `SKYEXPLODE`. Fast and plain projectiles
+   both do this; see [Creating projectiles](../../decorate/concepts/creating-projectiles.md)'s
+   "Sky and horizon hits". See
    [PlayActorSound](../functions/playactorsound.md), [IsPointerEqual](../functions/ispointerequal.md).
+
+8. **NULL activation line dereferenced by a tag-0 action special.** An action special called
+   from ACS gets the script's activation line, which is NULL for a script no line started
+   (`OPEN`, `ENTER`, `puke`). `Door_Animated(0, ...)` reads `line->backsector` with no check
+   (Zandronum `p_doors.cpp:1088`, UZDoom `a_doors.cpp:774`), so it crashes both engines from such
+   a script; from a one-sided line it crashes one step later on the missing back sector. Read
+   from source, not tested. Other tag-0 "the activating line's sector" specials may share the
+   shape: check each. See [Animated door family](../families/animated-doors.md).
 
 ## Computed TIDs that silently hit unrelated actors (no crash, no error — just wrong actors)
 
@@ -260,15 +274,17 @@ call — easy to miss in testing if the tested case happens to be one where it w
 
 ## Operators that compile fine and silently produce the wrong answer
 
-1. **`==`/`!=` between a compiled string literal and any runtime-built `str` (`StrParam`,
-   concatenation, or a `ScriptCall`-bridged function returning a ZScript/C++ string) is always
-   false/true respectively, regardless of text content.** `str` comparison compiles to a raw
-   integer `PCD_EQ`/`PCD_NE` with no string-content awareness; a literal's index carries its
-   compiled module's real library ID while every runtime-built string is unconditionally tagged
-   with a reserved sentinel library ID (`STRPOOL_LIBRARYID_OR`) that can never match a real one —
-   the two sides live in permanently disjoint integer ranges. Grep for `==`/`!=` against a `str`
-   where one side is a bound/extension-function call and the other a literal; printing both sides
-   (e.g. via `Log`) can show identical text while the comparison still silently fails. See
+1. **In a module compiled without `#library` (map `BEHAVIOR`), `==`/`!=` between a string
+   literal and any runtime-built `str` (`StrParam`, concatenation, `GetActorClass` and other
+   string-returning built-ins, a `ScriptCall` return) is always false/true respectively,
+   regardless of text content.** `str` comparison compiles to a raw integer `PCD_EQ`/`PCD_NE`;
+   such a literal is a raw table index, while every runtime-built string carries a reserved
+   sentinel library ID (`STRPOOL_LIBRARYID_OR`) in its top bits. Inside a `#library` module the
+   same line works, because both compilers emit `PCD_TAGSTRING` after each literal there, which
+   pools it. A map literal passed into a library function and compared there against the
+   library's own literal still fails. Grep non-library files for `==`/`!=` with a literal on one
+   side and a function call on the other; printing both sides (e.g. via `Log`) can show identical
+   text while the comparison silently fails. See
    [String literal vs. pool equality](string-literal-vs-pool-equality.md) for the full mechanism
    and the fix (`StrCmp`/`StrIcmp`).
 
@@ -324,6 +340,21 @@ call — easy to miss in testing if the tested case happens to be one where it w
    [Spawn-callback tic offset](spawn-callback-tic-offset.md) — which also records that the
    source-order derivation of *why* the offset exists is contradicted by measurement and remains
    open, so do not re-derive it from `statnums.h`/`dthinker.cpp` reading order.
+
+## Activator hops that silently leave the script running as the world (no error; can feed the crash patterns above)
+
+1. **A `SetActivator(tid, selector)` hop whose restore sits only inside its `if (success)` branch
+   leaves the activator NULL on a miss, for the rest of the script and for every script it
+   launches afterwards.** `SetActivator` assigns the resolved pointer to the activator *first* and
+   only then returns whether it's non-NULL, so a failed hop (an aim-target selector while aiming
+   at nothing, a NULL tracer) has already clobbered the activator by the time the `if` tests it.
+   From then on `PlayerNumber()` reads -1, `ActivatorTID()` reads 0, TID-0 calls address no actor
+   (or crash, for patterns 1 and 6 above), and every `ACS_*Execute*` child inherits the NULL
+   activator, since children get the caller's *current* activator. It's intermittent because it
+   needs the miss. Grep for `if (SetActivator(` whose `SetActivator(<own tid>)` restore is nested
+   inside the success block. Fix: an unconditional, checked restore after the block.
+   `SetActivatorToTarget` is the exception: it returns 0 without touching the activator on a
+   failure. See [SetActivator](../functions/setactivator.md)'s "Return value / failure behavior".
 
 ## Engine-family divergence
 
@@ -408,11 +439,16 @@ rest is unchecked"):
   same "don't crash on invalid strings" substitution), and the 4096-word VM stack's bounds check
   ahead of a user-function call.
 - Both entries under "Operators that compile fine and silently produce the wrong answer": UZDoom
-  uses the same reserved string-pool library ID that can never match a compiled literal's real
-  one, so literal-vs-runtime `str` equality fails identically; and the `str + str` bug is a
+  uses the same reserved string-pool library ID and the same pooling `PCD_TAGSTRING`, so
+  literal-vs-runtime `str` equality fails outside `#library` and works inside it identically; and
+  the `str + str` bug is a
   `zt-bcc` code-generation bug, engine-independent by construction.
 - The `LineAttack` `pufftid` silent-drop entry, which the linked file records as agreeing between
   the two engines.
+- The `SetActivator` missed-hop entry: UZDoom's `ACSF_SetActivator` has the same
+  assign-then-return-non-NULL shape, its `ACSF_SetActivatorToTarget` likewise returns 0 without
+  touching the activator on failure, and its `ACS_Named*` dispatch and `PCD_LSPEC*` opcodes pass
+  the live activator to the child exactly as Zandronum's do.
 
 ## When you find a new one
 

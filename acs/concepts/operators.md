@@ -64,10 +64,11 @@ absent from base ACS and the ZDoom wiki page's examples — worth recording prec
 
 No type-directed dispatch exists for `str` operands — both compile to the same `PCD_EQ`/`PCD_NE`
 used for `int`, a plain stack-integer comparison. This is safe between two runtime-built
-(`StrParam`/pool-origin) strings, but **always false/true respectively** when one
-side is a compiled string literal and the other is pool-origin, even with byte-identical text —
-the two live in disjoint index ranges by construction (a reserved library-ID tag on every
-pool-origin string). See
+(`StrParam`/pool-origin) strings, and for literals in a `#library` module (pooled by the
+`PCD_TAGSTRING` the compiler emits after each one there). In a module compiled without
+`#library`, a literal is a raw table index and comparing it against a pool-origin string is
+**always false/true respectively**, even with byte-identical text, since every pool index carries
+a reserved library-ID tag. See
 [String literal vs. pool equality](string-literal-vs-pool-equality.md) for the full mechanism and
 [`StrCmp`/`StrIcmp`](../functions/strcmp.md) for the comparison that's actually safe across that
 boundary.

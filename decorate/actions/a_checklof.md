@@ -52,7 +52,7 @@ Performs a line-of-fire hitscan test to check whether a path between the calling
 | **`CLOFF_ALLOWNULL`** | Cast the ray even if the target pointer is null. When there is no target, the calling actor's current angle and pitch are used regardless of `CLOFF_NOAIM_*` flags. |
 | **`CLOFF_CHECKPARTIAL`** | Perform the check even if the target is actually out of range (beyond `range`). Useful if you want to detect closer intercepting actors regardless of whether the target itself is reachable. |
 
-## Zandronum-specific notes
+## Zandronum-specific: missing wiki parameter, flags and anonymous blocks
 
 **Missing parameters (ZDoom/GZDoom extension):** The original ZDoom wiki documents a 10th parameter `offsetforward` which does not exist in Zandronum's implementation. The function signature here is the complete Zandronum arity.
 

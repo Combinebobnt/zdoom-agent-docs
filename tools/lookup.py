@@ -6,16 +6,19 @@ Not a substitute for reading the full doc file -- this strips everything except 
 signature and whatever parameter-level prose the doc actually contains, for the common
 case of "what are the arguments and what do they mean" before writing a call. For a
 Table-of-entries section (DECORATE flags, console cvars, etc.) it instead prints the
-matching inventory row and points at a notes/ file if one exists.
+matching inventory row and points at a notes/ file if one exists. For a lump/format
+name (KEYCONF, MAPINFO, ...) it prints the title and path of that format's entry
+concept page.
 
 Usage:
     python3 tools/lookup.py <name>                    # search every section
     python3 tools/lookup.py --section acs <name>      # scope to one section
     python3 tools/lookup.py --long <name>              # signature + parameter info
 
-Resolution order within a section: a dedicated primary-callable file (functions/,
+A lump/format name mapped in sections.py's "lumps" field is checked first, across every
+section (exact, case-insensitive). Then, resolution order within a section: a dedicated primary-callable file (functions/,
 actions/, classes/ -- whichever the section uses), a families/*.md per-callable
-heading, a weak whole-file inline mention (renames/aliases), an INDEX.md
+heading, a weak whole-file inline code mention (renames/aliases), an INDEX.md
 "Signature-only (tier C)" entry (acs only, for now -- the only section with that
 generated block), then a table-inventory row. Sections are tried in the order
 declared in sections.py (acs first). Fails loudly if nothing hits anywhere -- this
@@ -341,22 +344,55 @@ def _try_family_file(name, section_key):
     return None
 
 
+C_KEYWORDS = {"if", "while", "for", "switch", "return", "sizeof"}
+
+
+def _weak_candidates(lines):
+    """Signature-shaped Sigs written as code: inside a fence (before any // comment) or
+    inside one inline backtick span. A space before the paren needs typed or empty params."""
+    in_fence = in_span = False
+    for line in lines:
+        if FENCE_RE.match(line):
+            in_fence, in_span = not in_fence, False
+            continue
+        if in_fence:
+            comment = line.find("//")
+            texts = [line[:comment] if comment != -1 else line]
+        elif not line.strip():
+            in_span = False
+            continue
+        else:
+            # Spans can wrap within a paragraph, so parity carries over; `` spans are approximated.
+            parts = line.split("`")
+            texts = parts[0::2] if in_span else parts[1::2]
+            in_span ^= (len(parts) - 1) % 2 == 1
+        for text in texts:
+            for m in FULL_SIG_RE.finditer(text):
+                rettype, name, params = m.groups()
+                if name in C_KEYWORDS:
+                    continue
+                if text[m.end(2)] != "(" and params.strip() and not _looks_typed(params):
+                    continue
+                prefix = f"{rettype} " if rettype else ""
+                sig = Sig(name, f"{prefix}{name}({params})", params)
+                if _is_signature_shaped(sig):
+                    yield sig
+
+
 def _try_weak_inline(name, section_key):
-    """Last-resort tier for a name that only ever appears as a signature-shaped
-    mention inside prose (aliases, or a family intro), not in any heading. This scans
-    every line of every doc file unrestricted, so it must gate on shape -- without it,
-    ordinary prose matches the FULL_SIG_RE name+parens pattern just as well as a real
-    call, and gets reported as that name's "signature"."""
+    """Last-resort tier for a name that only ever appears as an inline code mention
+    (aliases, or a family intro), not in any heading. This scans every line of every doc
+    file unrestricted, so it gates on code context and shape: prose parentheticals like
+    "MAPINFO (writable)" match FULL_SIG_RE just as well as a real call."""
     primary, families = _index_link_paths(section_key)
     for path in primary + families:
         lines = path.read_text().splitlines()
-        for line in lines:
-            for c in sig_candidates(line):
-                if c.name.lower() == name.lower() and _is_signature_shaped(c):
-                    tokens = param_names(c.params)
-                    blocks = extract_param_blocks(lines[1:], tokens)
-                    note = f"found only as an inline mention in {path.relative_to(ROOT)}; best-effort"
-                    return Result(c, path, "weak", blocks, [], note)
+        for c in _weak_candidates(lines):
+            if c.name.lower() == name.lower():
+                tokens = param_names(c.params)
+                blocks = extract_param_blocks(lines[1:], tokens)
+                note = f"found only as an inline mention in {path.relative_to(ROOT)}; best-effort"
+                return Result(c, path, "weak", blocks, [], note)
     return None
 
 
@@ -409,10 +445,25 @@ def _try_inventory_row(name, section_key):
     return None
 
 
+def _try_lump_name(name, section_key):
+    """A lump/format name (KEYCONF, MAPINFO, ...) mapped in sections.py's "lumps" field,
+    exact case-insensitive match only."""
+    for lump, rel in S.SECTIONS[section_key].get("lumps", {}).items():
+        if lump.lower() == name.lower():
+            return Result(None, ROOT / rel, "concept", [], [], None)
+    return None
+
+
 RESOLVERS = (_try_function_file, _try_family_file, _try_weak_inline, _try_tier_c, _try_inventory_row)
 
 
 def resolve(name, section_key=None):
+    # Lump names go first across every section: a per-section tier would still lose to an
+    # earlier section's weak-inline prose match (MAPINFO -> "MAPINFO(writable)").
+    for key in _section_order(section_key):
+        result = _try_lump_name(name, key)
+        if result is not None:
+            return result, key
     for key in _section_order(section_key):
         for finder in RESOLVERS:
             result = finder(name, key)
@@ -422,8 +473,8 @@ def resolve(name, section_key=None):
 
 
 def _known_names(section_key):
-    """Every name this tool would resolve on the first (non-weak) tiers for one section,
-    lower-cased name -> preferred display casing. Only computed on a lookup failure."""
+    """Every name this tool would resolve on the lump-name and first (non-weak) tiers for one
+    section, lower-cased name -> preferred display casing. Only computed on a lookup failure."""
     by_lower = {}
 
     def add(preferred):
@@ -432,6 +483,8 @@ def _known_names(section_key):
         if current is None or (current.islower() and not preferred.islower()):
             by_lower[low] = preferred
 
+    for lump in S.SECTIONS[section_key].get("lumps", {}):
+        add(lump)
     primary, families = _index_link_paths(section_key)
     for path in primary:
         add(path.stem)
@@ -517,7 +570,58 @@ def format_bullet_block(blk, width=TERM_WIDTH):
     return _render_bullet_tree(_parse_bullet_tree(blk), width=width)
 
 
+HEADER_FIELD_RE = re.compile(r'^\*\*([A-Za-z][A-Za-z ]*):\*\*\s*(.*)$')
+
+
+def concept_header(path):
+    """(H1 text, {field: value} from the header block, first body paragraph) of a concept page.
+    Wrapped header fields are joined onto one line."""
+    lines = path.read_text().splitlines()
+    title = HEADING_RE.match(lines[0]).group(2) if lines and HEADING_RE.match(lines[0]) else path.stem
+    title = title.replace("`", "")
+    i = 1
+    while i < len(lines) and not lines[i].strip():
+        i += 1
+    fields, current = {}, None
+    while i < len(lines) and lines[i].strip():
+        m = HEADER_FIELD_RE.match(lines[i].strip())
+        if m:
+            current = m.group(1)
+            fields[current] = m.group(2)
+        elif current:
+            fields[current] += " " + lines[i].strip()
+        i += 1
+    para = []
+    while i < len(lines):
+        line = lines[i]
+        if para and not line.strip():
+            break
+        # A page that opens on a bullet list gets its first bullet, not the whole list.
+        if para and BULLET_START_RE.match(para[0]) and BULLET_START_RE.match(line):
+            break
+        if line.strip() and not HEADING_RE.match(line):
+            para.append(line.strip())
+        i += 1
+    if para:
+        para[0] = BULLET_START_RE.sub("", para[0])
+    return title, fields, " ".join(para)
+
+
 def format_output(result, long):
+    if getattr(result, "kind", None) == "concept":
+        title, fields, para = concept_header(result.file)
+        rel = result.file.relative_to(ROOT)
+        if not long:
+            return f"{title} -- concept page: {rel}"
+        out = [f"{title} -- concept page: {rel}"]
+        for key in ("Applies to", "Verified against"):
+            if key in fields:
+                out.extend(textwrap.wrap(f"{key}: {fields[key]}", width=TERM_WIDTH, subsequent_indent="  "))
+        if para:
+            out.append("")
+            out.extend(textwrap.wrap(para, width=TERM_WIDTH))
+        return "\n".join(out)
+
     if isinstance(result, InventoryResult):
         lines = [f"{h}: {v}" for h, v in zip(result.header, result.row)]
         if not long:
@@ -563,11 +667,15 @@ def main():
     ap = argparse.ArgumentParser(
         prog="lookup.py",
         description=(
-            "Looks up <name> in this doc tree -- a callable's signature, or a table-inventory "
-            "row -- across every section by default (add --section to scope to one)."
+            "Looks up <name> in this doc tree -- a callable's signature, a table-inventory "
+            "row, or a lump/format's concept page -- across every section by default (add "
+            "--section to scope to one)."
         ),
     )
-    ap.add_argument("name", nargs="?", help="function/flag/property/cvar name, case-insensitive")
+    ap.add_argument(
+        "name", nargs="?",
+        help="function/flag/property/cvar or lump/format name (e.g. KEYCONF), case-insensitive",
+    )
     ap.add_argument(
         "--section", choices=sorted(S.SECTIONS.keys()), default=None,
         help="scope the search to one section instead of trying all of them",
